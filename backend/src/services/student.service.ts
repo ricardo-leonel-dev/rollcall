@@ -1,17 +1,17 @@
 import { AppDataSource } from '../data-source';
 import { Student } from '../entities/Student';
-import { ILike } from 'typeorm';
+import { ILike, IsNull } from 'typeorm';
 
 const repo = () => AppDataSource.getRepository(Student);
 
 export async function findAll(search?: string) {
-  const where: any = { deletedAt: null as any };
+  const where: any = { deletedAt: IsNull() };
   if (search) where.name = ILike(`%${search}%`);
   return repo().find({ where, order: { name: 'ASC' } });
 }
 
 export async function findById(id: number) {
-  const s = await repo().findOne({ where: { id, deletedAt: null as any } });
+  const s = await repo().findOne({ where: { id, deletedAt: IsNull() } });
   if (!s) throw Object.assign(new Error('Student not found'), { status: 404 });
   return s;
 }

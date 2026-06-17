@@ -2,134 +2,120 @@ import { Component, ChangeDetectionStrategy, signal, inject, OnInit } from '@ang
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { MatTabsModule } from '@angular/material/tabs';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatDialogModule, MatDialog } from '@angular/material/dialog';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
-import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatNativeDateModule } from '@angular/material/core';
-import { BreakpointObserver } from '@angular/cdk/layout';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { map, firstValueFrom } from 'rxjs';
-import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
-import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { firstValueFrom } from 'rxjs';
 import { AcademicYear, Course, Enrollment, Absence, OcrResult } from '../../core/models/index';
+import { DEFAULT_NOTIFICATION_TEMPLATE } from '../../shared/components/notification-settings-dialog/notification-settings-dialog.component';
+import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    FormsModule, MatTabsModule, MatCardModule, MatFormFieldModule, MatSelectModule,
-    MatInputModule, MatButtonModule, MatIconModule, MatTableModule, MatCheckboxModule,
-    MatDialogModule, MatProgressSpinnerModule, MatSnackBarModule,
-    MatDatepickerModule, MatNativeDateModule, LoadingSpinnerComponent,
-  ],
+  imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule,
+            MatButtonModule, MatIconModule, MatCheckboxModule, MatSnackBarModule, MatTooltipModule, WhatsappIconComponent],
+  styles: [`
+    .tab-content { padding: 20px 0; }
+    .enroll-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px; border-bottom: 1px solid var(--border-soft);
+      transition: background 0.1s;
+    }
+    .enroll-row:hover { background: var(--paper-deep); }
+  `],
   template: `
-    <div class="page-title">Inasistencias</div>
+    <div class="page-header">
+      <h1 class="page-title">Inasistencias</h1>
+    </div>
 
     <!-- Filtros comunes -->
-    <div class="flex flex-wrap gap-3 mb-4">
-      <mat-form-field appearance="outline" class="w-44">
+    <div class="filter-bar">
+      <mat-form-field appearance="outline" style="width:180px">
         <mat-label>Año lectivo</mat-label>
         <mat-select [(ngModel)]="selYear" (ngModelChange)="onFiltersChange()">
           @for (y of years(); track y.id) { <mat-option [value]="y.id">{{y.name}}</mat-option> }
         </mat-select>
       </mat-form-field>
-      <mat-form-field appearance="outline" class="w-56">
+      <mat-form-field appearance="outline" style="width:220px">
         <mat-label>Curso</mat-label>
         <mat-select [(ngModel)]="selCourse" (ngModelChange)="onFiltersChange()">
-          <mat-option [value]="null">-- Seleccionar --</mat-option>
+          <mat-option [value]="null">— Seleccionar —</mat-option>
           @for (c of courses(); track c.id) { <mat-option [value]="c.id">{{c.name}}</mat-option> }
         </mat-select>
       </mat-form-field>
     </div>
 
-    <mat-tab-group>
-      <!-- TAB 1: DESDE FOTO -->
-      <mat-tab label="📷 Desde foto">
-        <div class="pt-4">
-          <div class="flex flex-wrap gap-3 mb-4">
-            <mat-form-field appearance="outline" class="w-44">
-              <mat-label>Fecha (opcional)</mat-label>
-              <input matInput type="date" [(ngModel)]="photoDate">
-            </mat-form-field>
-          </div>
+    <mat-tab-group style="background:var(--paper);border-radius:16px;border:1px solid var(--border);overflow:hidden">
 
-          <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400 transition-colors"
-               (dragover)="$event.preventDefault()" (drop)="onDrop($event)">
-            <mat-icon class="text-gray-400 text-5xl" style="font-size:48px">photo_camera</mat-icon>
-            <p class="text-gray-500 mt-2">Arrastra una foto aquí o usa los botones</p>
-            <div class="flex justify-center gap-3 mt-4 flex-wrap">
-              <label mat-flat-button color="primary" class="cursor-pointer">
-                <input type="file" class="hidden" accept="image/*" (change)="onFileSelect($event)">
-                <span class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded">
-                  <mat-icon>upload_file</mat-icon> Subir imagen
+      <!-- TAB FOTO -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">photo_camera</mat-icon>
+          Desde foto
+        </ng-template>
+        <div class="tab-content" style="padding:20px">
+
+          <mat-form-field appearance="outline" style="width:200px;margin-bottom:16px">
+            <mat-label>Fecha (opcional)</mat-label>
+            <input matInput type="date" [(ngModel)]="photoDate">
+          </mat-form-field>
+
+          <div class="upload-zone" (dragover)="$event.preventDefault()" (drop)="onDrop($event)">
+            <mat-icon style="font-size:48px;width:48px;height:48px;color:var(--border);margin-bottom:12px">cloud_upload</mat-icon>
+            <div style="font-weight:600;color:var(--ink-soft);margin-bottom:4px">Arrastra la foto aquí</div>
+            <div style="font-size:13px;color:var(--muted);margin-bottom:16px">o usa los botones para seleccionar</div>
+            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+              <label>
+                <input type="file" style="display:none" accept="image/*" (change)="onFileSelect($event)">
+                <span style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#6366f1;color:white;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">
+                  <mat-icon style="font-size:16px;width:16px;height:16px">upload_file</mat-icon> Subir imagen
                 </span>
               </label>
-              <label mat-stroked-button class="cursor-pointer md:hidden">
-                <input type="file" class="hidden" accept="image/*" capture="environment" (change)="onFileSelect($event)">
-                <span class="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded">
-                  <mat-icon>camera_alt</mat-icon> Tomar foto
+              <label class="md:hidden">
+                <input type="file" style="display:none" accept="image/*" capture="environment" (change)="onFileSelect($event)">
+                <span style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--paper);border:1px solid var(--border);color:var(--ink-soft);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">
+                  <mat-icon style="font-size:16px;width:16px;height:16px">camera_alt</mat-icon> Cámara
                 </span>
               </label>
             </div>
           </div>
 
           @if (ocrLoading()) {
-            <app-loading-spinner message="Procesando imagen con IA... esto puede tomar varios minutos" />
-          }
-
-          @if (ocrResult()) {
-            <div class="mt-4 space-y-4">
-              <div class="card">
-                <div class="text-green-700 font-medium mb-2">
-                  ✅ {{ocrResult()!.records_created}} registros creados — Fecha: {{ocrResult()!.date}}
-                </div>
-                @if (ocrResult()!.not_found.length > 0) {
-                  <div class="mt-3">
-                    <div class="text-orange-600 font-medium mb-2">⚠️ No encontrados ({{ocrResult()!.not_found.length}}):</div>
-                    @for (name of ocrResult()!.not_found; track name) {
-                      <div class="flex items-center justify-between py-1 border-b border-gray-100">
-                        <span class="text-sm">{{name}}</span>
-                        <button mat-stroked-button color="accent" class="text-xs"
-                                (click)="openManualAdd(name)">
-                          Agregar manual
-                        </button>
-                      </div>
-                    }
-                  </div>
-                }
+            <div style="display:flex;align-items:center;gap:16px;padding:20px;background:var(--paper-deep);border-radius:12px;margin-top:16px">
+              <div class="spinner" style="flex-shrink:0"></div>
+              <div>
+                <div style="font-weight:600;color:var(--ink-soft)">Procesando con IA...</div>
+                <div style="font-size:13px;color:var(--muted)">Esto puede tomar varios minutos</div>
               </div>
             </div>
           }
-        </div>
-      </mat-tab>
 
-      <!-- TAB 2: MANUAL -->
-      <mat-tab label="✏️ Manual">
-        <div class="pt-4">
-          @if (!selCourse) {
-            <p class="text-gray-500">Selecciona un curso para ver los estudiantes</p>
-          } @else if (enrollLoading()) {
-            <app-loading-spinner />
-          } @else {
-            <div class="overflow-auto">
-              @for (e of enrollments(); track e.enrollmentId) {
-                <div class="flex items-center justify-between py-2 border-b border-gray-100 hover:bg-gray-50">
-                  <div>
-                    <span class="text-sm font-medium">{{e.rosterNumber}}. {{e.fullName}}</span>
+          @if (ocrResult()) {
+            <div style="margin-top:16px">
+              <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px 20px;margin-bottom:12px">
+                <div style="display:flex;align-items:center;gap:8px;color:#15803d;font-weight:600">
+                  <mat-icon style="font-size:20px;width:20px;height:20px">check_circle</mat-icon>
+                  {{ocrResult()!.records_created}} registros creados — Fecha: {{ocrResult()!.date}}
+                </div>
+              </div>
+              @if (ocrResult()!.not_found.length) {
+                <div class="card" style="border-left:4px solid #f59e0b">
+                  <div style="font-weight:600;color:#b45309;margin-bottom:10px">
+                    <mat-icon style="vertical-align:middle;margin-right:4px">warning_amber</mat-icon>
+                    {{ocrResult()!.not_found.length}} no encontrados
                   </div>
-                  <div class="flex gap-2">
-                    <button mat-mini-fab color="warn" (click)="addAbsence(e.enrollmentId, 'A')" title="Falta (A)" class="scale-75">A</button>
-                    <button mat-mini-fab color="accent" (click)="addAbsence(e.enrollmentId, 'AT')" title="Atraso (AT)" class="scale-75">AT</button>
-                  </div>
+                  @for (name of ocrResult()!.not_found; track name) {
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #fef3c7">
+                      <span style="font-size:13px">{{name}}</span>
+                      <button mat-button color="accent" style="font-size:12px" (click)="openManualAdd(name)">Agregar</button>
+                    </div>
+                  }
                 </div>
               }
             </div>
@@ -137,19 +123,66 @@ import { AcademicYear, Course, Enrollment, Absence, OcrResult } from '../../core
         </div>
       </mat-tab>
 
-      <!-- TAB 3: LISTADO -->
-      <mat-tab label="📋 Listado">
-        <div class="pt-4">
-          <div class="flex flex-wrap gap-3 mb-4">
-            <mat-form-field appearance="outline" class="w-36">
+      <!-- TAB MANUAL -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">edit</mat-icon>
+          Manual
+        </ng-template>
+        <div class="tab-content">
+          @if (!selCourse) {
+            <div class="empty-state" style="padding:40px">
+              <mat-icon style="font-size:40px;width:40px;height:40px;color:var(--border)">people</mat-icon>
+              <div style="margin-top:8px;color:var(--ink-soft)">Selecciona un curso para registrar</div>
+            </div>
+          } @else if (enrollLoading()) {
+            <div class="spinner-center">
+              <div class="spinner"></div>
+            </div>
+          } @else {
+            <div style="padding:12px 16px;background:var(--paper-deep);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted-strong)">
+              {{enrollments().length}} estudiantes — haz clic en A (Ausente) o AT (Atraso)
+            </div>
+            @for (e of enrollments(); track e.enrollmentId) {
+              <div class="enroll-row">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:28px;height:28px;border-radius:7px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4f46e5;flex-shrink:0">
+                    {{e.rosterNumber}}
+                  </div>
+                  <span style="font-size:14px;font-weight:500">{{e.fullName}}</span>
+                </div>
+                <div style="display:flex;gap:6px">
+                  <button class="action-pill action-pill-a" (click)="addAbsence(e.enrollmentId, 'A')">
+                    <mat-icon style="font-size:14px;width:14px;height:14px">event_busy</mat-icon> A
+                  </button>
+                  <button class="action-pill action-pill-at" (click)="addAbsence(e.enrollmentId, 'AT')">
+                    <mat-icon style="font-size:14px;width:14px;height:14px">schedule</mat-icon> AT
+                  </button>
+                </div>
+              </div>
+            }
+          }
+        </div>
+      </mat-tab>
+
+      <!-- TAB LISTADO -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">list</mat-icon>
+          Listado
+        </ng-template>
+        <div class="tab-content" style="padding:16px">
+          <!-- Sub-filtros -->
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+            <mat-form-field appearance="outline" style="width:150px">
               <mat-label>Desde</mat-label>
               <input matInput type="date" [(ngModel)]="dateFrom" (change)="loadAbsences()">
             </mat-form-field>
-            <mat-form-field appearance="outline" class="w-36">
+            <mat-form-field appearance="outline" style="width:150px">
               <mat-label>Hasta</mat-label>
               <input matInput type="date" [(ngModel)]="dateTo" (change)="loadAbsences()">
             </mat-form-field>
-            <mat-form-field appearance="outline" class="w-32">
+            <mat-form-field appearance="outline" style="width:130px">
               <mat-label>Tipo</mat-label>
               <mat-select [(ngModel)]="filterType" (ngModelChange)="loadAbsences()">
                 <mat-option value="">Todos</mat-option>
@@ -157,66 +190,67 @@ import { AcademicYear, Course, Enrollment, Absence, OcrResult } from '../../core
                 <mat-option value="AT">Atraso (AT)</mat-option>
               </mat-select>
             </mat-form-field>
-            <mat-form-field appearance="outline" class="w-40">
-              <mat-label>Justificación</mat-label>
-              <mat-select [(ngModel)]="filterJustified" (ngModelChange)="loadAbsences()">
-                <mat-option value="">Todos</mat-option>
-                <mat-option value="true">Justificadas</mat-option>
-                <mat-option value="false">Sin justificar</mat-option>
-              </mat-select>
-            </mat-form-field>
+            @if (selectedAbsences().length) {
+              <button mat-flat-button color="primary" style="align-self:center" (click)="openJustifyDialog()">
+                <mat-icon>task_alt</mat-icon> Justificar ({{selectedAbsences().length}})
+              </button>
+            }
           </div>
 
-          @if (selectedAbsences().length > 0) {
-            <div class="mb-3 flex items-center gap-3">
-              <span class="text-sm text-blue-600">{{selectedAbsences().length}} seleccionadas</span>
-              <button mat-flat-button color="primary" (click)="openJustifyDialog()">
-                <mat-icon>verified</mat-icon> Justificar selección
-              </button>
-              <button mat-stroked-button (click)="selectedAbsences.set([])">Limpiar</button>
-            </div>
-          }
-
           @if (absLoading()) {
-            <app-loading-spinner />
+            <div class="spinner-center">
+              <div class="spinner"></div>
+            </div>
+          } @else if (!absences().length) {
+            <div class="empty-state">
+              <mat-icon style="font-size:40px;width:40px;height:40px;color:var(--border)">event_available</mat-icon>
+              <div style="margin-top:8px;color:var(--ink-soft)">Sin inasistencias con estos filtros</div>
+            </div>
           } @else {
-            <!-- Desktop table -->
-            <div class="hidden md:block overflow-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50">
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead>
                   <tr>
-                    <th class="p-2 text-left"><mat-checkbox (change)="toggleAll($event.checked)" /></th>
-                    <th class="p-2 text-left">N°</th>
-                    <th class="p-2 text-left">Estudiante</th>
-                    <th class="p-2 text-left">Fecha</th>
-                    <th class="p-2 text-left">Tipo</th>
-                    <th class="p-2 text-left">Estado</th>
-                    <th class="p-2 text-left">Acciones</th>
+                    <th style="width:40px">
+                      <mat-checkbox (change)="toggleAll($event.checked)"></mat-checkbox>
+                    </th>
+                    <th>Estudiante</th>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th>Notas</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (a of absences(); track a.id) {
-                    <tr class="border-b border-gray-100 hover:bg-gray-50">
-                      <td class="p-2">
-                        <mat-checkbox
-                          [checked]="isSelected(a.id)"
-                          [disabled]="a.isJustified"
-                          (change)="toggleAbsence(a, $event.checked)" />
-                      </td>
-                      <td class="p-2 text-gray-500">{{a.rosterNumber}}</td>
-                      <td class="p-2">{{a.studentName}}</td>
-                      <td class="p-2">{{a.date}}</td>
-                      <td class="p-2"><span [class]="'badge-' + a.type">{{a.type}}</span></td>
-                      <td class="p-2">
-                        @if (a.isJustified) {
-                          <span class="badge-J">J</span>
-                        } @else {
-                          <span class="text-gray-400 text-xs">—</span>
+                    <tr>
+                      <td>
+                        @if (!a.isJustified) {
+                          <mat-checkbox [checked]="isSelected(a.id)" (change)="toggleAbsence(a, $event.checked)"></mat-checkbox>
                         }
                       </td>
-                      <td class="p-2">
-                        <button mat-icon-button color="warn" (click)="deleteAbsence(a.id)" title="Eliminar">
-                          <mat-icon class="text-sm">delete</mat-icon>
+                      <td style="font-weight:500">{{a.studentName}}</td>
+                      <td style="color:var(--muted-strong);white-space:nowrap">{{a.date}}</td>
+                      <td><span [class]="'badge-' + a.type">{{a.type}}</span></td>
+                      <td>
+                        @if (a.isJustified) {
+                          <span class="badge-J">Justificada</span>
+                        } @else {
+                          <span class="badge-gray">Pendiente</span>
+                        }
+                      </td>
+                      <td style="font-size:12px;color:var(--muted-strong);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                        {{a.notes ?? '—'}}
+                      </td>
+                      <td style="white-space:nowrap">
+                        @if (a.whatsappLink) {
+                          <button mat-icon-button style="color:#16a34a" (click)="notifyGuardian(a.whatsappLink, a.studentName, a.date, a.type, a.course)" matTooltip="Notificar por WhatsApp">
+                            <app-whatsapp-icon [size]="20" />
+                          </button>
+                        }
+                        <button mat-icon-button style="color:#b91c1c" (click)="deleteAbsence(a.id)">
+                          <mat-icon>delete_outline</mat-icon>
                         </button>
                       </td>
                     </tr>
@@ -224,63 +258,40 @@ import { AcademicYear, Course, Enrollment, Absence, OcrResult } from '../../core
                 </tbody>
               </table>
             </div>
-
-            <!-- Mobile cards -->
-            <div class="md:hidden space-y-2">
-              @for (a of absences(); track a.id) {
-                <div class="card flex justify-between items-start">
-                  <div>
-                    <div class="font-medium text-sm">{{a.studentName}}</div>
-                    <div class="text-xs text-gray-500">{{a.date}} · {{a.course}}</div>
-                    <div class="flex gap-2 mt-1">
-                      <span [class]="'badge-' + a.type">{{a.type}}</span>
-                      @if (a.isJustified) { <span class="badge-J">J</span> }
-                    </div>
-                  </div>
-                  <div class="flex gap-1">
-                    <mat-checkbox [checked]="isSelected(a.id)" [disabled]="a.isJustified"
-                                  (change)="toggleAbsence(a, $event.checked)" />
-                    <button mat-icon-button color="warn" (click)="deleteAbsence(a.id)">
-                      <mat-icon class="text-sm">delete</mat-icon>
-                    </button>
-                  </div>
-                </div>
-              }
-            </div>
           }
         </div>
       </mat-tab>
     </mat-tab-group>
 
-    <!-- Dialog justificación -->
+    <!-- Modal justificación -->
     @if (showJustifyForm()) {
-      <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <mat-card class="w-full max-w-md">
-          <mat-card-header>
-            <mat-card-title>Justificar {{selectedAbsences().length}} falta(s)</mat-card-title>
-          </mat-card-header>
-          <mat-card-content class="pt-4 space-y-3">
-            <div class="text-sm text-gray-600 mb-3">
-              @for (a of selectedAbsences(); track a.id) {
-                <div>• {{a.studentName}} — {{a.date}} <span [class]="'badge-' + a.type">{{a.type}}</span></div>
-              }
-            </div>
-            <mat-form-field appearance="outline" class="w-full">
-              <mat-label>Motivo de justificación</mat-label>
-              <textarea matInput [(ngModel)]="justifyReason" rows="3"></textarea>
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="w-full">
-              <mat-label>Quién notificó</mat-label>
-              <input matInput [(ngModel)]="justifyNotifiedBy">
-            </mat-form-field>
-          </mat-card-content>
-          <mat-card-actions align="end">
-            <button mat-button (click)="showJustifyForm.set(false)">Cancelar</button>
+      <div class="modal-overlay">
+        <div class="modal-panel">
+          <div style="font-family:'Fraunces',serif;font-size:19px;font-weight:600;color:var(--ink);margin-bottom:4px">Justificar inasistencias</div>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:16px">{{selectedAbsences().length}} falta(s) seleccionadas</div>
+          <div style="background:var(--paper-deep);border-radius:10px;padding:12px;margin-bottom:16px">
+            @for (a of selectedAbsences(); track a.id) {
+              <div style="font-size:13px;padding:4px 0;color:var(--muted-strong)">
+                <strong style="color:var(--ink-soft)">{{a.studentName}}</strong> — {{a.date}}
+                <span [class]="'badge-' + a.type" style="margin-left:6px">{{a.type}}</span>
+              </div>
+            }
+          </div>
+          <mat-form-field appearance="outline" style="width:100%;margin-bottom:12px">
+            <mat-label>Motivo *</mat-label>
+            <textarea matInput [(ngModel)]="justifyReason" rows="3" placeholder="Describe el motivo de la justificación..."></textarea>
+          </mat-form-field>
+          <mat-form-field appearance="outline" style="width:100%;margin-bottom:16px">
+            <mat-label>Quién notificó</mat-label>
+            <input matInput [(ngModel)]="justifyNotifiedBy" placeholder="Representante, médico, etc.">
+          </mat-form-field>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button mat-stroked-button (click)="showJustifyForm.set(false)">Cancelar</button>
             <button mat-flat-button color="primary" (click)="submitJustification()" [disabled]="!justifyReason">
-              Guardar
+              Guardar justificación
             </button>
-          </mat-card-actions>
-        </mat-card>
+          </div>
+        </div>
       </div>
     }
   `,
@@ -306,19 +317,21 @@ export class AbsencesComponent implements OnInit {
   dateFrom = '';
   dateTo = '';
   filterType = '';
-  filterJustified = '';
   justifyReason = '';
   justifyNotifiedBy = '';
+  private notificationTemplate = DEFAULT_NOTIFICATION_TEMPLATE;
 
   async ngOnInit(): Promise<void> {
-    const [years, courses] = await Promise.all([
+    const [years, courses, me] = await Promise.all([
       firstValueFrom(this.http.get<AcademicYear[]>('/api/academic-years')),
       firstValueFrom(this.http.get<Course[]>('/api/courses')),
+      firstValueFrom(this.http.get<{ notificationTemplate: string | null }>('/api/auth/me')),
     ]);
     this.years.set(years);
     this.courses.set(courses);
     const active = years.find(y => y.isActive);
     if (active) this.selYear = active.id;
+    if (me.notificationTemplate) this.notificationTemplate = me.notificationTemplate;
   }
 
   async onFiltersChange(): Promise<void> {
@@ -329,28 +342,23 @@ export class AbsencesComponent implements OnInit {
           this.http.get<Enrollment[]>(`/api/enrollments?course_id=${this.selCourse}&academic_year_id=${this.selYear}`)
         );
         this.enrollments.set(data);
-      } finally {
-        this.enrollLoading.set(false);
-      }
+      } finally { this.enrollLoading.set(false); }
       await this.loadAbsences();
     }
   }
 
   async loadAbsences(): Promise<void> {
     const params: string[] = [];
-    if (this.selCourse)       params.push(`course_id=${this.selCourse}`);
-    if (this.selYear)         params.push(`academic_year_id=${this.selYear}`);
-    if (this.dateFrom)        params.push(`date_from=${this.dateFrom}`);
-    if (this.dateTo)          params.push(`date_to=${this.dateTo}`);
-    if (this.filterType)      params.push(`type=${this.filterType}`);
-    if (this.filterJustified) params.push(`is_justified=${this.filterJustified}`);
+    if (this.selCourse)  params.push(`course_id=${this.selCourse}`);
+    if (this.selYear)    params.push(`academic_year_id=${this.selYear}`);
+    if (this.dateFrom)   params.push(`date_from=${this.dateFrom}`);
+    if (this.dateTo)     params.push(`date_to=${this.dateTo}`);
+    if (this.filterType) params.push(`type=${this.filterType}`);
     this.absLoading.set(true);
     try {
       const data = await firstValueFrom(this.http.get<Absence[]>(`/api/absences?${params.join('&')}`));
       this.absences.set(data);
-    } finally {
-      this.absLoading.set(false);
-    }
+    } finally { this.absLoading.set(false); }
   }
 
   onDrop(e: DragEvent): void {
@@ -381,24 +389,38 @@ export class AbsencesComponent implements OnInit {
       this.ocrResult.set(result);
       await this.loadAbsences();
     } catch (err: any) {
-      this.snackBar.open('Error al procesar imagen: ' + (err?.error?.detail ?? err.message), '', { duration: 5000 });
-    } finally {
-      this.ocrLoading.set(false);
-    }
+      this.snackBar.open('Error: ' + (err?.error?.detail ?? err.message), '', { duration: 5000 });
+    } finally { this.ocrLoading.set(false); }
   }
 
   async addAbsence(enrollmentId: number, type: 'A' | 'AT'): Promise<void> {
     const today = new Date().toISOString().split('T')[0];
     try {
       await firstValueFrom(this.http.post('/api/absences', { enrollmentId, date: today, type }));
-      this.snackBar.open(`Falta ${type} registrada`, '', { duration: 2000 });
+      const enrollment = this.enrollments().find(e => e.enrollmentId === enrollmentId);
+      const link = enrollment?.whatsappLink;
+      const ref = this.snackBar.open(`Falta ${type} registrada`, link ? 'Notificar' : '', { duration: 4000 });
+      if (link) {
+        ref.onAction().subscribe(() => this.notifyGuardian(link, enrollment!.fullName, today, type, enrollment!.course));
+      }
+      await this.loadAbsences();
     } catch (err: any) {
       this.snackBar.open('Error: ' + (err?.error?.error ?? 'ya existe una falta este día'), '', { duration: 3000 });
     }
   }
 
+  notifyGuardian(whatsappLink: string, studentName: string, date: string, type: 'A' | 'AT', course: string): void {
+    const label = type === 'A' ? 'una falta' : 'un atraso';
+    const message = this.notificationTemplate
+      .replace(/\{\{nombre\}\}/g, studentName)
+      .replace(/\{\{fecha\}\}/g, date)
+      .replace(/\{\{tipo\}\}/g, label)
+      .replace(/\{\{curso\}\}/g, course);
+    window.open(`${whatsappLink}?text=${encodeURIComponent(message)}`, '_blank');
+  }
+
   openManualAdd(name: string): void {
-    this.snackBar.open(`Buscando "${name}" en la pestaña Manual`, '', { duration: 2000 });
+    this.snackBar.open(`Busca "${name}" en la pestaña Manual`, '', { duration: 2000 });
   }
 
   isSelected(id: number): boolean { return this.selectedAbsences().some(a => a.id === id); }
@@ -422,10 +444,9 @@ export class AbsencesComponent implements OnInit {
   async submitJustification(): Promise<void> {
     const sel = this.selectedAbsences();
     if (!sel.length || !this.justifyReason) return;
-    const enrollmentId = sel[0].enrollmentId;
     try {
       await firstValueFrom(this.http.post('/api/justifications', {
-        enrollmentId,
+        enrollmentId: sel[0].enrollmentId,
         reason: this.justifyReason,
         notifiedBy: this.justifyNotifiedBy || null,
         absenceIds: sel.map(a => a.id),

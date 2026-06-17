@@ -22,16 +22,16 @@ export async function getSummary(courseId?: number, academicYearId?: number) {
 
   const topStudents = await AppDataSource.query(`
     SELECT
-      e.name AS student_name, m.roster_number, c.name AS course,
-      COUNT(*) FILTER (WHERE a.type = 'A')  AS total_absences,
-      COUNT(*) FILTER (WHERE a.type = 'AT') AS total_tardies
+      e.name AS "studentName", m.roster_number AS "rosterNumber", c.name AS course,
+      COUNT(*) FILTER (WHERE a.type = 'A')  AS "totalAbsences",
+      COUNT(*) FILTER (WHERE a.type = 'AT') AS "totalTardies"
     FROM absences a
     JOIN enrollments m     ON m.id = a.enrollment_id
     JOIN students e        ON e.id = m.student_id
     JOIN courses c         ON c.id = m.course_id
     WHERE ${where}
     GROUP BY e.id, e.name, m.roster_number, c.name
-    ORDER BY total_absences DESC, total_tardies DESC
+    ORDER BY "totalAbsences" DESC, "totalTardies" DESC
     LIMIT 10
   `, params);
 

@@ -20,4 +20,9 @@ router.get('/me', authMiddleware, async (req, res) => {
   res.json(user);
 });
 
+router.put('/me', authMiddleware, async (req, res) => {
+  const user = await authService.updateMe(req.user!.id, req.body);
+  res.json(user);
+});
+
 export default router;

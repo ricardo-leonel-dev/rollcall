@@ -1,0 +1,18 @@
+# Development overrides — hot reload + exposed ports for local dev
+# Usage: docker compose up  (override is picked up automatically)
+services:
+  backend:
+    volumes:
+      - ./backend/src:/app/src:ro
+    environment:
+      NODE_ENV: development
+
+  frontend:
+    volumes:
+      - ./frontend/src:/app/src:ro
+
+  ocr-service:
+    volumes:
+      - ./ocr-service/main.py:/app/main.py:ro
+    environment:
+      RELOAD: "true"

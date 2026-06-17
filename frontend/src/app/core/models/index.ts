@@ -62,6 +62,7 @@ export interface Enrollment {
   guardianPhone: string | null;
   whatsappLink: string | null;
   guardianEmail: string | null;
+  guardianIdNumber: string | null;
   isActive: boolean;
 }
 
@@ -78,6 +79,8 @@ export interface Absence {
   rosterNumber: number | null;
   course: string;
   academicYear: string;
+  guardianPhone: string | null;
+  whatsappLink: string | null;
 }
 
 export interface Justification {

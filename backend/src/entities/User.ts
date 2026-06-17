@@ -23,6 +23,9 @@ export class User {
   @Column({ name: 'is_active', default: true })
   isActive!: boolean;
 
+  @Column({ name: 'notification_template', type: 'text', nullable: true })
+  notificationTemplate!: string | null;
+
   @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
   deletedAt!: Date | null;
 

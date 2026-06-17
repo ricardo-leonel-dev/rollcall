@@ -6,9 +6,10 @@ const router = Router();
 const R = 'enrollments';
 
 router.get('/', requirePermission(R,'read'), async (req, res) => {
-  const courseId = req.query.course_id ? +req.query.course_id : undefined;
-  const yearId   = req.query.academic_year_id ? +req.query.academic_year_id : undefined;
-  res.json(await svc.findAll(courseId, yearId));
+  const courseId  = req.query.course_id ? +req.query.course_id : undefined;
+  const yearId    = req.query.academic_year_id ? +req.query.academic_year_id : undefined;
+  const studentId = req.query.student_id ? +req.query.student_id : undefined;
+  res.json(await svc.findAll(courseId, yearId, studentId));
 });
 
 router.post('/',   requirePermission(R,'create'), async (req, res) => res.status(201).json(await svc.create(req.body)));

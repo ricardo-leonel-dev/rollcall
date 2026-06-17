@@ -2,51 +2,77 @@ import { Component, ChangeDetectionStrategy, signal, inject, OnInit } from '@ang
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { MatTabsModule } from '@angular/material/tabs';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { firstValueFrom } from 'rxjs';
-import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { AcademicYear, Course, User, Role, RolePermission } from '../../core/models/index';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    FormsModule, MatTabsModule, MatCardModule, MatFormFieldModule, MatSelectModule,
-    MatInputModule, MatButtonModule, MatIconModule, MatTableModule, MatCheckboxModule,
-    MatSnackBarModule, MatProgressBarModule, LoadingSpinnerComponent,
-  ],
+  imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule,
+            MatInputModule, MatButtonModule, MatIconModule, MatCheckboxModule, MatSnackBarModule],
+  styles: [`
+    .tab-content { padding: 20px; }
+    .section-card { background: var(--paper-deep); border: 1px solid var(--border-soft); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    .inline-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 16px; }
+    .inline-form mat-form-field { flex: 1; min-width: 160px; }
+    .list-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; background: var(--paper); border-radius: 12px; border: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+    .user-avatar {
+      width: 36px; height: 36px; border-radius: 9px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white; display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; flex-shrink: 0;
+    }
+  `],
   template: `
-    <div class="page-title">Administración</div>
+    <div class="page-header">
+      <h1 class="page-title">Administración</h1>
+    </div>
 
-    <mat-tab-group>
+    <mat-tab-group style="background:var(--paper);border-radius:16px;border:1px solid var(--border);overflow:hidden">
 
-      <!-- AÑO LECTIVOS -->
-      <mat-tab label="Años Lectivos">
-        <div class="pt-4 space-y-4">
-          <div class="flex gap-3">
-            <mat-form-field appearance="outline"><mat-label>Nombre</mat-label><input matInput [(ngModel)]="newYear.name"></mat-form-field>
-            <mat-form-field appearance="outline"><mat-label>Inicio</mat-label><input matInput type="date" [(ngModel)]="newYear.startDate"></mat-form-field>
-            <mat-form-field appearance="outline"><mat-label>Fin</mat-label><input matInput type="date" [(ngModel)]="newYear.endDate"></mat-form-field>
-            <button mat-flat-button color="primary" (click)="createYear()">Agregar</button>
+      <!-- AÑOS LECTIVOS -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">calendar_today</mat-icon>
+          Años Lectivos
+        </ng-template>
+        <div class="tab-content">
+          <div class="section-card">
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-strong);margin-bottom:12px">Agregar año lectivo</div>
+            <div class="inline-form">
+              <mat-form-field appearance="outline"><mat-label>Nombre (ej: 2026-2027)</mat-label><input matInput [(ngModel)]="newYear.name"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>Fecha inicio</mat-label><input matInput type="date" [(ngModel)]="newYear.startDate"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>Fecha fin</mat-label><input matInput type="date" [(ngModel)]="newYear.endDate"></mat-form-field>
+              <button mat-flat-button color="primary" (click)="createYear()" style="height:56px;min-width:100px">
+                <mat-icon>add</mat-icon> Agregar
+              </button>
+            </div>
           </div>
           @for (y of years(); track y.id) {
-            <div class="card flex justify-between items-center">
-              <span class="font-medium">{{y.name}}</span>
-              <div class="flex gap-2 items-center">
-                <span class="text-xs text-gray-500">{{y.startDate}} — {{y.endDate}}</span>
-                <span class="badge-J" [class]="y.isActive ? 'badge-J' : 'bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded'">
-                  {{y.isActive ? 'Activo' : 'Inactivo'}}
-                </span>
-                <button mat-icon-button color="warn" (click)="deleteYear(y.id)"><mat-icon>delete</mat-icon></button>
+            <div class="list-item">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center">
+                  <mat-icon style="color:#4f46e5">calendar_today</mat-icon>
+                </div>
+                <div>
+                  <div style="font-weight:600">{{y.name}}</div>
+                  <div style="font-size:12px;color:var(--muted)">{{y.startDate ?? '—'}} → {{y.endDate ?? '—'}}</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span [class]="y.isActive ? 'badge-J' : 'badge-gray'">{{y.isActive ? 'Activo' : 'Inactivo'}}</span>
+                <button mat-icon-button style="color:#b91c1c" (click)="deleteYear(y.id)"><mat-icon>delete_outline</mat-icon></button>
               </div>
             </div>
           }
@@ -54,24 +80,32 @@ import { AcademicYear, Course, User, Role, RolePermission } from '../../core/mod
       </mat-tab>
 
       <!-- CURSOS -->
-      <mat-tab label="Cursos">
-        <div class="pt-4 space-y-4">
-          <div class="flex gap-3">
-            <mat-form-field appearance="outline" class="flex-1"><mat-label>Nombre del curso</mat-label><input matInput [(ngModel)]="newCourse.name"></mat-form-field>
-            <button mat-flat-button color="primary" (click)="createCourse()">Agregar</button>
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">class</mat-icon>
+          Cursos
+        </ng-template>
+        <div class="tab-content">
+          <div class="section-card">
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-strong);margin-bottom:12px">Agregar curso</div>
+            <div class="inline-form">
+              <mat-form-field appearance="outline" style="flex:2"><mat-label>Nombre del curso</mat-label><input matInput [(ngModel)]="newCourse.name" placeholder="Ej: OCTAVO A BÁSICA SUPERIOR"></mat-form-field>
+              <button mat-flat-button color="primary" (click)="createCourse()" style="height:56px;min-width:100px">
+                <mat-icon>add</mat-icon> Agregar
+              </button>
+            </div>
           </div>
-          <div class="overflow-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-gray-50">
-                <tr><th class="p-2 text-left">Curso</th><th class="p-2 text-left">Jornada</th><th class="p-2"></th></tr>
-              </thead>
+          <div class="data-table-wrap">
+            <table class="data-table">
+              <thead><tr><th>#</th><th>Nombre del curso</th><th>Jornada</th><th></th></tr></thead>
               <tbody>
-                @for (c of courses(); track c.id) {
-                  <tr class="border-b border-gray-100">
-                    <td class="p-2">{{c.name}}</td>
-                    <td class="p-2 text-gray-500">{{c.shift}}</td>
-                    <td class="p-2">
-                      <button mat-icon-button color="warn" (click)="deleteCourse(c.id)"><mat-icon>delete</mat-icon></button>
+                @for (c of courses(); track c.id; let i = $index) {
+                  <tr>
+                    <td style="color:var(--muted);width:36px">{{i+1}}</td>
+                    <td style="font-weight:500">{{c.name}}</td>
+                    <td><span class="badge-info">{{c.shift}}</span></td>
+                    <td>
+                      <button mat-icon-button style="color:#b91c1c" (click)="deleteCourse(c.id)"><mat-icon>delete_outline</mat-icon></button>
                     </td>
                   </tr>
                 }
@@ -82,102 +116,142 @@ import { AcademicYear, Course, User, Role, RolePermission } from '../../core/mod
       </mat-tab>
 
       <!-- USUARIOS -->
-      <mat-tab label="Usuarios">
-        <div class="pt-4 space-y-4">
-          <div class="flex flex-wrap gap-3">
-            <mat-form-field appearance="outline"><mat-label>Usuario</mat-label><input matInput [(ngModel)]="newUser.username"></mat-form-field>
-            <mat-form-field appearance="outline"><mat-label>Contraseña</mat-label><input matInput type="password" [(ngModel)]="newUser.password"></mat-form-field>
-            <mat-form-field appearance="outline"><mat-label>Nombre</mat-label><input matInput [(ngModel)]="newUser.fullName"></mat-form-field>
-            <mat-form-field appearance="outline" class="w-36">
-              <mat-label>Rol</mat-label>
-              <mat-select [(ngModel)]="newUser.roleId">
-                @for (r of roles(); track r.id) { <mat-option [value]="r.id">{{r.name}}</mat-option> }
-              </mat-select>
-            </mat-form-field>
-            <button mat-flat-button color="primary" (click)="createUser()">Crear</button>
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">manage_accounts</mat-icon>
+          Usuarios
+        </ng-template>
+        <div class="tab-content">
+          <div class="section-card">
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-strong);margin-bottom:12px">Nuevo usuario</div>
+            <div class="inline-form">
+              <mat-form-field appearance="outline"><mat-label>Usuario</mat-label><input matInput [(ngModel)]="newUser.username"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>Contraseña</mat-label><input matInput type="password" [(ngModel)]="newUser.password"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>Nombre completo</mat-label><input matInput [(ngModel)]="newUser.fullName"></mat-form-field>
+              <mat-form-field appearance="outline" style="min-width:140px;flex:0">
+                <mat-label>Rol</mat-label>
+                <mat-select [(ngModel)]="newUser.roleId">
+                  @for (r of roles(); track r.id) { <mat-option [value]="r.id">{{r.name}}</mat-option> }
+                </mat-select>
+              </mat-form-field>
+              <button mat-flat-button color="primary" (click)="createUser()" style="height:56px;min-width:100px">
+                <mat-icon>person_add</mat-icon> Crear
+              </button>
+            </div>
           </div>
           @for (u of users(); track u.id) {
-            <div class="card flex justify-between items-center">
-              <div>
-                <div class="font-medium">{{u.username}} <span class="text-xs text-blue-600 ml-2">{{u.roleName}}</span></div>
-                <div class="text-sm text-gray-500">{{u.fullName}}</div>
+            <div class="list-item">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div class="user-avatar">{{(u.fullName || u.username)[0].toUpperCase()}}</div>
+                <div>
+                  <div style="font-weight:600">{{u.fullName || u.username}}</div>
+                  <div style="font-size:12px;color:var(--muted)">@{{u.username}} · <span style="color:#4f46e5">{{u.roleName}}</span></div>
+                </div>
               </div>
-              <button mat-icon-button color="warn" (click)="deleteUser(u.id)"><mat-icon>delete</mat-icon></button>
+              <button mat-icon-button style="color:#b91c1c" (click)="deleteUser(u.id)"><mat-icon>delete_outline</mat-icon></button>
             </div>
           }
         </div>
       </mat-tab>
 
-      <!-- ROLES Y PERMISOS -->
-      <mat-tab label="Roles y Permisos">
-        <div class="pt-4">
-          <mat-form-field appearance="outline" class="w-48 mb-4">
+      <!-- PERMISOS -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">security</mat-icon>
+          Permisos
+        </ng-template>
+        <div class="tab-content">
+          <mat-form-field appearance="outline" style="width:200px;margin-bottom:16px">
             <mat-label>Rol</mat-label>
             <mat-select [(ngModel)]="selRole" (ngModelChange)="loadPermissions()">
               @for (r of roles(); track r.id) { <mat-option [value]="r.id">{{r.name}}</mat-option> }
             </mat-select>
           </mat-form-field>
-          @if (permissions().length > 0) {
-            <div class="overflow-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50">
+          @if (permissions().length) {
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead>
                   <tr>
-                    <th class="p-2 text-left">Recurso</th>
-                    <th class="p-2 text-center">Leer</th>
-                    <th class="p-2 text-center">Crear</th>
-                    <th class="p-2 text-center">Actualizar</th>
-                    <th class="p-2 text-center">Eliminar</th>
+                    <th>Recurso</th>
+                    <th style="text-align:center">Leer</th>
+                    <th style="text-align:center">Crear</th>
+                    <th style="text-align:center">Editar</th>
+                    <th style="text-align:center">Eliminar</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (p of permissions(); track p.resource) {
-                    <tr class="border-b border-gray-100">
-                      <td class="p-2 font-medium">{{p.resource}}</td>
-                      <td class="p-2 text-center"><mat-checkbox [(ngModel)]="p.canRead" /></td>
-                      <td class="p-2 text-center"><mat-checkbox [(ngModel)]="p.canCreate" /></td>
-                      <td class="p-2 text-center"><mat-checkbox [(ngModel)]="p.canUpdate" /></td>
-                      <td class="p-2 text-center"><mat-checkbox [(ngModel)]="p.canDelete" /></td>
+                    <tr>
+                      <td style="font-weight:500">{{p.resource}}</td>
+                      <td style="text-align:center"><mat-checkbox [(ngModel)]="p.canRead" /></td>
+                      <td style="text-align:center"><mat-checkbox [(ngModel)]="p.canCreate" /></td>
+                      <td style="text-align:center"><mat-checkbox [(ngModel)]="p.canUpdate" /></td>
+                      <td style="text-align:center"><mat-checkbox [(ngModel)]="p.canDelete" /></td>
                     </tr>
                   }
                 </tbody>
               </table>
             </div>
-            <button mat-flat-button color="primary" class="mt-4" (click)="savePermissions()">Guardar permisos</button>
+            <button mat-flat-button color="primary" style="margin-top:16px" (click)="savePermissions()">
+              <mat-icon>save</mat-icon> Guardar permisos
+            </button>
           }
         </div>
       </mat-tab>
 
       <!-- IMPORTAR NÓMINA -->
-      <mat-tab label="Importar Nómina">
-        <div class="pt-4">
-          <p class="text-gray-600 mb-4">Sube el archivo Excel de nómina. Cada hoja = un curso. Fila 6 = encabezados, fila 7+ = estudiantes.</p>
-          <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-4">
-            <label class="cursor-pointer">
-              <input type="file" class="hidden" accept=".xlsx,.xls" (change)="onRosterFile($event)">
-              <mat-icon class="text-gray-400 text-4xl" style="font-size:40px">upload_file</mat-icon>
-              <p class="text-gray-500 mt-2">Haz clic para seleccionar el archivo Excel</p>
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">upload_file</mat-icon>
+          Importar Nómina
+        </ng-template>
+        <div class="tab-content">
+          <p style="color:var(--muted-strong);font-size:14px;margin-bottom:20px">
+            Sube el archivo Excel de nómina. Cada hoja = un curso. Fila 6 = encabezados, fila 7+ = estudiantes.
+          </p>
+          <div class="upload-zone">
+            <label style="cursor:pointer;display:block">
+              <input type="file" style="display:none" accept=".xlsx,.xls" (change)="onRosterFile($event)">
+              <mat-icon style="font-size:48px;width:48px;height:48px;color:var(--border);margin-bottom:12px;display:block;margin-left:auto;margin-right:auto">cloud_upload</mat-icon>
+              <div style="font-weight:600;color:var(--ink-soft);margin-bottom:4px">Haz clic para seleccionar el archivo Excel</div>
+              <div style="font-size:13px;color:var(--muted)">Formatos: .xlsx, .xls</div>
             </label>
           </div>
+
           @if (importLoading()) {
-            <app-loading-spinner message="Procesando nómina..." />
+            <div style="display:flex;align-items:center;gap:16px;padding:20px;background:var(--paper-deep);border-radius:12px;margin-top:16px">
+              <div class="spinner" style="flex-shrink:0"></div>
+              <div style="font-weight:600;color:var(--ink-soft)">Procesando nómina...</div>
+            </div>
           }
+
           @if (importResult()) {
-            <div class="card bg-green-50 border border-green-200">
-              <div class="text-green-800 font-medium mb-2">Importación completada</div>
-              <div class="text-sm space-y-1">
-                <div>Cursos: {{importResult()!.coursesProcessed}}</div>
-                <div>Estudiantes creados: {{importResult()!.studentsCreated}}</div>
-                <div>Estudiantes actualizados: {{importResult()!.studentsUpdated}}</div>
-                <div>Matrículas creadas: {{importResult()!.enrollmentsCreated}}</div>
-                @if (importResult()!.errors.length > 0) {
-                  <div class="text-orange-600">Errores: {{importResult()!.errors.length}}</div>
-                }
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:20px;margin-top:16px">
+              <div style="display:flex;align-items:center;gap:8px;font-weight:700;color:#15803d;margin-bottom:12px">
+                <mat-icon>check_circle</mat-icon> Importación completada
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div style="background:var(--paper);border-radius:8px;padding:10px 14px">
+                  <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.coursesProcessed}}</div>
+                  <div style="font-size:12px;color:var(--muted-strong)">Cursos procesados</div>
+                </div>
+                <div style="background:var(--paper);border-radius:8px;padding:10px 14px">
+                  <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.studentsCreated}}</div>
+                  <div style="font-size:12px;color:var(--muted-strong)">Estudiantes creados</div>
+                </div>
+                <div style="background:var(--paper);border-radius:8px;padding:10px 14px">
+                  <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.studentsUpdated}}</div>
+                  <div style="font-size:12px;color:var(--muted-strong)">Actualizados</div>
+                </div>
+                <div style="background:var(--paper);border-radius:8px;padding:10px 14px">
+                  <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.enrollmentsCreated}}</div>
+                  <div style="font-size:12px;color:var(--muted-strong)">Matrículas creadas</div>
+                </div>
               </div>
             </div>
           }
         </div>
       </mat-tab>
-
     </mat-tab-group>
   `,
 })
@@ -198,9 +272,7 @@ export class AdminComponent implements OnInit {
   newCourse = { name: '' };
   newUser = { username: '', password: '', fullName: '', roleId: null as number | null };
 
-  async ngOnInit(): Promise<void> {
-    await this.loadAll();
-  }
+  async ngOnInit(): Promise<void> { await this.loadAll(); }
 
   async loadAll(): Promise<void> {
     const [years, courses, users, roles] = await Promise.all([
@@ -280,8 +352,6 @@ export class AdminComponent implements OnInit {
       this.snack.open('Nómina importada correctamente', '', { duration: 3000 });
     } catch (err: any) {
       this.snack.open('Error: ' + (err?.error?.error ?? 'Error al importar'), '', { duration: 5000 });
-    } finally {
-      this.importLoading.set(false);
-    }
+    } finally { this.importLoading.set(false); }
   }
 }

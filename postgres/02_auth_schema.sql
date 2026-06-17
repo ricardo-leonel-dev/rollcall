@@ -61,7 +61,8 @@ CREATE TABLE IF NOT EXISTS users (
   is_active     BOOLEAN DEFAULT TRUE,
   deleted_at    TIMESTAMPTZ,
   created_at    TIMESTAMPTZ DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ DEFAULT NOW()
+  updated_at    TIMESTAMPTZ DEFAULT NOW(),
+  notification_template TEXT
 );
 
 -- ─── JUSTIFICATIONS ───────────────────────────────────────────────

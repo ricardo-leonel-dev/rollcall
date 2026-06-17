@@ -32,16 +32,18 @@ export async function findAll(filters: AbsenceFilters) {
 
   const sql = `
     SELECT
-      a.id, a.enrollment_id, a.date, a.type,
-      a.notes, a.photo_source, a.is_active,
-      e.name AS student_name, m.roster_number,
-      c.name AS course, al.name AS academic_year,
-      EXISTS (SELECT 1 FROM justification_absences ja WHERE ja.absence_id = a.id) AS is_justified
+      a.id, a.enrollment_id AS "enrollmentId", a.date::text AS date, a.type,
+      a.notes, a.photo_source AS "photoSource", a.is_active AS "isActive",
+      e.name AS "studentName", m.roster_number AS "rosterNumber",
+      c.name AS course, al.name AS "academicYear",
+      g.phone AS "guardianPhone", g.whatsapp_link AS "whatsappLink",
+      EXISTS (SELECT 1 FROM justification_absences ja WHERE ja.absence_id = a.id) AS "isJustified"
     FROM absences a
-    JOIN enrollments m     ON m.id = a.enrollment_id
-    JOIN students e        ON e.id = m.student_id
-    JOIN courses c         ON c.id = m.course_id
-    JOIN academic_years al ON al.id = m.academic_year_id
+    JOIN enrollments m       ON m.id = a.enrollment_id
+    JOIN students e          ON e.id = m.student_id
+    JOIN courses c           ON c.id = m.course_id
+    JOIN academic_years al   ON al.id = m.academic_year_id
+    LEFT JOIN guardians g    ON g.id = m.guardian_id
     WHERE ${conditions.join(' AND ')}
     ${justifiedFilter}
     ORDER BY a.date DESC, e.name

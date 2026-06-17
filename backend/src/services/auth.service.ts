@@ -57,5 +57,19 @@ export async function getMe(userId: number) {
     roleName: role?.name ?? null,
     roleId: user.roleId,
     isActive: user.isActive,
+    notificationTemplate: user.notificationTemplate,
   };
+}
+
+export async function updateMe(userId: number, data: Partial<{ fullName: string; email: string; notificationTemplate: string }>) {
+  const userRepo = AppDataSource.getRepository(User);
+  const user = await userRepo.findOne({ where: { id: userId } });
+  if (!user) throw Object.assign(new Error('Usuario no encontrado'), { status: 404 });
+
+  if (data.fullName !== undefined) user.fullName = data.fullName;
+  if (data.email !== undefined) user.email = data.email;
+  if (data.notificationTemplate !== undefined) user.notificationTemplate = data.notificationTemplate;
+  await userRepo.save(user);
+
+  return getMe(userId);
 }

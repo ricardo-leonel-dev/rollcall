@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, signal, inject, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
@@ -9,68 +8,101 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
-import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { Enrollment, AcademicYear, Course } from '../../core/models/index';
+import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    FormsModule, MatCardModule, MatFormFieldModule, MatSelectModule,
-    MatInputModule, MatButtonModule, MatIconModule, MatSnackBarModule, LoadingSpinnerComponent,
-  ],
+  imports: [FormsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule, MatSnackBarModule, WhatsappIconComponent],
   template: `
-    <div class="page-title">Matrículas</div>
-
-    <div class="flex flex-wrap gap-3 mb-4">
-      <mat-form-field appearance="outline" class="w-44">
-        <mat-label>Año lectivo</mat-label>
-        <mat-select [(ngModel)]="selYear" (ngModelChange)="load()">
-          @for (y of years(); track y.id) { <mat-option [value]="y.id">{{y.name}}</mat-option> }
-        </mat-select>
-      </mat-form-field>
-      <mat-form-field appearance="outline" class="w-56">
-        <mat-label>Curso</mat-label>
-        <mat-select [(ngModel)]="selCourse" (ngModelChange)="load()">
-          <mat-option [value]="null">-- Seleccionar --</mat-option>
-          @for (c of courses(); track c.id) { <mat-option [value]="c.id">{{c.name}}</mat-option> }
-        </mat-select>
-      </mat-form-field>
+    <div class="page-header">
+      <h1 class="page-title">Matrículas</h1>
       <button mat-flat-button color="primary" (click)="downloadExcel()" [disabled]="!selCourse || !selYear">
         <mat-icon>download</mat-icon> Exportar Excel
       </button>
     </div>
 
+    <div class="filter-bar">
+      <mat-form-field appearance="outline" style="width:180px">
+        <mat-label>Año lectivo</mat-label>
+        <mat-select [(ngModel)]="selYear" (ngModelChange)="load()">
+          @for (y of years(); track y.id) { <mat-option [value]="y.id">{{y.name}}</mat-option> }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" style="width:220px">
+        <mat-label>Curso</mat-label>
+        <mat-select [(ngModel)]="selCourse" (ngModelChange)="load()">
+          <mat-option [value]="null">— Seleccionar —</mat-option>
+          @for (c of courses(); track c.id) { <mat-option [value]="c.id">{{c.name}}</mat-option> }
+        </mat-select>
+      </mat-form-field>
+      @if (enrollments().length) {
+        <div style="align-self:center;background:var(--accent-soft);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:#4f46e5">
+          {{enrollments().length}} estudiantes
+        </div>
+      }
+    </div>
+
     @if (loading()) {
-      <app-loading-spinner />
+      <div class="spinner-center" style="height:200px">
+        <div style="text-align:center">
+          <div class="spinner" style="margin:0 auto 12px"></div>
+          <div style="font-size:13px;color:var(--muted)">Cargando matrículas...</div>
+        </div>
+      </div>
+    } @else if (!selCourse) {
+      <div class="empty-state card">
+        <mat-icon style="font-size:48px;width:48px;height:48px;color:var(--border);margin-bottom:12px">assignment_ind</mat-icon>
+        <div style="font-weight:600;color:var(--ink-soft)">Selecciona un curso</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:4px">Elige el año lectivo y el curso para ver la nómina</div>
+      </div>
+    } @else if (!enrollments().length) {
+      <div class="empty-state card">
+        <mat-icon style="font-size:48px;width:48px;height:48px;color:var(--border);margin-bottom:12px">people_outline</mat-icon>
+        <div style="font-weight:600;color:var(--ink-soft)">Sin matrículas</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:4px">Este curso no tiene estudiantes matriculados</div>
+      </div>
     } @else {
-      <!-- Desktop table -->
-      <div class="hidden md:block overflow-auto">
-        <table class="w-full text-sm">
-          <thead class="bg-gray-50">
+      <!-- Desktop -->
+      <div class="data-table-wrap hidden md:block">
+        <table class="data-table">
+          <thead>
             <tr>
-              <th class="p-2 text-left">N°</th>
-              <th class="p-2 text-left">Estudiante</th>
-              <th class="p-2 text-left">Edad</th>
-              <th class="p-2 text-left">Representante</th>
-              <th class="p-2 text-left">Teléfono</th>
-              <th class="p-2 text-left">WhatsApp</th>
+              <th style="width:48px">N°</th>
+              <th>Estudiante</th>
+              <th>Edad</th>
+              <th>Representante</th>
+              <th>Teléfono</th>
+              <th>WhatsApp</th>
             </tr>
           </thead>
           <tbody>
             @for (e of enrollments(); track e.enrollmentId) {
-              <tr class="border-b border-gray-100 hover:bg-gray-50">
-                <td class="p-2 text-gray-500">{{e.rosterNumber}}</td>
-                <td class="p-2 font-medium">{{e.fullName}}</td>
-                <td class="p-2 text-center">{{e.age ?? '—'}}</td>
-                <td class="p-2 text-gray-600">{{e.guardianName ?? '—'}}</td>
-                <td class="p-2 text-gray-600">{{e.guardianPhone ?? '—'}}</td>
-                <td class="p-2">
+              <tr>
+                <td style="color:var(--muted);font-weight:600;font-size:13px">{{e.rosterNumber}}</td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div style="width:32px;height:32px;border-radius:8px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#4f46e5;flex-shrink:0">
+                      {{e.fullName?.[0] ?? '?'}}
+                    </div>
+                    <div>
+                      <div style="font-weight:500">{{e.fullName}}</div>
+                      @if (e.idNumber) { <div style="font-size:11px;color:var(--muted);font-family:monospace">{{e.idNumber}}</div> }
+                    </div>
+                  </div>
+                </td>
+                <td style="color:var(--muted-strong)">{{e.age ?? '—'}}</td>
+                <td style="color:var(--muted-strong)">{{e.guardianName ?? '—'}}</td>
+                <td style="color:var(--muted-strong);font-family:monospace">{{e.guardianPhone ?? '—'}}</td>
+                <td>
                   @if (e.whatsappLink) {
-                    <a [href]="e.whatsappLink" target="_blank" class="text-green-600 flex items-center gap-1">
-                      <mat-icon class="text-sm" style="font-size:16px">chat</mat-icon>
-                      Enviar
+                    <a [href]="e.whatsappLink" target="_blank"
+                       style="display:inline-flex;align-items:center;gap:6px;color:#16a34a;font-size:13px;font-weight:500;text-decoration:none;background:#f0fdf4;border-radius:8px;padding:4px 10px">
+                      <app-whatsapp-icon [size]="14" /> Enviar
                     </a>
+                  } @else {
+                    <span style="color:var(--border);font-size:13px">—</span>
                   }
                 </td>
               </tr>
@@ -78,26 +110,27 @@ import { Enrollment, AcademicYear, Course } from '../../core/models/index';
           </tbody>
         </table>
       </div>
-      <!-- Mobile cards -->
-      <div class="md:hidden space-y-2">
+      <!-- Mobile -->
+      <div class="md:hidden" style="display:flex;flex-direction:column;gap:8px">
         @for (e of enrollments(); track e.enrollmentId) {
-          <div class="card">
-            <div class="font-medium">{{e.rosterNumber}}. {{e.fullName}}</div>
-            <div class="text-xs text-gray-500">Edad: {{e.age ?? '—'}} · {{e.gender ?? ''}}</div>
-            @if (e.guardianName) {
-              <div class="text-xs text-gray-600 mt-1">Rep.: {{e.guardianName}}</div>
-            }
-            @if (e.whatsappLink) {
-              <a [href]="e.whatsappLink" target="_blank" class="text-green-600 text-xs flex items-center gap-1 mt-1">
-                <mat-icon style="font-size:14px">chat</mat-icon> WhatsApp
-              </a>
-            }
+          <div class="card" style="padding:14px 16px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="width:36px;height:36px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#4f46e5;flex-shrink:0">
+                {{e.rosterNumber}}
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{e.fullName}}</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px">{{e.age ? e.age + ' años' : ''}} {{e.guardianName ? '· ' + e.guardianName : ''}}</div>
+              </div>
+              @if (e.whatsappLink) {
+                <a [href]="e.whatsappLink" target="_blank" style="color:#16a34a">
+                  <app-whatsapp-icon [size]="22" />
+                </a>
+              }
+            </div>
           </div>
         }
       </div>
-      @if (enrollments().length === 0) {
-        <p class="text-gray-500 text-center py-8">Selecciona un curso para ver las matrículas</p>
-      }
     }
   `,
 })
@@ -137,11 +170,19 @@ export class EnrollmentsComponent implements OnInit {
     } finally { this.loading.set(false); }
   }
 
-  downloadExcel(): void {
+  async downloadExcel(): Promise<void> {
     if (!this.selCourse || !this.selYear) return;
     const url = `/api/export/excel?course_id=${this.selCourse}&academic_year_id=${this.selYear}&date_from=${this.dateFrom}&date_to=${this.dateTo}`;
-    const link = document.createElement('a');
-    link.href = url;
-    link.click();
+    try {
+      const blob = await firstValueFrom(this.http.get(url, { responseType: 'blob' }));
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `matriculas_${this.selCourse}_${this.selYear}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      this.snack.open('Error al exportar', '', { duration: 3000 });
+    }
   }
 }

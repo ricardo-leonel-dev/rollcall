@@ -1,23 +1,45 @@
-import { Component, ChangeDetectionStrategy, signal, computed, inject, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, computed, inject, OnInit, AfterViewInit, ViewChild, ElementRef, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { MatCardModule } from '@angular/material/card';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
 import { FormsModule } from '@angular/forms';
-import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
-import { toSignal } from '@angular/core/rxjs-interop';
 import { DashboardSummary, AcademicYear, Course } from '../../core/models/index';
 import { firstValueFrom } from 'rxjs';
+import { Chart, registerables } from 'chart.js';
+
+Chart.register(...registerables);
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatCardModule, MatSelectModule, MatFormFieldModule, FormsModule, LoadingSpinnerComponent],
+  imports: [MatSelectModule, MatFormFieldModule, MatIconModule, MatButtonModule, FormsModule],
+  styles: [`
+    .stat-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    .stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px -8px rgba(15,23,42,.15) !important; }
+    .chart-wrap { position: relative; height: 200px; }
+    .top-table tr td:first-child { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .alert-bar {
+      background: linear-gradient(135deg, #fef2f2, #fff7ed);
+      border: 1px dashed #fca5a5;
+      border-radius: 14px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+  `],
   template: `
-    <div class="page-title">Dashboard</div>
+    <div class="page-header">
+      <h1 class="page-title">Dashboard</h1>
+      <span style="color:var(--muted);font-size:13px">{{today}}</span>
+    </div>
 
-    <div class="flex flex-wrap gap-3 mb-6">
-      <mat-form-field appearance="outline" class="w-48">
+    <!-- Filtros -->
+    <div class="filter-bar">
+      <mat-form-field appearance="outline" style="width:180px">
         <mat-label>Año lectivo</mat-label>
         <mat-select [(ngModel)]="selectedYear" (ngModelChange)="loadSummary()">
           <mat-option [value]="null">Todos</mat-option>
@@ -26,10 +48,10 @@ import { firstValueFrom } from 'rxjs';
           }
         </mat-select>
       </mat-form-field>
-      <mat-form-field appearance="outline" class="w-56">
+      <mat-form-field appearance="outline" style="width:220px">
         <mat-label>Curso</mat-label>
         <mat-select [(ngModel)]="selectedCourse" (ngModelChange)="loadSummary()">
-          <mat-option [value]="null">Todos</mat-option>
+          <mat-option [value]="null">Todos los cursos</mat-option>
           @for (c of courses(); track c.id) {
             <mat-option [value]="c.id">{{c.name}}</mat-option>
           }
@@ -38,86 +60,152 @@ import { firstValueFrom } from 'rxjs';
     </div>
 
     @if (loading()) {
-      <app-loading-spinner message="Cargando estadísticas..." />
+      <div class="spinner-center" style="height:200px">
+        <div style="text-align:center">
+          <div class="spinner spinner-lg" style="margin:0 auto 12px"></div>
+          <div style="font-size:14px;color:var(--muted)">Cargando estadísticas...</div>
+        </div>
+      </div>
     } @else if (summary()) {
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <mat-card class="text-center">
-          <mat-card-content class="pt-4">
-            <div class="text-3xl font-bold text-red-600">{{summary()!.totalAbsences}}</div>
-            <div class="text-sm text-gray-500 mt-1">Faltas (A)</div>
-          </mat-card-content>
-        </mat-card>
-        <mat-card class="text-center">
-          <mat-card-content class="pt-4">
-            <div class="text-3xl font-bold text-yellow-600">{{summary()!.totalTardies}}</div>
-            <div class="text-sm text-gray-500 mt-1">Atrasos (AT)</div>
-          </mat-card-content>
-        </mat-card>
-        <mat-card class="text-center">
-          <mat-card-content class="pt-4">
-            <div class="text-3xl font-bold text-green-600">{{summary()!.justifiedCount}}</div>
-            <div class="text-sm text-gray-500 mt-1">Justificadas</div>
-          </mat-card-content>
-        </mat-card>
-        <mat-card class="text-center">
-          <mat-card-content class="pt-4">
-            <div class="text-3xl font-bold text-blue-600">{{summary()!.justifiedPercent}}%</div>
-            <div class="text-sm text-gray-500 mt-1">% Justificado</div>
-          </mat-card-content>
-        </mat-card>
+
+      <!-- Alerta de umbral -->
+      @if (alertStudents().length > 0) {
+        <div class="alert-bar">
+          <mat-icon style="color:#ef4444;flex-shrink:0">warning_amber</mat-icon>
+          <div>
+            <span style="font-weight:600;color:#b91c1c">{{alertStudents().length}} estudiante(s) con 5+ faltas:</span>
+            <span style="color:#7f1d1d;font-size:13px;margin-left:6px">{{alertStudents().slice(0,3).map(s => s.studentName).join(', ')}}{{alertStudents().length > 3 ? ' y más...' : ''}}</span>
+          </div>
+        </div>
+      }
+
+      <!-- Stats cards -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#fef2f2">
+            <mat-icon style="color:#ef4444;font-size:24px">event_busy</mat-icon>
+          </div>
+          <div>
+            <div class="stat-value" style="color:#dc2626">{{summary()!.totalAbsences}}</div>
+            <div class="stat-label">Faltas (A)</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#fffbeb">
+            <mat-icon style="color:#f59e0b;font-size:24px">schedule</mat-icon>
+          </div>
+          <div>
+            <div class="stat-value" style="color:#d97706">{{summary()!.totalTardies}}</div>
+            <div class="stat-label">Atrasos (AT)</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#f0fdf4">
+            <mat-icon style="color:#22c55e;font-size:24px">task_alt</mat-icon>
+          </div>
+          <div>
+            <div class="stat-value" style="color:#16a34a">{{summary()!.justifiedCount}}</div>
+            <div class="stat-label">Justificadas</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--accent-soft)">
+            <mat-icon style="color:#6366f1;font-size:24px">percent</mat-icon>
+          </div>
+          <div>
+            <div class="stat-value" style="color:#6366f1">{{summary()!.justifiedPercent}}%</div>
+            <div class="stat-label">% Justificado</div>
+          </div>
+        </div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <mat-card>
-          <mat-card-header>
-            <mat-card-title class="text-base">Top 10 estudiantes con más faltas</mat-card-title>
-          </mat-card-header>
-          <mat-card-content class="overflow-auto">
-            <table class="w-full text-sm mt-2">
-              <thead>
-                <tr class="text-left text-gray-500 border-b">
-                  <th class="pb-1">Estudiante</th>
-                  <th class="pb-1">Curso</th>
-                  <th class="pb-1 text-center">A</th>
-                  <th class="pb-1 text-center">AT</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (s of summary()!.topStudents; track s.studentName) {
-                  <tr class="border-b border-gray-50 hover:bg-gray-50">
-                    <td class="py-1.5">{{s.studentName}}</td>
-                    <td class="py-1.5 text-xs text-gray-500">{{s.course}}</td>
-                    <td class="py-1.5 text-center"><span class="badge-A">{{s.totalAbsences}}</span></td>
-                    <td class="py-1.5 text-center"><span class="badge-AT">{{s.totalTardies}}</span></td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </mat-card-content>
-        </mat-card>
+      <!-- Charts + Top table -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="charts-grid">
+        <!-- Bar chart -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Inasistencias últimos 30 días</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas #barChart></canvas>
+          </div>
+        </div>
 
-        <mat-card>
-          <mat-card-header>
-            <mat-card-title class="text-base">Inasistencias últimos 30 días</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
-            <div class="flex items-end gap-1 h-40 mt-4">
-              @for (day of summary()!.absencesByDay; track day.date) {
-                <div class="flex flex-col items-center flex-1">
-                  <div class="bg-blue-400 w-full rounded-t"
-                       [style.height.px]="barHeight(day.count)"
-                       [title]="day.date + ': ' + day.count"></div>
-                </div>
-              }
+        <!-- Doughnut -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Faltas vs Atrasos</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:24px;height:200px">
+            <div style="position:relative;width:160px;height:160px">
+              <canvas #donutChart></canvas>
+              <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column">
+                <div style="font-family:'Fraunces',serif;font-size:24px;font-weight:600;color:var(--ink)">{{summary()!.totalAbsences + summary()!.totalTardies}}</div>
+                <div style="font-size:11px;color:var(--muted)">total</div>
+              </div>
             </div>
-          </mat-card-content>
-        </mat-card>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="width:12px;height:12px;border-radius:3px;background:#ef4444"></div>
+                <span style="font-size:13px;color:var(--muted-strong)">Faltas <strong style="color:var(--ink-soft)">{{summary()!.totalAbsences}}</strong></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="width:12px;height:12px;border-radius:3px;background:#f59e0b"></div>
+                <span style="font-size:13px;color:var(--muted-strong)">Atrasos <strong style="color:var(--ink-soft)">{{summary()!.totalTardies}}</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top 10 -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-header">
+          <span class="card-title">Top 10 — Más inasistencias</span>
+        </div>
+        <div class="data-table-wrap" style="border:none;border-radius:0;box-shadow:none">
+          <table class="data-table top-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Estudiante</th>
+                <th>Curso</th>
+                <th style="text-align:center">Faltas</th>
+                <th style="text-align:center">Atrasos</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of summary()!.topStudents; track s.studentName; let i = $index) {
+                <tr>
+                  <td style="color:var(--muted);font-size:12px;width:32px">{{i + 1}}</td>
+                  <td style="font-weight:500">{{s.studentName}}</td>
+                  <td style="font-size:12px;color:var(--muted-strong)">{{s.course}}</td>
+                  <td style="text-align:center"><span class="badge-A">{{s.totalAbsences}}</span></td>
+                  <td style="text-align:center"><span class="badge-AT">{{s.totalTardies}}</span></td>
+                </tr>
+              }
+              @if (!summary()!.topStudents?.length) {
+                <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:32px">Sin datos</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
       </div>
     }
+
+    <style>
+      @media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr !important; } }
+    </style>
   `,
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly http = inject(HttpClient);
+
+  @ViewChild('barChart')   barChartEl!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('donutChart') donutChartEl!: ElementRef<HTMLCanvasElement>;
+
+  private barChart: Chart | null = null;
+  private donutChart: Chart | null = null;
 
   readonly years = signal<AcademicYear[]>([]);
   readonly courses = signal<Course[]>([]);
@@ -127,11 +215,11 @@ export class DashboardComponent implements OnInit {
   selectedYear: number | null = null;
   selectedCourse: number | null = null;
 
-  private maxCount = computed(() => Math.max(...(this.summary()?.absencesByDay.map(d => d.count) ?? [1]), 1));
+  readonly alertStudents = computed(() =>
+    (this.summary()?.topStudents ?? []).filter(s => s.totalAbsences >= 5)
+  );
 
-  barHeight(count: number): number {
-    return Math.round((count / this.maxCount()) * 120) + 4;
-  }
+  readonly today = new Date().toLocaleDateString('es-EC', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   async ngOnInit(): Promise<void> {
     const [years, courses] = await Promise.all([
@@ -140,7 +228,16 @@ export class DashboardComponent implements OnInit {
     ]);
     this.years.set(years);
     this.courses.set(courses);
+    const active = years.find(y => y.isActive);
+    if (active) this.selectedYear = active.id;
     await this.loadSummary();
+  }
+
+  ngAfterViewInit(): void {}
+
+  ngOnDestroy(): void {
+    this.barChart?.destroy();
+    this.donutChart?.destroy();
   }
 
   async loadSummary(): Promise<void> {
@@ -152,8 +249,62 @@ export class DashboardComponent implements OnInit {
       const qs = params.length ? '?' + params.join('&') : '';
       const data = await firstValueFrom(this.http.get<DashboardSummary>(`/api/dashboard/summary${qs}`));
       this.summary.set(data);
+      setTimeout(() => this.renderCharts(data), 50);
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  private renderCharts(data: DashboardSummary): void {
+    this.barChart?.destroy();
+    this.donutChart?.destroy();
+
+    const days = data.absencesByDay ?? [];
+    if (this.barChartEl?.nativeElement) {
+      this.barChart = new Chart(this.barChartEl.nativeElement, {
+        type: 'bar',
+        data: {
+          labels: days.map(d => d.date.slice(5)),
+          datasets: [{
+            data: days.map(d => d.count),
+            backgroundColor: 'rgba(99,102,241,0.7)',
+            hoverBackgroundColor: '#6366f1',
+            borderRadius: 6,
+            borderSkipped: false,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } },
+            y: { grid: { color: '#f1ece0' }, ticks: { font: { size: 11 } }, beginAtZero: true },
+          },
+        },
+      });
+    }
+
+    if (this.donutChartEl?.nativeElement) {
+      const total = data.totalAbsences + data.totalTardies;
+      this.donutChart = new Chart(this.donutChartEl.nativeElement, {
+        type: 'doughnut',
+        data: {
+          labels: ['Faltas', 'Atrasos'],
+          datasets: [{
+            data: total ? [data.totalAbsences, data.totalTardies] : [1, 0],
+            backgroundColor: total ? ['#ef4444', '#f59e0b'] : ['#e7e1d3', '#e7e1d3'],
+            borderWidth: 0,
+            hoverOffset: 4,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '72%',
+          plugins: { legend: { display: false } },
+        },
+      });
     }
   }
 }

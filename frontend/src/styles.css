@@ -1,15 +1,361 @@
+@import '@fontsource/inter/300.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/fraunces/400.css';
+@import '@fontsource/fraunces/500.css';
+@import '@fontsource/fraunces/600.css';
+@import '@fontsource/fraunces/700.css';
+@import 'material-icons/iconfont/round.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @import '@angular/material/prebuilt-themes/indigo-pink.css';
 
+/* ─── Ledger design tokens ─────────────────────────────────────────────────
+   "Cuaderno de Asistencia" — warm paper palette layered over the existing
+   indigo brand color, shared by every page so the app reads as one product
+   instead of 8 one-off styles. */
+:root {
+  --page-bg: #f6f3ec;
+  --paper: #fffdf8;
+  --paper-deep: #faf8f3;
+  --ink: #1e1b16;
+  --ink-soft: #44403c;
+  --muted: #a8a29e;
+  --muted-strong: #78716c;
+  --border: #e7e1d3;
+  --border-soft: #f1ece0;
+  --stripe: #9f3a3a;
+  --accent: #6366f1;
+  --accent-2: #8b5cf6;
+  --accent-soft: #eef2ff;
+}
+
+/* ─── Base ─────────────────────────────────────────────────────────────── */
 html, body { height: 100%; margin: 0; }
-body { font-family: Roboto, "Helvetica Neue", sans-serif; }
+body {
+  font-family: 'Inter', 'Helvetica Neue', sans-serif;
+  background: var(--page-bg);
+  color: var(--ink-soft);
+}
 
-.badge-A  { @apply bg-red-100 text-red-800 text-xs font-medium px-2 py-0.5 rounded; }
-.badge-AT { @apply bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded; }
-.badge-J  { @apply bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded; }
+/* ─── Material overrides ────────────────────────────────────────────────── */
+.mat-mdc-card {
+  border-radius: 16px !important;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07) !important;
+  border: 1px solid #e2e8f0;
+}
 
-.card { @apply bg-white rounded-lg shadow p-4; }
-.page-title { @apply text-2xl font-bold text-gray-800 mb-4; }
+.mat-mdc-form-field .mdc-notched-outline__leading,
+.mat-mdc-form-field .mdc-notched-outline__notch,
+.mat-mdc-form-field .mdc-notched-outline__trailing {
+  border-color: #cbd5e1 !important;
+}
+/* Each of the 3 notched-outline pieces only owns its own outer corners —
+   forcing the same radius on all three breaks the curve where they meet
+   (visible as a kink right at the label notch). */
+.mat-mdc-form-field .mdc-notched-outline__leading  { border-radius: 10px 0 0 10px !important; }
+.mat-mdc-form-field .mdc-notched-outline__trailing { border-radius: 0 10px 10px 0 !important; }
+.mat-mdc-form-field .mdc-notched-outline__notch    { border-radius: 0 !important; }
+
+/* Tighter field height — default MDC outlined fields run tall/empty-looking
+   for a single line of text. */
+.mat-mdc-text-field-wrapper { --mat-form-field-container-height: 50px; }
+.mat-mdc-form-field-infix { min-height: 26px !important; padding-top: 12px !important; padding-bottom: 12px !important; }
+
+.mat-mdc-form-field.mat-focused .mdc-notched-outline__leading,
+.mat-mdc-form-field.mat-focused .mdc-notched-outline__notch,
+.mat-mdc-form-field.mat-focused .mdc-notched-outline__trailing {
+  border-color: #6366f1 !important;
+}
+
+/* Select/autocomplete dropdown panels — the indigo-pink theme ships these as
+   stark white MDC overlays with Roboto typography baked in; bring them back
+   into the warm paper palette + Inter so they don't look like a foreign
+   widget bolted onto the page. */
+.mat-mdc-select-panel, .mat-mdc-autocomplete-panel {
+  background: var(--paper) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 16px 32px -12px rgba(15, 23, 42, .22) !important;
+  min-width: 280px !important;
+  padding: 6px !important;
+}
+.mat-mdc-option {
+  font-family: 'Inter', 'Helvetica Neue', sans-serif !important;
+  color: var(--ink-soft) !important;
+  border-radius: 8px !important;
+  min-height: 40px !important;
+}
+.mat-mdc-option:hover:not(.mdc-list-item--disabled),
+.mat-mdc-option.mat-mdc-option-active {
+  background: var(--accent-soft) !important;
+}
+.mat-mdc-option.mdc-list-item--selected:not(.mat-mdc-option-multiple) {
+  background: var(--accent-soft) !important;
+  color: #4338ca !important;
+  font-weight: 600 !important;
+}
+.mat-mdc-option .mdc-list-item__primary-text { color: inherit !important; }
+.mat-mdc-select-arrow { color: var(--muted-strong) !important; }
+
+/* Dialogs */
+.mat-mdc-dialog-container .mdc-dialog__surface {
+  background: var(--paper) !important;
+  border-radius: 16px !important;
+}
+.mat-mdc-dialog-title { color: var(--ink) !important; }
+.mat-mdc-dialog-content { color: var(--ink-soft) !important; }
+
+.mat-mdc-unelevated-button.mat-primary,
+.mat-mdc-raised-button.mat-primary {
+  background-color: #6366f1 !important;
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+}
+
+.mat-mdc-outlined-button {
+  border-radius: 10px !important;
+  border-color: #cbd5e1 !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+}
+
+.mat-mdc-tab-label-container { border-bottom: 1px solid #e2e8f0 !important; }
+.mdc-tab--active .mdc-tab__text-label { color: #6366f1 !important; font-weight: 600 !important; }
+.mdc-tab-indicator__content--underline { border-color: #6366f1 !important; }
+
+.mat-mdc-snack-bar-container { border-radius: 12px !important; }
+
+/* ─── Layout tokens ─────────────────────────────────────────────────────── */
+@layer components {
+
+  /* Page header */
+  .page-header {
+    @apply flex items-center justify-between flex-wrap gap-2 mb-6;
+  }
+  .page-title {
+    font-family: 'Fraunces', serif;
+    color: var(--ink);
+    @apply text-3xl font-semibold tracking-tight;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .05);
+    @apply rounded-2xl p-5;
+  }
+  .card-header {
+    @apply flex items-center justify-between mb-4;
+  }
+  .card-title {
+    color: var(--ink-soft);
+    @apply text-base font-semibold;
+  }
+
+  /* Stat cards */
+  .stat-card {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .05);
+    @apply rounded-2xl p-5 flex items-center gap-4;
+  }
+  .stat-icon {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0;
+  }
+  .stat-value {
+    font-family: 'Fraunces', serif;
+    color: var(--ink);
+    @apply text-3xl font-semibold leading-none;
+  }
+  .stat-label {
+    color: var(--muted-strong);
+    @apply text-sm mt-1;
+  }
+
+  /* Filter bar */
+  .filter-bar {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .04);
+    @apply flex flex-wrap gap-3 mb-5 p-4 rounded-2xl;
+  }
+
+  /* Tables */
+  .data-table-wrap {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    @apply overflow-x-auto rounded-2xl;
+  }
+  .data-table {
+    @apply w-full text-sm;
+  }
+  .data-table thead tr {
+    background: var(--paper-deep);
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table thead th {
+    color: var(--muted-strong);
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide;
+  }
+  .data-table tbody tr {
+    border-bottom: 1px solid var(--border-soft);
+    @apply transition-colors;
+  }
+  .data-table tbody tr:hover {
+    background: rgba(99, 102, 241, .05);
+  }
+  .data-table tbody td {
+    @apply px-4 py-3;
+  }
+  .data-table tbody tr:last-child {
+    @apply border-b-0;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+  .badge-A   { @apply badge bg-red-100 text-red-700; }
+  .badge-AT  { @apply badge bg-amber-100 text-amber-700; }
+  .badge-J   { @apply badge bg-emerald-100 text-emerald-700; }
+  .badge-info { @apply badge bg-indigo-100 text-indigo-700; }
+  .badge-gray { @apply badge bg-slate-100 text-slate-600; }
+
+  /* Rubber-stamp badges — handwritten-ledger feel for card/summary contexts
+     (table cells keep the flatter .badge-* pills above; dense data shouldn't
+     wear a costume). */
+  .stamp {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 5px;
+    border: 1px dashed currentColor;
+    letter-spacing: .02em;
+    transform: rotate(-2deg);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .stamp-a  { color: #b91c1c; background: rgba(239, 68, 68, .08); }
+  .stamp-at { color: #92400e; background: rgba(245, 158, 11, .1); transform: rotate(2deg); }
+  .stamp-j  { color: #15803d; background: rgba(16, 185, 129, .08); transform: rotate(-1deg); }
+
+  /* Empty state */
+  .empty-state {
+    color: var(--muted);
+    @apply flex flex-col items-center justify-center py-16;
+  }
+  .empty-state .material-icons-round {
+    color: var(--border);
+    @apply text-5xl mb-3;
+  }
+
+  /* Section heading */
+  .section-title {
+    color: var(--muted-strong);
+    @apply text-sm font-semibold uppercase tracking-wide mb-3;
+  }
+
+  /* Spinner — single shared loader, replaces 5 copy-pasted inline versions */
+  .spinner {
+    display: inline-block;
+    width: 32px; height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  .spinner-sm { width: 20px; height: 20px; border-width: 2px; }
+  .spinner-lg { width: 40px; height: 40px; border-width: 3px; }
+  .spinner-center { @apply flex items-center justify-center py-12; }
+
+  /* Ghost icon button — table row actions (edit/delete/etc) */
+  .icon-btn {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    color: var(--muted-strong);
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all .15s ease;
+    @apply inline-flex items-center justify-center;
+  }
+  .icon-btn:hover { background: var(--paper-deep); border-color: var(--border); color: var(--ink-soft); }
+  .icon-btn-danger { color: #b91c1c; }
+  .icon-btn-danger:hover { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+  .icon-btn-muted { color: var(--muted); }
+
+  /* Action pill — compact colored quick-action (e.g. A / AT roll-call buttons) */
+  .action-pill {
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px dashed currentColor;
+    cursor: pointer;
+    background: transparent;
+    transition: all .15s ease;
+    @apply inline-flex items-center gap-1;
+  }
+  .action-pill-a  { color: #b91c1c; }
+  .action-pill-a:hover  { background: #ef4444; color: #fff; border-color: #ef4444; }
+  .action-pill-at { color: #92400e; }
+  .action-pill-at:hover { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+
+  /* Inline modal — fixed-overlay dialogs that don't need full MatDialog */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(28, 25, 20, .55);
+    backdrop-filter: blur(2px);
+    z-index: 200;
+    @apply flex items-center justify-center p-4;
+  }
+  .modal-panel {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, .35);
+    width: 100%;
+    max-width: 460px;
+    padding: 24px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Ledger card — ruled-paper texture + red margin stripe, reserved for
+     "hero" surfaces (calendar, dashboard summary, login card) so it stays a
+     deliberate flourish rather than wallpaper repeated on every card. */
+  .ledger-card {
+    position: relative;
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-left: 9px solid var(--stripe);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 16px 32px -20px rgba(15, 23, 42, 0.18);
+  }
+  .ledger-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(to bottom, transparent 0 35px, rgba(99, 102, 241, 0.05) 35px 36px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    @apply border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center
+           cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/40 transition-all;
+  }
+}
