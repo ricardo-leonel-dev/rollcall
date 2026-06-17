@@ -70,7 +70,7 @@ export interface Absence {
   id: number;
   enrollmentId: number;
   date: string;
-  type: 'A' | 'AT';
+  type: 'F' | 'AT';
   notes: string | null;
   photoSource: string | null;
   isJustified: boolean;

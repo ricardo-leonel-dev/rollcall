@@ -87,7 +87,7 @@ Chart.register(...registerables);
           </div>
           <div>
             <div class="stat-value" style="color:#dc2626">{{summary()!.totalAbsences}}</div>
-            <div class="stat-label">Faltas (A)</div>
+            <div class="stat-label">Faltas</div>
           </div>
         </div>
         <div class="stat-card">
@@ -96,7 +96,7 @@ Chart.register(...registerables);
           </div>
           <div>
             <div class="stat-value" style="color:#d97706">{{summary()!.totalTardies}}</div>
-            <div class="stat-label">Atrasos (AT)</div>
+            <div class="stat-label">Atrasos</div>
           </div>
         </div>
         <div class="stat-card">
@@ -180,7 +180,7 @@ Chart.register(...registerables);
                   <td style="color:var(--muted);font-size:12px;width:32px">{{i + 1}}</td>
                   <td style="font-weight:500">{{s.studentName}}</td>
                   <td style="font-size:12px;color:var(--muted-strong)">{{s.course}}</td>
-                  <td style="text-align:center"><span class="badge-A">{{s.totalAbsences}}</span></td>
+                  <td style="text-align:center"><span class="badge-F">{{s.totalAbsences}}</span></td>
                   <td style="text-align:center"><span class="badge-AT">{{s.totalTardies}}</span></td>
                 </tr>
               }

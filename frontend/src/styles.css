@@ -223,7 +223,7 @@ body {
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
-  .badge-A   { @apply badge bg-red-100 text-red-700; }
+  .badge-F   { @apply badge bg-red-100 text-red-700; }
   .badge-AT  { @apply badge bg-amber-100 text-amber-700; }
   .badge-J   { @apply badge bg-emerald-100 text-emerald-700; }
   .badge-info { @apply badge bg-indigo-100 text-indigo-700; }
@@ -245,7 +245,7 @@ body {
     align-items: center;
     gap: 3px;
   }
-  .stamp-a  { color: #b91c1c; background: rgba(239, 68, 68, .08); }
+  .stamp-f  { color: #b91c1c; background: rgba(239, 68, 68, .08); }
   .stamp-at { color: #92400e; background: rgba(245, 158, 11, .1); transform: rotate(2deg); }
   .stamp-j  { color: #15803d; background: rgba(16, 185, 129, .08); transform: rotate(-1deg); }
 
@@ -306,8 +306,8 @@ body {
     transition: all .15s ease;
     @apply inline-flex items-center gap-1;
   }
-  .action-pill-a  { color: #b91c1c; }
-  .action-pill-a:hover  { background: #ef4444; color: #fff; border-color: #ef4444; }
+  .action-pill-f  { color: #b91c1c; }
+  .action-pill-f:hover  { background: #ef4444; color: #fff; border-color: #ef4444; }
   .action-pill-at { color: #92400e; }
   .action-pill-at:hover { background: #f59e0b; color: #fff; border-color: #f59e0b; }
 

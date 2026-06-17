@@ -152,11 +152,11 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
                   <span style="font-size:14px;font-weight:500">{{e.fullName}}</span>
                 </div>
                 <div style="display:flex;gap:6px">
-                  <button class="action-pill action-pill-a" (click)="addAbsence(e.enrollmentId, 'A')">
-                    <mat-icon style="font-size:14px;width:14px;height:14px">event_busy</mat-icon> A
+                  <button class="action-pill action-pill-f" (click)="addAbsence(e.enrollmentId, 'F')">
+                    <mat-icon style="font-size:14px;width:14px;height:14px">event_busy</mat-icon> Falta
                   </button>
                   <button class="action-pill action-pill-at" (click)="addAbsence(e.enrollmentId, 'AT')">
-                    <mat-icon style="font-size:14px;width:14px;height:14px">schedule</mat-icon> AT
+                    <mat-icon style="font-size:14px;width:14px;height:14px">schedule</mat-icon> Atrasado
                   </button>
                 </div>
               </div>
@@ -186,8 +186,8 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
               <mat-label>Tipo</mat-label>
               <mat-select [(ngModel)]="filterType" (ngModelChange)="loadAbsences()">
                 <mat-option value="">Todos</mat-option>
-                <mat-option value="A">Falta (A)</mat-option>
-                <mat-option value="AT">Atraso (AT)</mat-option>
+                <mat-option value="F">Falta</mat-option>
+                <mat-option value="AT">Atrasado</mat-option>
               </mat-select>
             </mat-form-field>
             @if (selectedAbsences().length) {
@@ -232,7 +232,7 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
                       </td>
                       <td style="font-weight:500">{{a.studentName}}</td>
                       <td style="color:var(--muted-strong);white-space:nowrap">{{a.date}}</td>
-                      <td><span [class]="'badge-' + a.type">{{a.type}}</span></td>
+                      <td><span [class]="'badge-' + a.type">{{typeLabel(a.type)}}</span></td>
                       <td>
                         @if (a.isJustified) {
                           <span class="badge-J">Justificada</span>
@@ -245,7 +245,7 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
                       </td>
                       <td style="white-space:nowrap">
                         @if (a.whatsappLink) {
-                          <button mat-icon-button style="color:#16a34a" (click)="notifyGuardian(a.whatsappLink, a.studentName, a.date, a.type, a.course)" matTooltip="Notificar por WhatsApp">
+                          <button mat-icon-button style="color:#16a34a" (click)="notifyGuardian(a.whatsappLink, a.studentName, a.date, a.type, a.course, a.isJustified)" matTooltip="Notificar por WhatsApp">
                             <app-whatsapp-icon [size]="20" />
                           </button>
                         }
@@ -273,7 +273,7 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
             @for (a of selectedAbsences(); track a.id) {
               <div style="font-size:13px;padding:4px 0;color:var(--muted-strong)">
                 <strong style="color:var(--ink-soft)">{{a.studentName}}</strong> — {{a.date}}
-                <span [class]="'badge-' + a.type" style="margin-left:6px">{{a.type}}</span>
+                <span [class]="'badge-' + a.type" style="margin-left:6px">{{typeLabel(a.type)}}</span>
               </div>
             }
           </div>
@@ -393,24 +393,34 @@ export class AbsencesComponent implements OnInit {
     } finally { this.ocrLoading.set(false); }
   }
 
-  async addAbsence(enrollmentId: number, type: 'A' | 'AT'): Promise<void> {
+  typeLabel(type: 'F' | 'AT'): string {
+    return type === 'F' ? 'Falta' : 'Atrasado';
+  }
+
+  async addAbsence(enrollmentId: number, type: 'F' | 'AT'): Promise<void> {
     const today = new Date().toISOString().split('T')[0];
     try {
       await firstValueFrom(this.http.post('/api/absences', { enrollmentId, date: today, type }));
       const enrollment = this.enrollments().find(e => e.enrollmentId === enrollmentId);
       const link = enrollment?.whatsappLink;
-      const ref = this.snackBar.open(`Falta ${type} registrada`, link ? 'Notificar' : '', { duration: 4000 });
+      const ref = this.snackBar.open(`${this.typeLabel(type)} registrada`, link ? 'Notificar' : '', { duration: 4000 });
       if (link) {
         ref.onAction().subscribe(() => this.notifyGuardian(link, enrollment!.fullName, today, type, enrollment!.course));
       }
       await this.loadAbsences();
     } catch (err: any) {
-      this.snackBar.open('Error: ' + (err?.error?.error ?? 'ya existe una falta este día'), '', { duration: 3000 });
+      this.snackBar.open('Error: ' + (err?.error?.error ?? 'ya existe un registro este día'), '', { duration: 3000 });
     }
   }
 
-  notifyGuardian(whatsappLink: string, studentName: string, date: string, type: 'A' | 'AT', course: string): void {
-    const label = type === 'A' ? 'una falta' : 'un atraso';
+  notifyGuardian(whatsappLink: string, studentName: string, date: string, type: 'F' | 'AT', course: string, isJustified?: boolean): void {
+    if (isJustified) {
+      // Ya justificada: abrir el chat vacío, igual que en el listado de estudiantes —
+      // no tiene sentido mandar el mensaje con el formato de falta pendiente.
+      window.open(whatsappLink, '_blank');
+      return;
+    }
+    const label = type === 'F' ? 'una falta' : 'un atraso';
     const message = this.notificationTemplate
       .replace(/\{\{nombre\}\}/g, studentName)
       .replace(/\{\{fecha\}\}/g, date)

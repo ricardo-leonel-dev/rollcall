@@ -72,15 +72,15 @@ services:
       - OLLAMA_MAX_LOADED_MODELS=1
       - OLLAMA_KEEP_ALIVE=-1
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      test: ["CMD", "ollama", "list"]
       interval: 15s
       timeout: 10s
       retries: 40
       start_period: 30s
 
   # ─────────────────────────────────────────
-  # VLLM-VISION — GPU 1 + GPU 2
-  # tensor parallelism entre ambas GPUs
+  # VLLM-VISION — GPU 1 (single GPU)
+  # Qwen2.5-VL-3B-AWQ: ~1.8 GB pesos, ~4 GB libre para KV cache
   # ─────────────────────────────────────────
   vllm-vision:
     image: vllm/vllm-openai:latest
@@ -95,19 +95,21 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["1", "2"]
+              device_ids: ["1"]
               capabilities: [gpu]
     environment:
-      - CUDA_VISIBLE_DEVICES=0,1
-      - HF_HUB_OFFLINE=1
+      - CUDA_VISIBLE_DEVICES=0
+      - HF_HUB_OFFLINE=0
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
     command: >
-      --model Qwen/Qwen2.5-VL-7B-Instruct
-      --tensor-parallel-size 2
-      --max-model-len 4096
-      --gpu-memory-utilization 0.85
+      --model Qwen/Qwen2.5-VL-3B-Instruct-AWQ
+      --max-model-len 2048
+      --gpu-memory-utilization 0.75
       --dtype float16
+      --quantization awq
       --trust-remote-code
       --enforce-eager
+      --limit-mm-per-prompt '{"image":1}'
     shm_size: '2gb'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -181,17 +183,37 @@ services:
     restart: unless-stopped
     ports:
       - "8001:8001"
-    volumes:
-      - ./agente-ocr/plantilla_asistencia.xlsx:/app/plantilla_asistencia.xlsx:ro
-      - ocr_output:/app/output
     environment:
       - DATABASE_URL=${DATABASE_URL}
+      - DB_SCHEMA=${DB_SCHEMA}
       - VLLM_URL=${VLLM_URL}
       - VISION_MODEL=${VISION_MODEL}
     depends_on:
       postgres:
         condition: service_healthy
       vllm-vision:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────
+  # EXCEL-SERVICE — Go
+  # Export de reportes a la plantilla .xlsx + import de nómina (en progreso)
+  # ─────────────────────────────────────────
+  excel-service:
+    build:
+      context: ./excel-service
+      dockerfile: Dockerfile
+    container_name: excel-service
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./agente-ocr/plantilla_asistencia.xlsx:/app/plantilla_asistencia.xlsx:ro
+      - excel_output:/app/output
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - DB_SCHEMA=${DB_SCHEMA}
+    depends_on:
+      postgres:
         condition: service_healthy
 
   # ─────────────────────────────────────────
@@ -208,9 +230,11 @@ services:
       - "3000:3000"
     environment:
       - DATABASE_URL=${DATABASE_URL}
+      - DB_SCHEMA=${DB_SCHEMA}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
       - OCR_SERVICE_URL=http://ocr-service:8001
+      - EXCEL_SERVICE_URL=http://excel-service:8002
       - NODE_ENV=production
     depends_on:
       postgres:
@@ -244,7 +268,7 @@ volumes:
   vllm_vision_data:
   webui_data:
   postgres_data:
-  ocr_output:
+  excel_output:
 
 networks:
   default:

@@ -41,7 +41,7 @@ export async function create(data: {
     if (abs.enrollmentId !== data.enrollmentId) {
       throw Object.assign(new Error(`Absence ${absId} does not belong to this enrollment`), { status: 400 });
     }
-    if (!['A', 'AT'].includes(abs.type)) {
+    if (!['F', 'AT'].includes(abs.type)) {
       throw Object.assign(new Error(`Invalid absence type: ${abs.type}`), { status: 400 });
     }
     const exists = await jaRepo().findOne({ where: { absenceId: absId } });

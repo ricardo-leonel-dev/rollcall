@@ -13,7 +13,7 @@ export class Absence {
   date!: string;
 
   @Column({ name: 'type', length: 5 })
-  type!: 'A' | 'AT';
+  type!: 'F' | 'AT';
 
   @Column({ name: 'notes', type: 'varchar', nullable: true })
   notes!: string | null;

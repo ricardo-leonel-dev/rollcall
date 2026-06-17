@@ -11,7 +11,7 @@ export async function getSummary(courseId?: number, academicYearId?: number) {
 
   const [totals] = await AppDataSource.query(`
     SELECT
-      COUNT(*) FILTER (WHERE a.type = 'A')  AS total_absences,
+      COUNT(*) FILTER (WHERE a.type = 'F')  AS total_absences,
       COUNT(*) FILTER (WHERE a.type = 'AT') AS total_tardies,
       COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM justification_absences ja WHERE ja.absence_id = a.id)) AS justified_count,
       COUNT(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM justification_absences ja WHERE ja.absence_id = a.id)) AS unjustified_count
@@ -23,7 +23,7 @@ export async function getSummary(courseId?: number, academicYearId?: number) {
   const topStudents = await AppDataSource.query(`
     SELECT
       e.name AS "studentName", m.roster_number AS "rosterNumber", c.name AS course,
-      COUNT(*) FILTER (WHERE a.type = 'A')  AS "totalAbsences",
+      COUNT(*) FILTER (WHERE a.type = 'F')  AS "totalAbsences",
       COUNT(*) FILTER (WHERE a.type = 'AT') AS "totalTardies"
     FROM absences a
     JOIN enrollments m     ON m.id = a.enrollment_id

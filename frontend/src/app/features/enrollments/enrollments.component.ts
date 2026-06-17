@@ -26,7 +26,7 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
     <div class="filter-bar">
       <mat-form-field appearance="outline" style="width:180px">
         <mat-label>Año lectivo</mat-label>
-        <mat-select [(ngModel)]="selYear" (ngModelChange)="load()">
+        <mat-select [(ngModel)]="selYear" (ngModelChange)="onYearChange()">
           @for (y of years(); track y.id) { <mat-option [value]="y.id">{{y.name}}</mat-option> }
         </mat-select>
       </mat-form-field>
@@ -36,6 +36,14 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
           <mat-option [value]="null">— Seleccionar —</mat-option>
           @for (c of courses(); track c.id) { <mat-option [value]="c.id">{{c.name}}</mat-option> }
         </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" style="width:150px">
+        <mat-label>Desde</mat-label>
+        <input matInput type="date" [(ngModel)]="dateFrom">
+      </mat-form-field>
+      <mat-form-field appearance="outline" style="width:150px">
+        <mat-label>Hasta</mat-label>
+        <input matInput type="date" [(ngModel)]="dateTo">
       </mat-form-field>
       @if (enrollments().length) {
         <div style="align-self:center;background:var(--accent-soft);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:#4f46e5">
@@ -156,7 +164,34 @@ export class EnrollmentsComponent implements OnInit {
     this.years.set(years);
     this.courses.set(courses);
     const active = years.find(y => y.isActive);
-    if (active) this.selYear = active.id;
+    if (active) {
+      this.selYear = active.id;
+      this.setDefaultTrimester(active);
+    }
+  }
+
+  onYearChange(): void {
+    const year = this.years().find(y => y.id === this.selYear);
+    if (year) this.setDefaultTrimester(year);
+    this.load();
+  }
+
+  /** Marca por defecto el trimestre actual, dividiendo el año lectivo en 3
+   * tercios iguales desde su fecha de inicio. */
+  private setDefaultTrimester(year: AcademicYear): void {
+    if (!year.startDate || !year.endDate) return;
+    const fmt = (d: Date) => d.toISOString().split('T')[0];
+    const start = new Date(year.startDate);
+    const end = new Date(year.endDate);
+    const third = (end.getTime() - start.getTime()) / 3;
+    const bounds = [start, new Date(start.getTime() + third), new Date(start.getTime() + 2 * third), end];
+
+    const today = new Date();
+    const clamped = today < start ? start : today > end ? end : today;
+    const idx = bounds.slice(1).findIndex(b => clamped.getTime() <= b.getTime());
+    const i = idx === -1 ? 2 : idx;
+    this.dateFrom = fmt(bounds[i]);
+    this.dateTo = fmt(bounds[i + 1]);
   }
 
   async load(): Promise<void> {

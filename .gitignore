@@ -11,6 +11,7 @@
 
 # DB seed data (only schema is committed)
 postgres/init.sql
+postgres/backups/
 
 # Node
 node_modules/

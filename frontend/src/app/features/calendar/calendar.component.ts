@@ -13,7 +13,7 @@ interface DayCell {
   inMonth: boolean;
   isToday: boolean;
   absences: Absence[];
-  countA: number;
+  countF: number;
   countAT: number;
 }
 
@@ -95,9 +95,9 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
                     } @else {
                       <span class="day-num">{{cell.day}}</span>
                     }
-                    @if (cell.countA || cell.countAT) {
+                    @if (cell.countF || cell.countAT) {
                       <div class="stamp-row">
-                        @if (cell.countA)  { <span class="stamp stamp-a">{{cell.countA}} A</span> }
+                        @if (cell.countF)  { <span class="stamp stamp-f">{{cell.countF}} F</span> }
                         @if (cell.countAT) { <span class="stamp stamp-at">{{cell.countAT}} AT</span> }
                       </div>
                     }
@@ -241,7 +241,7 @@ export class CalendarComponent implements OnInit {
         inMonth: date.getMonth() === month,
         isToday: iso === todayIso,
         absences: dayAbsences,
-        countA: dayAbsences.filter(a => a.type === 'A').length,
+        countF: dayAbsences.filter(a => a.type === 'F').length,
         countAT: dayAbsences.filter(a => a.type === 'AT').length,
       });
     }
@@ -264,7 +264,7 @@ export class CalendarComponent implements OnInit {
     let a = 0, at = 0;
     for (const week of this.weeks()) {
       for (const c of week) {
-        if (c.inMonth) { a += c.countA; at += c.countAT; }
+        if (c.inMonth) { a += c.countF; at += c.countAT; }
       }
     }
     return { a, at };

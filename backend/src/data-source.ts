@@ -17,6 +17,7 @@ import { JustificationAbsence } from './entities/JustificationAbsence';
 export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
+  schema: process.env.DB_SCHEMA || 'attendance',
   synchronize: false,
   logging: process.env.NODE_ENV !== 'production',
   entities: [

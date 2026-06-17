@@ -58,11 +58,11 @@ export async function findById(id: number) {
 }
 
 export async function create(data: {
-  enrollmentId: number; date: string; type: 'A' | 'AT';
+  enrollmentId: number; date: string; type: 'F' | 'AT';
   notes?: string; photoSource?: string;
 }) {
-  if (!['A', 'AT'].includes(data.type)) {
-    throw Object.assign(new Error('Invalid type. Only A or AT'), { status: 400 });
+  if (!['F', 'AT'].includes(data.type)) {
+    throw Object.assign(new Error('Invalid type. Only F or AT'), { status: 400 });
   }
   const a = repo().create({
     enrollmentId: data.enrollmentId,
@@ -75,11 +75,11 @@ export async function create(data: {
 }
 
 export async function update(id: number, data: Partial<{
-  date: string; type: 'A' | 'AT'; notes: string; photoSource: string;
+  date: string; type: 'F' | 'AT'; notes: string; photoSource: string;
 }>) {
   const a = await findById(id);
-  if (data.type && !['A', 'AT'].includes(data.type)) {
-    throw Object.assign(new Error('Invalid type. Only A or AT'), { status: 400 });
+  if (data.type && !['F', 'AT'].includes(data.type)) {
+    throw Object.assign(new Error('Invalid type. Only F or AT'), { status: 400 });
   }
   if (data.date)                      a.date        = data.date;
   if (data.type)                      a.type        = data.type;

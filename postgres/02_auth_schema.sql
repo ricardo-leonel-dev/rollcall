@@ -3,6 +3,9 @@
 -- Runs AFTER 01_init.sql (alphabetical order guaranteed)
 -- ================================================================
 
+CREATE SCHEMA IF NOT EXISTS attendance;
+SET search_path TO attendance;
+
 -- ─── MISSING COLUMNS IN EXISTING TABLES ──────────────────────────
 ALTER TABLE academic_years
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW(),
