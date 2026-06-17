@@ -44,7 +44,6 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler(pool))
 	mux.HandleFunc("GET /export/excel", exportExcelHandler(pool, plantillaPath, outputDir))
-	mux.HandleFunc("POST /import/roster", importRosterHandler())
 
 	port := os.Getenv("PORT")
 	if port == "" {

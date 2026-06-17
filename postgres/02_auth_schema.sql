@@ -220,7 +220,8 @@ SELECT
   r.email             AS guardian_email,
   m.is_active,
   m.deleted_at,
-  m.created_at
+  m.created_at,
+  r.id_number         AS guardian_id_number
 FROM enrollments m
 JOIN students e        ON e.id = m.student_id
 JOIN courses c         ON c.id = m.course_id
