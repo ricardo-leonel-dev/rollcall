@@ -10,7 +10,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
-import { AcademicYear, Course, User, Role, RolePermission } from '../../core/models/index';
+import { AcademicYear, Course, User, Role, RolePermission, Institution } from '../../core/models/index';
+import { AuthService } from '../../core/services/auth.service';
+import { InstitutionContextService } from '../../core/services/institution-context.service';
 
 @Component({
   standalone: true,
@@ -40,6 +42,41 @@ import { AcademicYear, Course, User, Role, RolePermission } from '../../core/mod
     </div>
 
     <mat-tab-group style="background:var(--paper);border-radius:16px;border:1px solid var(--border);overflow:hidden">
+
+      <!-- INSTITUCIONES (solo superadmin) -->
+      @if (auth.isSuperAdmin()) {
+        <mat-tab>
+          <ng-template mat-tab-label>
+            <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">corporate_fare</mat-icon>
+            Instituciones
+          </ng-template>
+          <div class="tab-content">
+            <div class="section-card">
+              <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-strong);margin-bottom:12px">Nueva institución</div>
+              <div class="inline-form">
+                <mat-form-field appearance="outline" style="flex:2"><mat-label>Nombre</mat-label><input matInput [(ngModel)]="newInstitution.name"></mat-form-field>
+                <button mat-flat-button color="primary" (click)="createInstitution()" style="height:56px;min-width:100px">
+                  <mat-icon>add</mat-icon> Agregar
+                </button>
+              </div>
+            </div>
+            @for (inst of institutionContext.institutions(); track inst.id) {
+              <div class="list-item">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center">
+                    <mat-icon style="color:#4f46e5">corporate_fare</mat-icon>
+                  </div>
+                  <div style="font-weight:600">{{inst.name}}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span [class]="inst.isActive ? 'badge-J' : 'badge-gray'">{{inst.isActive ? 'Activa' : 'Inactiva'}}</span>
+                  <button mat-icon-button style="color:#b91c1c" (click)="deactivateInstitution(inst.id)"><mat-icon>delete_outline</mat-icon></button>
+                </div>
+              </div>
+            }
+          </div>
+        </mat-tab>
+      }
 
       <!-- AÑOS LECTIVOS -->
       <mat-tab>
@@ -134,6 +171,14 @@ import { AcademicYear, Course, User, Role, RolePermission } from '../../core/mod
                   @for (r of roles(); track r.id) { <mat-option [value]="r.id">{{r.name}}</mat-option> }
                 </mat-select>
               </mat-form-field>
+              @if (auth.isSuperAdmin()) {
+                <mat-form-field appearance="outline" style="min-width:200px;flex:0">
+                  <mat-label>Institución</mat-label>
+                  <mat-select [(ngModel)]="newUser.institutionId">
+                    @for (inst of institutionContext.institutions(); track inst.id) { <mat-option [value]="inst.id">{{inst.name}}</mat-option> }
+                  </mat-select>
+                </mat-form-field>
+              }
               <button mat-flat-button color="primary" (click)="createUser()" style="height:56px;min-width:100px">
                 <mat-icon>person_add</mat-icon> Crear
               </button>
@@ -258,6 +303,8 @@ import { AcademicYear, Course, User, Role, RolePermission } from '../../core/mod
 export class AdminComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly snack = inject(MatSnackBar);
+  readonly auth = inject(AuthService);
+  readonly institutionContext = inject(InstitutionContextService);
 
   readonly years = signal<AcademicYear[]>([]);
   readonly courses = signal<Course[]>([]);
@@ -270,15 +317,24 @@ export class AdminComponent implements OnInit {
   selRole: number | null = null;
   newYear = { name: '', startDate: '', endDate: '' };
   newCourse = { name: '' };
-  newUser = { username: '', password: '', fullName: '', roleId: null as number | null };
+  newUser = { username: '', password: '', fullName: '', roleId: null as number | null, institutionId: null as number | null };
+  newInstitution = { name: '' };
 
-  async ngOnInit(): Promise<void> { await this.loadAll(); }
+  async ngOnInit(): Promise<void> {
+    // For a superadmin, an institution must be selected before any
+    // institution-scoped endpoint below will succeed — load/auto-select
+    // first. A brand-new superadmin with zero institutions yet simply gets
+    // empty lists below until they create one in the Instituciones tab.
+    if (this.auth.isSuperAdmin()) await this.institutionContext.loadInstitutions();
+    await this.loadAll();
+  }
 
   async loadAll(): Promise<void> {
+    const noInstitutionYet = this.auth.isSuperAdmin() && this.institutionContext.selectedId() === null;
     const [years, courses, users, roles] = await Promise.all([
-      firstValueFrom(this.http.get<AcademicYear[]>('/api/academic-years')),
-      firstValueFrom(this.http.get<Course[]>('/api/courses')),
-      firstValueFrom(this.http.get<User[]>('/api/users')),
+      noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<AcademicYear[]>('/api/academic-years')).catch(() => []),
+      noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<Course[]>('/api/courses')).catch(() => []),
+      noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<User[]>('/api/users')).catch(() => []),
       firstValueFrom(this.http.get<Role[]>('/api/roles')),
     ]);
     this.years.set(years); this.courses.set(courses);
@@ -316,9 +372,23 @@ export class AdminComponent implements OnInit {
   async createUser(): Promise<void> {
     if (!this.newUser.username || !this.newUser.password) return;
     await firstValueFrom(this.http.post('/api/users', this.newUser));
-    this.newUser = { username: '', password: '', fullName: '', roleId: null };
+    this.newUser = { username: '', password: '', fullName: '', roleId: null, institutionId: null };
     this.snack.open('Usuario creado', '', { duration: 2000 });
     await this.loadAll();
+  }
+
+  async createInstitution(): Promise<void> {
+    if (!this.newInstitution.name) return;
+    await firstValueFrom(this.http.post('/api/institutions', this.newInstitution));
+    this.newInstitution = { name: '' };
+    this.snack.open('Institución creada', '', { duration: 2000 });
+    await this.institutionContext.loadInstitutions();
+  }
+
+  async deactivateInstitution(id: number): Promise<void> {
+    if (!confirm('¿Desactivar esta institución?')) return;
+    await firstValueFrom(this.http.delete(`/api/institutions/${id}`));
+    await this.institutionContext.loadInstitutions();
   }
 
   async deleteUser(id: number): Promise<void> {

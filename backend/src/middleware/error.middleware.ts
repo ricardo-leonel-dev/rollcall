@@ -1,5 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 
+interface HttpError extends Error {
+  status?: number;
+}
+
 export function errorMiddleware(err: unknown, req: Request, res: Response, _next: NextFunction): void {
   console.error('[error]', err);
 
@@ -14,7 +18,7 @@ export function errorMiddleware(err: unknown, req: Request, res: Response, _next
       res.status(409).json({ error: 'Referencia inválida', detail: err.message });
       return;
     }
-    res.status(500).json({ error: err.message });
+    res.status((err as HttpError).status ?? 500).json({ error: err.message });
     return;
   }
 

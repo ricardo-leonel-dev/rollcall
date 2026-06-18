@@ -15,6 +15,9 @@ export class Enrollment {
   @Column({ name: 'academic_year_id', type: 'integer' })
   academicYearId!: number;
 
+  @Column({ name: 'institution_id', type: 'integer' })
+  institutionId!: number;
+
   @Column({ name: 'guardian_id', nullable: true, type: 'integer' })
   guardianId!: number | null;
 

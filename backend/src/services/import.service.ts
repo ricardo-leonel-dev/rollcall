@@ -18,7 +18,7 @@ function padIdNumber(raw: string): string {
   return trimmed;
 }
 
-export async function importRoster(buffer: Buffer): Promise<{
+export async function importRoster(institutionId: number, buffer: Buffer): Promise<{
   coursesProcessed: number; studentsCreated: number;
   studentsUpdated: number; enrollmentsCreated: number; errors: string[];
 }> {
@@ -30,7 +30,7 @@ export async function importRoster(buffer: Buffer): Promise<{
   const enrollRepo   = AppDataSource.getRepository(Enrollment);
   const ayRepo       = AppDataSource.getRepository(AcademicYear);
 
-  const activeYear = await ayRepo.findOne({ where: { isActive: true, deletedAt: null as any } });
+  const activeYear = await ayRepo.findOne({ where: { institutionId, isActive: true, deletedAt: null as any } });
   if (!activeYear) throw Object.assign(new Error('No active academic year found'), { status: 400 });
 
   const stats = { coursesProcessed: 0, studentsCreated: 0, studentsUpdated: 0, enrollmentsCreated: 0, errors: [] as string[] };
@@ -56,9 +56,9 @@ export async function importRoster(buffer: Buffer): Promise<{
     const colEnroll = colIndex('MATRICULADO');
 
     const courseName = normalizeStr(sheetName);
-    let course = await courseRepo.findOne({ where: { name: courseName, deletedAt: null as any } });
+    let course = await courseRepo.findOne({ where: { institutionId, name: courseName, deletedAt: null as any } });
     if (!course) {
-      course = courseRepo.create({ name: courseName, shift: 'MATUTINA' });
+      course = courseRepo.create({ institutionId, name: courseName, shift: 'MATUTINA' });
       course = await courseRepo.save(course);
     }
     stats.coursesProcessed++;
@@ -85,8 +85,8 @@ export async function importRoster(buffer: Buffer): Promise<{
         }
 
         let student: Student | null = null;
-        if (idNumber) student = await studentRepo.findOne({ where: { idNumber, deletedAt: null as any } });
-        if (!student) student = await studentRepo.findOne({ where: { name: rawName, deletedAt: null as any } });
+        if (idNumber) student = await studentRepo.findOne({ where: { institutionId, idNumber, deletedAt: null as any } });
+        if (!student) student = await studentRepo.findOne({ where: { institutionId, name: rawName, deletedAt: null as any } });
 
         if (student) {
           student.name = rawName;
@@ -96,7 +96,7 @@ export async function importRoster(buffer: Buffer): Promise<{
           await studentRepo.save(student);
           stats.studentsUpdated++;
         } else {
-          student = studentRepo.create({ name: rawName, idNumber: idNumber ?? null, gender: gender ?? null, birthDate: birthDate ?? null });
+          student = studentRepo.create({ institutionId, name: rawName, idNumber: idNumber ?? null, gender: gender ?? null, birthDate: birthDate ?? null });
           student = await studentRepo.save(student);
           stats.studentsCreated++;
         }
@@ -105,10 +105,11 @@ export async function importRoster(buffer: Buffer): Promise<{
         if (colGuard >= 0 && row[colGuard]) {
           const guardName = normalizeStr(String(row[colGuard]));
           if (guardName) {
-            guardian = await guardianRepo.findOne({ where: { name: guardName, deletedAt: null as any } });
+            guardian = await guardianRepo.findOne({ where: { institutionId, name: guardName, deletedAt: null as any } });
             if (!guardian) {
               const phone = colPhone >= 0 ? String(row[colPhone] ?? '').trim() : undefined;
               guardian = guardianRepo.create({
+                institutionId,
                 name: guardName,
                 phone: phone || null,
                 whatsappLink: phone ? `https://wa.me/593${phone.replace(/^0/, '')}` : null,
@@ -120,7 +121,7 @@ export async function importRoster(buffer: Buffer): Promise<{
 
         const existing = await enrollRepo.findOne({
           where: {
-            studentId: student.id, courseId: course.id,
+            institutionId, studentId: student.id, courseId: course.id,
             academicYearId: activeYear.id, deletedAt: null as any,
           },
         });
@@ -132,6 +133,7 @@ export async function importRoster(buffer: Buffer): Promise<{
           const enrolled = colEnroll >= 0 ? String(row[colEnroll] ?? '').trim().toUpperCase() !== 'NO' : true;
 
           await enrollRepo.save(enrollRepo.create({
+            institutionId,
             studentId: student.id,
             courseId: course.id,
             academicYearId: activeYear.id,

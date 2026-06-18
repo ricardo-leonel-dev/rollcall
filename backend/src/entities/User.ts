@@ -20,6 +20,9 @@ export class User {
   @Column({ name: 'role_id', nullable: true, type: 'integer' })
   roleId!: number | null;
 
+  @Column({ name: 'institution_id', nullable: true, type: 'integer' })
+  institutionId!: number | null;
+
   @Column({ name: 'is_active', default: true })
   isActive!: boolean;
 

@@ -6,7 +6,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { AppDataSource } from './data-source';
-import { seedAdmin } from './seed';
+import { seedSuperAdmin } from './seed';
 import routes from './routes/index';
 import { errorMiddleware } from './middleware/error.middleware';
 
@@ -28,7 +28,7 @@ async function bootstrap() {
     await AppDataSource.initialize();
     console.log('[db] Conexión establecida');
 
-    await seedAdmin();
+    await seedSuperAdmin();
 
     app.listen(PORT, () => {
       console.log(`[server] Backend escuchando en http://0.0.0.0:${PORT}`);

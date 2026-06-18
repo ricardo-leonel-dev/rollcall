@@ -5,8 +5,11 @@ export class Course {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ name: 'name', unique: true, type: 'varchar' })
+  @Column({ name: 'name', type: 'varchar' })
   name!: string;
+
+  @Column({ name: 'institution_id', type: 'integer' })
+  institutionId!: number;
 
   @Column({ name: 'shift', default: 'MATUTINA', type: 'varchar' })
   shift!: string;

@@ -11,6 +11,9 @@ export class Student {
   @Column({ name: 'name', type: 'varchar' })
   name!: string;
 
+  @Column({ name: 'institution_id', type: 'integer' })
+  institutionId!: number;
+
   @Column({ name: 'gender', type: 'char', length: 1, nullable: true })
   gender!: string | null;
 

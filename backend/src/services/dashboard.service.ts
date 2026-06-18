@@ -1,9 +1,9 @@
 import { AppDataSource } from '../data-source';
 
-export async function getSummary(courseId?: number, academicYearId?: number) {
-  const filters: string[] = ['a.deleted_at IS NULL', 'm.deleted_at IS NULL'];
-  const params: any[] = [];
-  let i = 1;
+export async function getSummary(institutionId: number, courseId?: number, academicYearId?: number) {
+  const filters: string[] = ['a.deleted_at IS NULL', 'm.deleted_at IS NULL', 'a.institution_id = $1'];
+  const params: any[] = [institutionId];
+  let i = 2;
   if (courseId)       { filters.push(`m.course_id = $${i++}`);        params.push(courseId); }
   if (academicYearId) { filters.push(`m.academic_year_id = $${i++}`); params.push(academicYearId); }
 

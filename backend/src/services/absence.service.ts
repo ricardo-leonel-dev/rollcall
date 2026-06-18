@@ -1,5 +1,6 @@
 import { AppDataSource } from '../data-source';
 import { Absence } from '../entities/Absence';
+import { Enrollment } from '../entities/Enrollment';
 
 const repo = () => AppDataSource.getRepository(Absence);
 
@@ -13,10 +14,10 @@ interface AbsenceFilters {
   isJustified?: string;
 }
 
-export async function findAll(filters: AbsenceFilters) {
-  const conditions: string[] = ['a.deleted_at IS NULL', 'm.deleted_at IS NULL'];
-  const params: any[] = [];
-  let i = 1;
+export async function findAll(institutionId: number, filters: AbsenceFilters) {
+  const conditions: string[] = ['a.deleted_at IS NULL', 'm.deleted_at IS NULL', 'a.institution_id = $1'];
+  const params: any[] = [institutionId];
+  let i = 2;
 
   if (filters.enrollmentId)   { conditions.push(`a.enrollment_id = $${i++}`);   params.push(filters.enrollmentId); }
   if (filters.courseId)       { conditions.push(`m.course_id = $${i++}`);        params.push(filters.courseId); }
@@ -51,20 +52,24 @@ export async function findAll(filters: AbsenceFilters) {
   return AppDataSource.query(sql, params);
 }
 
-export async function findById(id: number) {
-  const a = await repo().findOne({ where: { id, deletedAt: null as any } });
+export async function findById(institutionId: number, id: number) {
+  const a = await repo().findOne({ where: { id, institutionId, deletedAt: null as any } });
   if (!a) throw Object.assign(new Error('Absence not found'), { status: 404 });
   return a;
 }
 
-export async function create(data: {
+export async function create(institutionId: number, data: {
   enrollmentId: number; date: string; type: 'F' | 'AT';
   notes?: string; photoSource?: string;
 }) {
   if (!['F', 'AT'].includes(data.type)) {
     throw Object.assign(new Error('Invalid type. Only F or AT'), { status: 400 });
   }
+  const enrollment = await AppDataSource.getRepository(Enrollment).findOne({ where: { id: data.enrollmentId, institutionId } });
+  if (!enrollment) throw Object.assign(new Error('Enrollment not found'), { status: 404 });
+
   const a = repo().create({
+    institutionId,
     enrollmentId: data.enrollmentId,
     date: data.date,
     type: data.type,
@@ -74,10 +79,10 @@ export async function create(data: {
   return repo().save(a);
 }
 
-export async function update(id: number, data: Partial<{
+export async function update(institutionId: number, id: number, data: Partial<{
   date: string; type: 'F' | 'AT'; notes: string; photoSource: string;
 }>) {
-  const a = await findById(id);
+  const a = await findById(institutionId, id);
   if (data.type && !['F', 'AT'].includes(data.type)) {
     throw Object.assign(new Error('Invalid type. Only F or AT'), { status: 400 });
   }
@@ -88,8 +93,8 @@ export async function update(id: number, data: Partial<{
   return repo().save(a);
 }
 
-export async function remove(id: number) {
-  const a = await findById(id);
+export async function remove(institutionId: number, id: number) {
+  const a = await findById(institutionId, id);
   a.deletedAt = new Date();
   a.isActive = false;
   await repo().save(a);

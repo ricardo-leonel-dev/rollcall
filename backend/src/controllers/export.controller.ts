@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { requirePermission } from '../middleware/role.middleware';
+import { requireInstitution } from '../middleware/institution.middleware';
 import * as svc from '../services/export.service';
 
 const router = Router();
+
+router.use(requireInstitution);
 
 router.get('/excel', requirePermission('export','read'), async (req, res) => {
   const { course_id, academic_year_id, date_from, date_to } = req.query as Record<string, string>;
@@ -11,7 +14,7 @@ router.get('/excel', requirePermission('export','read'), async (req, res) => {
     return;
   }
 
-  const ocrResp = await svc.exportExcel(+course_id, +academic_year_id, date_from, date_to);
+  const ocrResp = await svc.exportExcel(req.institutionId!, +course_id, +academic_year_id, date_from, date_to);
 
   const contentType = ocrResp.headers.get('content-type') || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   const disposition = ocrResp.headers.get('content-disposition') || 'attachment; filename="asistencia.xlsx"';

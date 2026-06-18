@@ -17,6 +17,9 @@ export class PhotoLog {
   @Column({ name: 'academic_year_id', nullable: true, type: 'integer' })
   academicYearId!: number | null;
 
+  @Column({ name: 'institution_id', type: 'integer' })
+  institutionId!: number;
+
   @Column({ name: 'records_created', default: 0, type: 'integer' })
   recordsCreated!: number;
 

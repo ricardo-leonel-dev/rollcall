@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware';
+import { institutionMiddleware } from '../middleware/institution.middleware';
 
 import authRouter            from '../controllers/auth.controller';
 import academicYearRouter    from '../controllers/academic-year.controller';
@@ -15,6 +16,8 @@ import userRouter            from '../controllers/user.controller';
 import dashboardRouter       from '../controllers/dashboard.controller';
 import importRouter          from '../controllers/import.controller';
 import exportRouter          from '../controllers/export.controller';
+import institutionRouter     from '../controllers/institution.controller';
+import ocrRouter             from '../controllers/ocr.controller';
 
 const router = Router();
 
@@ -24,8 +27,9 @@ router.get('/health', (_req, res) => res.json({ status: 'ok' }));
 // Auth (login is public)
 router.use('/auth', authRouter);
 
-// All protected routes require JWT
+// All protected routes require JWT + a resolved institution context
 router.use(authMiddleware);
+router.use(institutionMiddleware);
 
 router.use('/academic-years',       academicYearRouter);
 router.use('/courses',              courseRouter);
@@ -41,5 +45,7 @@ router.use('/users',                userRouter);
 router.use('/dashboard',            dashboardRouter);
 router.use('/import',               importRouter);
 router.use('/export',               exportRouter);
+router.use('/institutions',         institutionRouter);
+router.use('/ocr',                  ocrRouter);
 
 export default router;

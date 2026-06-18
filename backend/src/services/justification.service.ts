@@ -2,32 +2,40 @@ import { AppDataSource } from '../data-source';
 import { Justification } from '../entities/Justification';
 import { JustificationAbsence } from '../entities/JustificationAbsence';
 import { Absence } from '../entities/Absence';
+import { Enrollment } from '../entities/Enrollment';
 
 const repo = () => AppDataSource.getRepository(Justification);
 const jaRepo = () => AppDataSource.getRepository(JustificationAbsence);
 const absRepo = () => AppDataSource.getRepository(Absence);
 
-export async function findAll(enrollmentId?: number) {
+export async function findAll(institutionId: number, enrollmentId?: number) {
+  const params: any[] = [institutionId];
+  let enrollmentFilter = '';
+  if (enrollmentId) {
+    params.push(enrollmentId);
+    enrollmentFilter = `AND j.enrollment_id = $${params.length}`;
+  }
+
   const sql = `
     SELECT j.*,
       COALESCE(json_agg(ja.absence_id) FILTER (WHERE ja.absence_id IS NOT NULL), '[]') AS absence_ids
     FROM justifications j
     LEFT JOIN justification_absences ja ON ja.justification_id = j.id
-    WHERE j.deleted_at IS NULL
-    ${enrollmentId ? `AND j.enrollment_id = ${enrollmentId}` : ''}
+    WHERE j.institution_id = $1 AND j.deleted_at IS NULL
+    ${enrollmentFilter}
     GROUP BY j.id
     ORDER BY j.created_at DESC
   `;
-  return AppDataSource.query(sql);
+  return AppDataSource.query(sql, params);
 }
 
-export async function findById(id: number) {
-  const j = await repo().findOne({ where: { id, deletedAt: null as any } });
+export async function findById(institutionId: number, id: number) {
+  const j = await repo().findOne({ where: { id, institutionId, deletedAt: null as any } });
   if (!j) throw Object.assign(new Error('Justification not found'), { status: 404 });
   return j;
 }
 
-export async function create(data: {
+export async function create(institutionId: number, data: {
   enrollmentId: number; reason: string;
   notifiedBy?: string; absenceIds: number[];
 }) {
@@ -35,8 +43,11 @@ export async function create(data: {
     throw Object.assign(new Error('At least one absence is required'), { status: 400 });
   }
 
+  const enrollment = await AppDataSource.getRepository(Enrollment).findOne({ where: { id: data.enrollmentId, institutionId } });
+  if (!enrollment) throw Object.assign(new Error('Enrollment not found'), { status: 404 });
+
   for (const absId of data.absenceIds) {
-    const abs = await absRepo().findOne({ where: { id: absId, deletedAt: null as any } });
+    const abs = await absRepo().findOne({ where: { id: absId, institutionId, deletedAt: null as any } });
     if (!abs) throw Object.assign(new Error(`Absence ${absId} not found`), { status: 404 });
     if (abs.enrollmentId !== data.enrollmentId) {
       throw Object.assign(new Error(`Absence ${absId} does not belong to this enrollment`), { status: 400 });
@@ -50,6 +61,7 @@ export async function create(data: {
 
   return AppDataSource.transaction(async (em) => {
     const j = em.create(Justification, {
+      institutionId,
       enrollmentId: data.enrollmentId,
       reason: data.reason,
       notifiedBy: data.notifiedBy ?? null,
@@ -68,10 +80,10 @@ export async function create(data: {
   });
 }
 
-export async function update(id: number, data: {
+export async function update(institutionId: number, id: number, data: {
   reason?: string; notifiedBy?: string; absenceIds?: number[];
 }) {
-  const j = await findById(id);
+  const j = await findById(institutionId, id);
 
   if (data.reason) j.reason = data.reason;
   if (data.notifiedBy !== undefined) j.notifiedBy = data.notifiedBy;
@@ -91,8 +103,8 @@ export async function update(id: number, data: {
   });
 }
 
-export async function remove(id: number) {
-  const j = await findById(id);
+export async function remove(institutionId: number, id: number) {
+  const j = await findById(institutionId, id);
 
   return AppDataSource.transaction(async (em) => {
     await em.delete(JustificationAbsence, { justificationId: id });

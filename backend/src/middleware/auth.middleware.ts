@@ -6,12 +6,14 @@ export interface AuthUser {
   username: string;
   roleId: number;
   roleName: string;
+  institutionId: number | null;
 }
 
 declare global {
   namespace Express {
     interface Request {
       user?: AuthUser;
+      institutionId?: number;
     }
   }
 }

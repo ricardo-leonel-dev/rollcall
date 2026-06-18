@@ -385,7 +385,7 @@ export class AbsencesComponent implements OnInit {
       fd.append('course_id', String(this.selCourse));
       fd.append('academic_year_id', String(this.selYear));
       if (this.photoDate) fd.append('date', this.photoDate);
-      const result = await firstValueFrom(this.http.post<OcrResult>('/ocr/process-photo', fd));
+      const result = await firstValueFrom(this.http.post<OcrResult>('/api/ocr/process-photo', fd));
       this.ocrResult.set(result);
       await this.loadAbsences();
     } catch (err: any) {

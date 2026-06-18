@@ -13,6 +13,7 @@ import { RolePermission } from './entities/RolePermission';
 import { User } from './entities/User';
 import { Justification } from './entities/Justification';
 import { JustificationAbsence } from './entities/JustificationAbsence';
+import { Institution } from './entities/Institution';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -34,6 +35,7 @@ export const AppDataSource = new DataSource({
     User,
     Justification,
     JustificationAbsence,
+    Institution,
   ],
   migrations: [],
   subscribers: [],

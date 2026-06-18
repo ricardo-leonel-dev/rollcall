@@ -8,6 +8,9 @@ export class Guardian {
   @Column({ name: 'name', type: 'varchar' })
   name!: string;
 
+  @Column({ name: 'institution_id', type: 'integer' })
+  institutionId!: number;
+
   @Column({ name: 'id_number', type: 'varchar', nullable: true })
   idNumber!: string | null;
 

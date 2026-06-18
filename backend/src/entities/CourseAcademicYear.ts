@@ -12,6 +12,9 @@ export class CourseAcademicYear {
   @Column({ name: 'academic_year_id', type: 'integer' })
   academicYearId!: number;
 
+  @Column({ name: 'institution_id', type: 'integer' })
+  institutionId!: number;
+
   @Column({ name: 'teacher', type: 'varchar', nullable: true })
   teacher!: string | null;
 

@@ -3,29 +3,29 @@ import { AppDataSource } from './data-source';
 import { User } from './entities/User';
 import { Role } from './entities/Role';
 
-export async function seedAdmin(): Promise<void> {
+export async function seedSuperAdmin(): Promise<void> {
   const userRepo = AppDataSource.getRepository(User);
   const roleRepo = AppDataSource.getRepository(Role);
 
-  const existingAdmin = await userRepo.findOne({ where: { username: 'admin' } });
-  if (existingAdmin) return;
-
-  const adminRole = await roleRepo.findOne({ where: { name: 'admin' } });
-  if (!adminRole) {
-    console.warn('[seed] Rol admin no encontrado — ejecutar primero el SQL de migración');
+  const superAdminRole = await roleRepo.findOne({ where: { name: 'superadmin' } });
+  if (!superAdminRole) {
+    console.warn('[seed] Rol superadmin no encontrado — ejecutar primero el SQL de migración');
     return;
   }
+
+  const existing = await userRepo.findOne({ where: { roleId: superAdminRole.id } });
+  if (existing) return;
 
   const passwordHash = await bcrypt.hash('Admin2026!', 10);
 
   await userRepo.save({
-    username: 'admin',
+    username: 'superadmin',
     passwordHash,
-    fullName: 'Administrador del Sistema',
-    email: 'admin@tiablanquita.edu.ec',
-    roleId: adminRole.id,
+    fullName: 'Administrador de la Plataforma',
+    roleId: superAdminRole.id,
+    institutionId: null,
     isActive: true,
   });
 
-  console.log('[seed] Usuario admin creado — contraseña: Admin2026!');
+  console.log('[seed] Usuario superadmin creado — contraseña: Admin2026! (cámbiala después de iniciar sesión)');
 }

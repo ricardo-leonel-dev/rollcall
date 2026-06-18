@@ -116,6 +116,13 @@ export interface User {
   email: string | null;
   roleId: number | null;
   roleName: string | null;
+  institutionId: number | null;
+  isActive: boolean;
+}
+
+export interface Institution {
+  id: number;
+  name: string;
   isActive: boolean;
 }
 
@@ -145,6 +152,7 @@ export interface AuthResponse {
     email: string | null;
     roleName: string | null;
     roleId: number | null;
+    institutionId: number | null;
   };
 }
 

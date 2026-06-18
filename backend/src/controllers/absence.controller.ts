@@ -1,12 +1,15 @@
 import { Router } from 'express';
 import { requirePermission } from '../middleware/role.middleware';
+import { requireInstitution } from '../middleware/institution.middleware';
 import * as svc from '../services/absence.service';
 
 const router = Router();
 const R = 'absences';
 
+router.use(requireInstitution);
+
 router.get('/', requirePermission(R,'read'), async (req, res) => {
-  res.json(await svc.findAll({
+  res.json(await svc.findAll(req.institutionId!, {
     enrollmentId:   req.query.enrollment_id   ? +req.query.enrollment_id   : undefined,
     courseId:       req.query.course_id       ? +req.query.course_id       : undefined,
     academicYearId: req.query.academic_year_id ? +req.query.academic_year_id : undefined,
@@ -17,8 +20,8 @@ router.get('/', requirePermission(R,'read'), async (req, res) => {
   }));
 });
 
-router.post('/',   requirePermission(R,'create'), async (req, res) => res.status(201).json(await svc.create(req.body)));
-router.put('/:id', requirePermission(R,'update'), async (req, res) => res.json(await svc.update(+req.params.id, req.body)));
-router.delete('/:id', requirePermission(R,'delete'), async (req, res) => { await svc.remove(+req.params.id); res.status(204).send(); });
+router.post('/',   requirePermission(R,'create'), async (req, res) => res.status(201).json(await svc.create(req.institutionId!, req.body)));
+router.put('/:id', requirePermission(R,'update'), async (req, res) => res.json(await svc.update(req.institutionId!, +req.params.id, req.body)));
+router.delete('/:id', requirePermission(R,'delete'), async (req, res) => { await svc.remove(req.institutionId!, +req.params.id); res.status(204).send(); });
 
 export default router;

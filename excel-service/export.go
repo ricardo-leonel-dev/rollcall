@@ -164,12 +164,13 @@ func copyFile(src, dst string) error {
 func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
+		institutionID, errI := strconv.Atoi(q.Get("institution_id"))
 		courseID, errC := strconv.Atoi(q.Get("course_id"))
 		academicYearID, errY := strconv.Atoi(q.Get("academic_year_id"))
 		dateFromStr := q.Get("date_from")
 		dateToStr := q.Get("date_to")
-		if errC != nil || errY != nil {
-			http.Error(w, "course_id and academic_year_id must be integers", http.StatusBadRequest)
+		if errI != nil || errC != nil || errY != nil {
+			http.Error(w, "institution_id, course_id and academic_year_id must be integers", http.StatusBadRequest)
 			return
 		}
 		fDesde, err := time.Parse("2006-01-02", dateFromStr)
@@ -186,7 +187,7 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 		ctx := r.Context()
 
 		var courseName string
-		if err := pool.QueryRow(ctx, "SELECT name FROM courses WHERE id = $1", courseID).Scan(&courseName); err != nil {
+		if err := pool.QueryRow(ctx, "SELECT name FROM courses WHERE id = $1 AND institution_id = $2", courseID, institutionID).Scan(&courseName); err != nil {
 			http.Error(w, "Course not found", http.StatusNotFound)
 			return
 		}
@@ -206,10 +207,11 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 			WHERE m.course_id = $1
 			  AND m.academic_year_id = $2
 			  AND a.date BETWEEN $3 AND $4
+			  AND m.institution_id = $5
 			  AND a.deleted_at IS NULL
 			  AND m.deleted_at IS NULL
 			ORDER BY m.roster_number, a.date
-		`, courseID, academicYearID, fDesde, fHasta)
+		`, courseID, academicYearID, fDesde, fHasta, institutionID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -232,10 +234,11 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 			JOIN students e ON e.id = m.student_id
 			WHERE m.course_id = $1
 			  AND m.academic_year_id = $2
+			  AND m.institution_id = $3
 			  AND m.deleted_at IS NULL
 			  AND e.deleted_at IS NULL
 			ORDER BY m.roster_number NULLS LAST, e.name
-		`, courseID, academicYearID)
+		`, courseID, academicYearID, institutionID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

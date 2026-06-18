@@ -12,39 +12,39 @@ function buildWhatsappLink(phone?: string | null): string | null {
   return `https://wa.me/593${phone.replace(/^0/, '')}`;
 }
 
-export async function findAll(search?: string) {
-  const where: any = { deletedAt: null as any };
+export async function findAll(institutionId: number, search?: string) {
+  const where: any = { institutionId, deletedAt: null as any };
   if (search) where.name = ILike(`%${search}%`);
   return repo().find({ where, order: { name: 'ASC' } });
 }
 
-export async function findById(id: number) {
-  const g = await repo().findOne({ where: { id, deletedAt: null as any } });
+export async function findById(institutionId: number, id: number) {
+  const g = await repo().findOne({ where: { id, institutionId, deletedAt: null as any } });
   if (!g) throw Object.assign(new Error('Guardian not found'), { status: 404 });
   return g;
 }
 
-export async function create(data: {
+export async function create(institutionId: number, data: {
   name: string; idNumber?: string; phone?: string;
   whatsappLink?: string; email?: string;
 }) {
-  const g = repo().create({ ...data, name: data.name.toUpperCase(), whatsappLink: buildWhatsappLink(data.phone) });
+  const g = repo().create({ ...data, institutionId, name: data.name.toUpperCase(), whatsappLink: buildWhatsappLink(data.phone) });
   return repo().save(g);
 }
 
-export async function update(id: number, data: Partial<{
+export async function update(institutionId: number, id: number, data: Partial<{
   name: string; idNumber: string; phone: string;
   whatsappLink: string; email: string; isActive: boolean;
 }>) {
-  const g = await findById(id);
+  const g = await findById(institutionId, id);
   if (data.name) data.name = data.name.toUpperCase();
   Object.assign(g, data);
   if (data.phone !== undefined) g.whatsappLink = buildWhatsappLink(data.phone);
   return repo().save(g);
 }
 
-export async function remove(id: number) {
-  const g = await findById(id);
+export async function remove(institutionId: number, id: number) {
+  const g = await findById(institutionId, id);
   g.deletedAt = new Date();
   g.isActive = false;
   await repo().save(g);

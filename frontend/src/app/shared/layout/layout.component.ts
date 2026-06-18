@@ -1,19 +1,22 @@
-import { Component, ChangeDetectionStrategy, signal, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, OnInit, signal, inject } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSelectModule } from '@angular/material/select';
 import { MatDialog } from '@angular/material/dialog';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
+import { InstitutionContextService } from '../../core/services/institution-context.service';
 import { NotificationSettingsDialogComponent } from '../components/notification-settings-dialog/notification-settings-dialog.component';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatIconModule, MatButtonModule, MatTooltipModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule, MatIconModule, MatButtonModule, MatTooltipModule, MatSelectModule],
   styles: [`
     :host { display: flex; height: 100vh; overflow: hidden; }
 
@@ -136,6 +139,7 @@ import { NotificationSettingsDialogComponent } from '../components/notification-
     }
 
     .menu-toggle { color: var(--muted-strong) !important; }
+    .institution-switcher { width: 240px; }
 
     .content {
       flex: 1;
@@ -213,6 +217,14 @@ import { NotificationSettingsDialogComponent } from '../components/notification-
           <mat-icon>{{isMobile() ? 'menu' : (collapsed() ? 'menu_open' : 'menu')}}</mat-icon>
         </button>
         <span style="flex:1"></span>
+        @if (auth.isSuperAdmin()) {
+          <mat-select class="institution-switcher" [ngModel]="institutionContext.selectedId()"
+                      (ngModelChange)="onInstitutionChange($event)" placeholder="Institución">
+            @for (inst of institutionContext.institutions(); track inst.id) {
+              <mat-option [value]="inst.id">{{inst.name}}</mat-option>
+            }
+          </mat-select>
+        }
         @if (isMobile()) {
           <button mat-icon-button style="color:var(--muted-strong)" (click)="auth.logout()">
             <mat-icon>logout</mat-icon>
@@ -225,10 +237,22 @@ import { NotificationSettingsDialogComponent } from '../components/notification-
     </main>
   `,
 })
-export class LayoutComponent {
+export class LayoutComponent implements OnInit {
   readonly auth = inject(AuthService);
+  readonly institutionContext = inject(InstitutionContextService);
   private readonly bp = inject(BreakpointObserver);
   private readonly dialog = inject(MatDialog);
+
+  ngOnInit(): void {
+    if (this.auth.isSuperAdmin()) {
+      this.institutionContext.loadInstitutions();
+    }
+  }
+
+  onInstitutionChange(id: number): void {
+    this.institutionContext.select(id);
+    location.reload();
+  }
 
   openNotificationSettings(): void {
     this.dialog.open(NotificationSettingsDialogComponent, { width: '480px' });

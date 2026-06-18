@@ -9,6 +9,9 @@ export class Absence {
   @Column({ name: 'enrollment_id', type: 'integer' })
   enrollmentId!: number;
 
+  @Column({ name: 'institution_id', type: 'integer' })
+  institutionId!: number;
+
   @Column({ name: 'date', type: 'date' })
   date!: string;
 

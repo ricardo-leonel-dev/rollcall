@@ -3,11 +3,13 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AuthResponse } from '../models/index';
+import { InstitutionContextService } from './institution-context.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly institutionContext = inject(InstitutionContextService);
 
   private readonly _token = signal<string | null>(localStorage.getItem('token'));
   private readonly _user = signal<AuthResponse['user'] | null>(
@@ -18,6 +20,7 @@ export class AuthService {
   readonly currentUser = this._user.asReadonly();
   readonly isLoggedIn = computed(() => !!this._token());
   readonly roleName = computed(() => this._user()?.roleName ?? null);
+  readonly isSuperAdmin = computed(() => this._user()?.roleName === 'superadmin');
 
   async login(username: string, password: string): Promise<void> {
     const resp = await firstValueFrom(
@@ -35,6 +38,7 @@ export class AuthService {
     localStorage.removeItem('user');
     this._token.set(null);
     this._user.set(null);
+    this.institutionContext.clear();
     this.router.navigate(['/login']);
   }
 

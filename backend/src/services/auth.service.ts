@@ -24,6 +24,7 @@ export async function login(username: string, password: string) {
     username: user.username,
     roleId: user.roleId ?? 0,
     roleName: role?.name ?? '',
+    institutionId: user.institutionId,
   };
 
   const token = jwt.sign(payload, JWT_SECRET(), { expiresIn: JWT_EXPIRES_IN() } as any);
@@ -37,6 +38,7 @@ export async function login(username: string, password: string) {
       email: user.email,
       roleName: role?.name ?? null,
       roleId: user.roleId,
+      institutionId: user.institutionId,
     },
   };
 }
@@ -56,6 +58,7 @@ export async function getMe(userId: number) {
     email: user.email,
     roleName: role?.name ?? null,
     roleId: user.roleId,
+    institutionId: user.institutionId,
     isActive: user.isActive,
     notificationTemplate: user.notificationTemplate,
   };

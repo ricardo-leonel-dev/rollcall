@@ -38,6 +38,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/01_init.sql
       - ./postgres/02_auth_schema.sql:/docker-entrypoint-initdb.d/02_auth_schema.sql
+      - ./postgres/03_multi_tenant.sql:/docker-entrypoint-initdb.d/03_multi_tenant.sql
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -248,7 +249,7 @@ services:
 
   # ─────────────────────────────────────────
   # FRONTEND — Angular 22 + PWA servido por Nginx
-  # Proxy: /api/* → backend, /ocr/* → ocr-service
+  # Proxy: /api/* → backend (incluye /api/ocr/* → backend → ocr-service)
   # ─────────────────────────────────────────
   frontend:
     build:
