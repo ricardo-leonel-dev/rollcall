@@ -19,6 +19,7 @@ import { InstitutionDialogComponent } from './institution-dialog.component';
 import { AcademicYearDialogComponent } from './academic-year-dialog.component';
 import { CourseDialogComponent } from './course-dialog.component';
 import { UserDialogComponent } from './user-dialog.component';
+import { RoleDialogComponent } from './role-dialog.component';
 import { NAV_ITEMS } from '../../core/nav-items';
 
 @Component({
@@ -209,12 +210,20 @@ import { NAV_ITEMS } from '../../core/nav-items';
           Permisos
         </ng-template>
         <div class="tab-content">
-          <mat-form-field appearance="outline" style="width:200px;margin-bottom:16px">
-            <mat-label>Rol</mat-label>
-            <mat-select [(ngModel)]="selRole" (ngModelChange)="loadPermissions()">
-              @for (r of roles(); track r.id) { <mat-option [value]="r.id">{{r.name}}</mat-option> }
-            </mat-select>
-          </mat-form-field>
+          <div style="display:flex;align-items:flex-end;gap:8px;margin-bottom:16px">
+            <mat-form-field appearance="outline" style="width:200px;margin:0">
+              <mat-label>Rol</mat-label>
+              <mat-select [(ngModel)]="selRole" (ngModelChange)="loadPermissions()">
+                @for (r of roles(); track r.id) { <mat-option [value]="r.id">{{r.name}}</mat-option> }
+              </mat-select>
+            </mat-form-field>
+            @if (selectedRole()) {
+              <button mat-icon-button style="color:var(--muted-strong)" (click)="openRoleDialog(selectedRole()!)"><mat-icon>edit</mat-icon></button>
+            }
+            <button mat-stroked-button color="primary" (click)="openRoleDialog()">
+              <mat-icon>add</mat-icon> Agregar rol
+            </button>
+          </div>
           @if (permissions().length) {
             <div class="data-table-wrap">
               <table class="data-table">
@@ -448,6 +457,20 @@ export class AdminComponent implements OnInit {
     await firstValueFrom(this.http.put(`/api/users/${userId}/modules`, { moduleKeys }));
     this.snack.open('Módulos actualizados', '', { duration: 2000 });
     await this.loadAll();
+  }
+
+  readonly selectedRole = () => this.roles().find(r => r.id === this.selRole) ?? null;
+
+  openRoleDialog(role?: Role): void {
+    this.dialog.open(RoleDialogComponent, {
+      width: '420px',
+      data: { mode: role ? 'edit' : 'create', role },
+    }).afterClosed().subscribe(async result => {
+      if (!result) return;
+      await this.loadAll();
+      this.selRole = result.id;
+      await this.loadPermissions();
+    });
   }
 
   async loadPermissions(): Promise<void> {
