@@ -1,0 +1,56 @@
+# ─────────────────────────────────────────────────────────────────
+# Producción VPS — backend + excel-service
+# La base de datos vive en Supabase (no hay servicio postgres acá).
+# El frontend lo sirve nginx del host como build estático (no Docker).
+# ocr-service queda fuera a propósito: se agrega en un paso posterior,
+# desacoplado del resto (puede no estar corriendo sin romper la app).
+# Los puertos se publican solo en 127.0.0.1: nginx (en el host) es el
+# único que les llega, no quedan expuestos a internet.
+# ─────────────────────────────────────────────────────────────────
+services:
+
+  excel-service:
+    build:
+      context: ./excel-service
+      dockerfile: Dockerfile
+    container_name: excel-service
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8002:8002"
+    volumes:
+      - ./agente-ocr/plantilla_asistencia.xlsx:/app/plantilla_asistencia.xlsx:ro
+      - excel_output:/app/output
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - DB_SCHEMA=${DB_SCHEMA}
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - avatars_data:/app/uploads
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - DB_SCHEMA=${DB_SCHEMA}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+      - OCR_SERVICE_URL=${OCR_SERVICE_URL}
+      - EXCEL_SERVICE_URL=http://excel-service:8002
+      - NODE_ENV=production
+    depends_on:
+      - excel-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  excel_output:
+  avatars_data:
