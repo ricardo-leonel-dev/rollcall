@@ -39,8 +39,7 @@ router.use('/students',             studentRouter);
 router.use('/enrollments',          enrollmentRouter);
 router.use('/absences',             absenceRouter);
 router.use('/justifications',       justificationRouter);
-router.use('/roles',                roleRouter);
-router.use('/role-permissions',     roleRouter);  // role.controller handles /permissions/:id
+router.use('/roles',                roleRouter);  // includes /roles/permissions/:roleId
 router.use('/users',                userRouter);
 router.use('/dashboard',            dashboardRouter);
 router.use('/import',               importRouter);

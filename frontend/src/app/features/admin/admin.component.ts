@@ -452,13 +452,13 @@ export class AdminComponent implements OnInit {
 
   async loadPermissions(): Promise<void> {
     if (!this.selRole) return;
-    const data = await firstValueFrom(this.http.get<RolePermission[]>(`/api/role-permissions/${this.selRole}`));
+    const data = await firstValueFrom(this.http.get<RolePermission[]>(`/api/roles/permissions/${this.selRole}`));
     this.permissions.set(data);
   }
 
   async savePermissions(): Promise<void> {
     if (!this.selRole) return;
-    await firstValueFrom(this.http.put(`/api/role-permissions/${this.selRole}`, this.permissions()));
+    await firstValueFrom(this.http.put(`/api/roles/permissions/${this.selRole}`, this.permissions()));
     this.snack.open('Permisos guardados', '', { duration: 2000 });
   }
 
