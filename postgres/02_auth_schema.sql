@@ -169,7 +169,11 @@ BEGIN
 END $$;
 
 -- ─── VIEW: absences with justification status ─────────────────────
-CREATE OR REPLACE VIEW v_absences_detail AS
+-- DROP+CREATE instead of CREATE OR REPLACE: schema.sql's version of this
+-- view uses "absences_id", this one renames it to "absence_id" — Postgres
+-- refuses to REPLACE a view while renaming an output column.
+DROP VIEW IF EXISTS v_absences_detail;
+CREATE VIEW v_absences_detail AS
 SELECT
   a.id          AS absence_id,
   al.name       AS academic_year,
@@ -195,7 +199,11 @@ WHERE a.deleted_at IS NULL
   AND m.deleted_at IS NULL;
 
 -- ─── VIEW: enrollments with calculated age ────────────────────────
-CREATE OR REPLACE VIEW v_enrollments_detail AS
+-- DROP+CREATE for the same reason as v_absences_detail above — safe even
+-- when the column set happens to match today, avoids this breaking again
+-- if either view's columns ever diverge.
+DROP VIEW IF EXISTS v_enrollments_detail;
+CREATE VIEW v_enrollments_detail AS
 SELECT
   m.id                AS enrollment_id,
   al.id               AS academic_year_id,
