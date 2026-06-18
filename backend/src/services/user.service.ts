@@ -25,12 +25,13 @@ async function assertRoleAssignable(roleId: number | undefined, isActorSuperAdmi
 export async function findAll(institutionId: number) {
   const users = await repo().find({ where: { institutionId, deletedAt: null as any }, order: { username: 'ASC' } });
   const userIds = users.map(u => u.id);
-  const [assignments, moduleAssignments] = userIds.length
-    ? await Promise.all([
-        AppDataSource.getRepository(UserCourse).find({ where: { userId: In(userIds) } }),
-        AppDataSource.getRepository(UserModule).find({ where: { userId: In(userIds) } }),
-      ])
-    : [[], []];
+  const roleIds = [...new Set(users.map(u => u.roleId).filter((id): id is number => id != null))];
+  const [assignments, moduleAssignments, roles] = await Promise.all([
+    userIds.length ? AppDataSource.getRepository(UserCourse).find({ where: { userId: In(userIds) } }) : [],
+    userIds.length ? AppDataSource.getRepository(UserModule).find({ where: { userId: In(userIds) } }) : [],
+    roleIds.length ? AppDataSource.getRepository(Role).find({ where: { id: In(roleIds) } }) : [],
+  ]);
+  const roleNameById = new Map(roles.map(r => [r.id, r.name]));
   const courseIdsByUser = new Map<number, number[]>();
   for (const a of assignments) {
     if (!courseIdsByUser.has(a.userId)) courseIdsByUser.set(a.userId, []);
@@ -43,7 +44,12 @@ export async function findAll(institutionId: number) {
   }
   return users.map(u => {
     const { passwordHash, ...rest } = u;
-    return { ...rest, courseIds: courseIdsByUser.get(u.id) ?? [], moduleKeys: moduleKeysByUser.get(u.id) ?? [] };
+    return {
+      ...rest,
+      roleName: u.roleId ? roleNameById.get(u.roleId) ?? null : null,
+      courseIds: courseIdsByUser.get(u.id) ?? [],
+      moduleKeys: moduleKeysByUser.get(u.id) ?? [],
+    };
   });
 }
 

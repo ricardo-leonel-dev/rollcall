@@ -29,10 +29,19 @@ import { NAV_ITEMS } from '../../core/nav-items';
             MatInputModule, MatButtonModule, MatIconModule, MatCheckboxModule, MatSnackBarModule],
   styles: [`
     .tab-content { padding: 20px; }
-    .list-item {
-      display: flex; align-items: center; justify-content: space-between;
+    .admin-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
       padding: 12px 16px; background: var(--paper); border-radius: 12px; border: 1px solid var(--border);
       margin-bottom: 8px;
+    }
+    .admin-row-actions { display: flex; align-items: center; gap: 8px; }
+    /* Below this width, every row stacks the same way regardless of how
+       long its name/title is — relying on flex-wrap alone let a long name
+       push that row's actions to a second line while a short-named sibling
+       row stayed on one line, making rows misalign with each other. */
+    @media (max-width: 1280px) {
+      .admin-row { flex-direction: column; align-items: flex-start; }
+      .admin-row-actions { flex-wrap: wrap; width: 100%; }
     }
     .user-avatar {
       width: 36px; height: 36px; border-radius: 9px;
@@ -62,7 +71,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
               </button>
             </div>
             @for (inst of institutionContext.institutions(); track inst.id) {
-              <div class="list-item">
+              <div class="admin-row">
                 <div style="display:flex;align-items:center;gap:12px">
                   <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
                     @if (inst.logoUrl) {
@@ -73,7 +82,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
                   </div>
                   <div style="font-weight:600">{{inst.name}}</div>
                 </div>
-                <div style="display:flex;align-items:center;gap:10px">
+                <div class="admin-row-actions">
                   <button mat-icon-button style="color:var(--muted-strong)" (click)="openInstitutionDialog(inst)"><mat-icon>edit</mat-icon></button>
                   <input type="color" title="Color primario" [value]="inst.primaryColor || '#6366f1'"
                          (change)="updateInstitutionColor(inst, 'primaryColor', $any($event.target).value)"
@@ -106,7 +115,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
             </button>
           </div>
           @for (y of years(); track y.id) {
-            <div class="list-item">
+            <div class="admin-row">
               <div style="display:flex;align-items:center;gap:12px">
                 <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center">
                   <mat-icon style="color:#4f46e5">calendar_today</mat-icon>
@@ -116,7 +125,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
                   <div style="font-size:12px;color:var(--muted)">{{y.startDate ?? '—'}} → {{y.endDate ?? '—'}}</div>
                 </div>
               </div>
-              <div style="display:flex;align-items:center;gap:8px">
+              <div class="admin-row-actions">
                 <span [class]="y.isActive ? 'badge-J' : 'badge-gray'">{{y.isActive ? 'Activo' : 'Inactivo'}}</span>
                 <button mat-icon-button style="color:var(--muted-strong)" (click)="openYearDialog(y)"><mat-icon>edit</mat-icon></button>
                 <button mat-icon-button style="color:#b91c1c" (click)="deleteYear(y.id)"><mat-icon>delete_outline</mat-icon></button>
@@ -138,7 +147,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
               <mat-icon>add</mat-icon> Agregar curso
             </button>
           </div>
-          <div class="data-table-wrap">
+          <div class="data-table-wrap hidden md:block">
             <table class="data-table">
               <thead><tr><th>#</th><th>Nombre del curso</th><th>Jornada</th><th></th></tr></thead>
               <tbody>
@@ -156,6 +165,20 @@ import { NAV_ITEMS } from '../../core/nav-items';
               </tbody>
             </table>
           </div>
+          <div class="md:hidden">
+            @for (c of courses(); track c.id) {
+              <div class="admin-row">
+                <div>
+                  <div style="font-weight:600">{{c.name}}</div>
+                  <span class="badge-info" style="margin-top:4px;display:inline-block">{{c.shift}}</span>
+                </div>
+                <div class="admin-row-actions">
+                  <button mat-icon-button style="color:var(--muted-strong)" (click)="openCourseDialog(c)"><mat-icon>edit</mat-icon></button>
+                  <button mat-icon-button style="color:#b91c1c" (click)="deleteCourse(c.id)"><mat-icon>delete_outline</mat-icon></button>
+                </div>
+              </div>
+            }
+          </div>
         </div>
       </mat-tab>
 
@@ -172,7 +195,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
             </button>
           </div>
           @for (u of users(); track u.id) {
-            <div class="list-item" style="flex-wrap:wrap">
+            <div class="admin-row">
               <div style="display:flex;align-items:center;gap:12px">
                 <div class="user-avatar">{{(u.fullName || u.username)[0].toUpperCase()}}</div>
                 <div>
@@ -180,7 +203,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
                   <div style="font-size:12px;color:var(--muted)">@{{u.username}} · <span style="color:#4f46e5">{{u.roleName}}</span></div>
                 </div>
               </div>
-              <div style="display:flex;align-items:center;gap:8px">
+              <div class="admin-row-actions">
                 @if (u.roleName !== 'superadmin') {
                   <button mat-icon-button style="color:var(--muted-strong)" (click)="openUserDialog(u)"><mat-icon>edit</mat-icon></button>
                   <mat-form-field appearance="outline" style="width:240px;margin:0">
