@@ -6,8 +6,13 @@ import { Role } from '../entities/Role';
 import { Institution } from '../entities/Institution';
 import { Course } from '../entities/Course';
 import { UserCourse } from '../entities/UserCourse';
+import { UserModule } from '../entities/UserModule';
 
 const repo = () => AppDataSource.getRepository(User);
+
+// Fixed set of navigable modules — not a DB-driven resource, so validated
+// against this whitelist rather than a foreign key.
+export const MODULE_KEYS = ['dashboard', 'absences', 'calendar', 'justifications', 'students', 'enrollments', 'admin'];
 
 async function assertRoleAssignable(roleId: number | undefined, isActorSuperAdmin: boolean) {
   if (!roleId) return;
@@ -20,17 +25,25 @@ async function assertRoleAssignable(roleId: number | undefined, isActorSuperAdmi
 export async function findAll(institutionId: number) {
   const users = await repo().find({ where: { institutionId, deletedAt: null as any }, order: { username: 'ASC' } });
   const userIds = users.map(u => u.id);
-  const assignments = userIds.length
-    ? await AppDataSource.getRepository(UserCourse).find({ where: { userId: In(userIds) } })
-    : [];
+  const [assignments, moduleAssignments] = userIds.length
+    ? await Promise.all([
+        AppDataSource.getRepository(UserCourse).find({ where: { userId: In(userIds) } }),
+        AppDataSource.getRepository(UserModule).find({ where: { userId: In(userIds) } }),
+      ])
+    : [[], []];
   const courseIdsByUser = new Map<number, number[]>();
   for (const a of assignments) {
     if (!courseIdsByUser.has(a.userId)) courseIdsByUser.set(a.userId, []);
     courseIdsByUser.get(a.userId)!.push(a.courseId);
   }
+  const moduleKeysByUser = new Map<number, string[]>();
+  for (const m of moduleAssignments) {
+    if (!moduleKeysByUser.has(m.userId)) moduleKeysByUser.set(m.userId, []);
+    moduleKeysByUser.get(m.userId)!.push(m.moduleKey);
+  }
   return users.map(u => {
     const { passwordHash, ...rest } = u;
-    return { ...rest, courseIds: courseIdsByUser.get(u.id) ?? [] };
+    return { ...rest, courseIds: courseIdsByUser.get(u.id) ?? [], moduleKeys: moduleKeysByUser.get(u.id) ?? [] };
   });
 }
 
@@ -112,6 +125,26 @@ export async function setCourses(institutionId: number, userId: number, courseId
     await em.delete(UserCourse, { userId });
     for (const courseId of courseIds) {
       await em.save(em.create(UserCourse, { userId, courseId }));
+    }
+  });
+}
+
+// Replaces all of a user's module assignments. Empty array = unrestricted
+// (can navigate to every module). This only gates UI navigation — it is
+// not a data-authorization mechanism (role_permissions/institution/course
+// scope still control what rows can be read or written).
+export async function setModules(institutionId: number, userId: number, moduleKeys: string[]) {
+  await findById(institutionId, userId);
+
+  const invalid = moduleKeys.filter(k => !MODULE_KEYS.includes(k));
+  if (invalid.length) {
+    throw Object.assign(new Error(`Módulo(s) inválido(s): ${invalid.join(', ')}`), { status: 400 });
+  }
+
+  await AppDataSource.transaction(async (em) => {
+    await em.delete(UserModule, { userId });
+    for (const moduleKey of moduleKeys) {
+      await em.save(em.create(UserModule, { userId, moduleKey }));
     }
   });
 }

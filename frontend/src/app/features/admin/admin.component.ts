@@ -9,10 +9,17 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { AcademicYear, Course, User, Role, RolePermission, Institution } from '../../core/models/index';
 import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { InstitutionDialogComponent } from './institution-dialog.component';
+import { AcademicYearDialogComponent } from './academic-year-dialog.component';
+import { CourseDialogComponent } from './course-dialog.component';
+import { UserDialogComponent } from './user-dialog.component';
+import { NAV_ITEMS } from '../../core/nav-items';
 
 @Component({
   standalone: true,
@@ -21,9 +28,6 @@ import { InstitutionContextService } from '../../core/services/institution-conte
             MatInputModule, MatButtonModule, MatIconModule, MatCheckboxModule, MatSnackBarModule],
   styles: [`
     .tab-content { padding: 20px; }
-    .section-card { background: var(--paper-deep); border: 1px solid var(--border-soft); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
-    .inline-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 16px; }
-    .inline-form mat-form-field { flex: 1; min-width: 160px; }
     .list-item {
       display: flex; align-items: center; justify-content: space-between;
       padding: 12px 16px; background: var(--paper); border-radius: 12px; border: 1px solid var(--border);
@@ -51,24 +55,34 @@ import { InstitutionContextService } from '../../core/services/institution-conte
             Instituciones
           </ng-template>
           <div class="tab-content">
-            <div class="section-card">
-              <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-strong);margin-bottom:12px">Nueva institución</div>
-              <div class="inline-form">
-                <mat-form-field appearance="outline" style="flex:2"><mat-label>Nombre</mat-label><input matInput [(ngModel)]="newInstitution.name"></mat-form-field>
-                <button mat-flat-button color="primary" (click)="createInstitution()" style="height:56px;min-width:100px">
-                  <mat-icon>add</mat-icon> Agregar
-                </button>
-              </div>
+            <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+              <button mat-flat-button color="primary" (click)="openInstitutionDialog()">
+                <mat-icon>add</mat-icon> Agregar institución
+              </button>
             </div>
             @for (inst of institutionContext.institutions(); track inst.id) {
               <div class="list-item">
                 <div style="display:flex;align-items:center;gap:12px">
-                  <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center">
-                    <mat-icon style="color:#4f46e5">corporate_fare</mat-icon>
+                  <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
+                    @if (inst.logoUrl) {
+                      <img [src]="inst.logoUrl" alt="" style="width:100%;height:100%;object-fit:cover">
+                    } @else {
+                      <mat-icon style="color:#4f46e5">corporate_fare</mat-icon>
+                    }
                   </div>
                   <div style="font-weight:600">{{inst.name}}</div>
                 </div>
-                <div style="display:flex;align-items:center;gap:8px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <button mat-icon-button style="color:var(--muted-strong)" (click)="openInstitutionDialog(inst)"><mat-icon>edit</mat-icon></button>
+                  <input type="color" title="Color primario" [value]="inst.primaryColor || '#6366f1'"
+                         (change)="updateInstitutionColor(inst, 'primaryColor', $any($event.target).value)"
+                         style="width:28px;height:28px;border:none;border-radius:6px;cursor:pointer;background:none">
+                  <input type="color" title="Color secundario" [value]="inst.secondaryColor || '#8b5cf6'"
+                         (change)="updateInstitutionColor(inst, 'secondaryColor', $any($event.target).value)"
+                         style="width:28px;height:28px;border:none;border-radius:6px;cursor:pointer;background:none">
+                  <input #logoInput type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden
+                         (change)="uploadInstitutionLogo(inst.id, $event)">
+                  <button mat-icon-button title="Subir logo" (click)="logoInput.click()"><mat-icon>image</mat-icon></button>
                   <span [class]="inst.isActive ? 'badge-J' : 'badge-gray'">{{inst.isActive ? 'Activa' : 'Inactiva'}}</span>
                   <button mat-icon-button style="color:#b91c1c" (click)="deactivateInstitution(inst.id)"><mat-icon>delete_outline</mat-icon></button>
                 </div>
@@ -85,16 +99,10 @@ import { InstitutionContextService } from '../../core/services/institution-conte
           Años Lectivos
         </ng-template>
         <div class="tab-content">
-          <div class="section-card">
-            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-strong);margin-bottom:12px">Agregar año lectivo</div>
-            <div class="inline-form">
-              <mat-form-field appearance="outline"><mat-label>Nombre (ej: 2026-2027)</mat-label><input matInput [(ngModel)]="newYear.name"></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>Fecha inicio</mat-label><input matInput type="date" [(ngModel)]="newYear.startDate"></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>Fecha fin</mat-label><input matInput type="date" [(ngModel)]="newYear.endDate"></mat-form-field>
-              <button mat-flat-button color="primary" (click)="createYear()" style="height:56px;min-width:100px">
-                <mat-icon>add</mat-icon> Agregar
-              </button>
-            </div>
+          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+            <button mat-flat-button color="primary" (click)="openYearDialog()">
+              <mat-icon>add</mat-icon> Agregar año lectivo
+            </button>
           </div>
           @for (y of years(); track y.id) {
             <div class="list-item">
@@ -109,6 +117,7 @@ import { InstitutionContextService } from '../../core/services/institution-conte
               </div>
               <div style="display:flex;align-items:center;gap:8px">
                 <span [class]="y.isActive ? 'badge-J' : 'badge-gray'">{{y.isActive ? 'Activo' : 'Inactivo'}}</span>
+                <button mat-icon-button style="color:var(--muted-strong)" (click)="openYearDialog(y)"><mat-icon>edit</mat-icon></button>
                 <button mat-icon-button style="color:#b91c1c" (click)="deleteYear(y.id)"><mat-icon>delete_outline</mat-icon></button>
               </div>
             </div>
@@ -123,14 +132,10 @@ import { InstitutionContextService } from '../../core/services/institution-conte
           Cursos
         </ng-template>
         <div class="tab-content">
-          <div class="section-card">
-            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-strong);margin-bottom:12px">Agregar curso</div>
-            <div class="inline-form">
-              <mat-form-field appearance="outline" style="flex:2"><mat-label>Nombre del curso</mat-label><input matInput [(ngModel)]="newCourse.name" placeholder="Ej: OCTAVO A BÁSICA SUPERIOR"></mat-form-field>
-              <button mat-flat-button color="primary" (click)="createCourse()" style="height:56px;min-width:100px">
-                <mat-icon>add</mat-icon> Agregar
-              </button>
-            </div>
+          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+            <button mat-flat-button color="primary" (click)="openCourseDialog()">
+              <mat-icon>add</mat-icon> Agregar curso
+            </button>
           </div>
           <div class="data-table-wrap">
             <table class="data-table">
@@ -142,6 +147,7 @@ import { InstitutionContextService } from '../../core/services/institution-conte
                     <td style="font-weight:500">{{c.name}}</td>
                     <td><span class="badge-info">{{c.shift}}</span></td>
                     <td>
+                      <button mat-icon-button style="color:var(--muted-strong)" (click)="openCourseDialog(c)"><mat-icon>edit</mat-icon></button>
                       <button mat-icon-button style="color:#b91c1c" (click)="deleteCourse(c.id)"><mat-icon>delete_outline</mat-icon></button>
                     </td>
                   </tr>
@@ -159,30 +165,10 @@ import { InstitutionContextService } from '../../core/services/institution-conte
           Usuarios
         </ng-template>
         <div class="tab-content">
-          <div class="section-card">
-            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-strong);margin-bottom:12px">Nuevo usuario</div>
-            <div class="inline-form">
-              <mat-form-field appearance="outline"><mat-label>Usuario</mat-label><input matInput [(ngModel)]="newUser.username"></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>Contraseña</mat-label><input matInput type="password" [(ngModel)]="newUser.password"></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>Nombre completo</mat-label><input matInput [(ngModel)]="newUser.fullName"></mat-form-field>
-              <mat-form-field appearance="outline" style="min-width:140px;flex:0">
-                <mat-label>Rol</mat-label>
-                <mat-select [(ngModel)]="newUser.roleId">
-                  @for (r of roles(); track r.id) { <mat-option [value]="r.id">{{r.name}}</mat-option> }
-                </mat-select>
-              </mat-form-field>
-              @if (auth.isSuperAdmin()) {
-                <mat-form-field appearance="outline" style="min-width:200px;flex:0">
-                  <mat-label>Institución</mat-label>
-                  <mat-select [(ngModel)]="newUser.institutionId">
-                    @for (inst of institutionContext.institutions(); track inst.id) { <mat-option [value]="inst.id">{{inst.name}}</mat-option> }
-                  </mat-select>
-                </mat-form-field>
-              }
-              <button mat-flat-button color="primary" (click)="createUser()" style="height:56px;min-width:100px">
-                <mat-icon>person_add</mat-icon> Crear
-              </button>
-            </div>
+          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+            <button mat-flat-button color="primary" (click)="openUserDialog()">
+              <mat-icon>person_add</mat-icon> Nuevo usuario
+            </button>
           </div>
           @for (u of users(); track u.id) {
             <div class="list-item" style="flex-wrap:wrap">
@@ -195,10 +181,17 @@ import { InstitutionContextService } from '../../core/services/institution-conte
               </div>
               <div style="display:flex;align-items:center;gap:8px">
                 @if (u.roleName !== 'superadmin') {
+                  <button mat-icon-button style="color:var(--muted-strong)" (click)="openUserDialog(u)"><mat-icon>edit</mat-icon></button>
                   <mat-form-field appearance="outline" style="width:240px;margin:0">
                     <mat-label>{{u.courseIds?.length ? 'Cursos asignados' : 'Ve todos los cursos'}}</mat-label>
-                    <mat-select multiple [ngModel]="u.courseIds" (ngModelChange)="updateUserCourses(u.id, $event)">
+                    <mat-select multiple [(ngModel)]="u.courseIds" (closed)="updateUserCourses(u.id, u.courseIds ?? [])">
                       @for (c of courses(); track c.id) { <mat-option [value]="c.id">{{c.name}}</mat-option> }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" style="width:240px;margin:0">
+                    <mat-label>{{u.moduleKeys?.length ? 'Acceso limitado' : 'Acceso a todo'}}</mat-label>
+                    <mat-select multiple [(ngModel)]="u.moduleKeys" (closed)="updateUserModules(u.id, u.moduleKeys ?? [])">
+                      @for (n of navItems; track n.key) { <mat-option [value]="n.key">{{n.label}}</mat-option> }
                     </mat-select>
                   </mat-form-field>
                 }
@@ -313,6 +306,7 @@ import { InstitutionContextService } from '../../core/services/institution-conte
 export class AdminComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly snack = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
   readonly auth = inject(AuthService);
   readonly institutionContext = inject(InstitutionContextService);
 
@@ -325,10 +319,6 @@ export class AdminComponent implements OnInit {
   readonly importResult = signal<any>(null);
 
   selRole: number | null = null;
-  newYear = { name: '', startDate: '', endDate: '' };
-  newCourse = { name: '' };
-  newUser = { username: '', password: '', fullName: '', roleId: null as number | null, institutionId: null as number | null };
-  newInstitution = { name: '' };
 
   async ngOnInit(): Promise<void> {
     // For a superadmin, an institution must be selected before any
@@ -351,65 +341,112 @@ export class AdminComponent implements OnInit {
     this.users.set(users); this.roles.set(roles);
   }
 
-  async createYear(): Promise<void> {
-    if (!this.newYear.name) return;
-    await firstValueFrom(this.http.post('/api/academic-years', this.newYear));
-    this.newYear = { name: '', startDate: '', endDate: '' };
-    this.snack.open('Año lectivo creado', '', { duration: 2000 });
-    await this.loadAll();
+  openYearDialog(year?: AcademicYear): void {
+    this.dialog.open(AcademicYearDialogComponent, {
+      width: '420px',
+      data: { mode: year ? 'edit' : 'create', year },
+    }).afterClosed().subscribe(async ok => {
+      if (ok) await this.loadAll();
+    });
   }
 
-  async deleteYear(id: number): Promise<void> {
-    if (!confirm('¿Eliminar este año lectivo?')) return;
-    await firstValueFrom(this.http.delete(`/api/academic-years/${id}`));
-    await this.loadAll();
+  deleteYear(id: number): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: { title: 'Eliminar año lectivo', message: '¿Eliminar este año lectivo? Esta acción no se puede deshacer.' },
+    }).afterClosed().subscribe(async ok => {
+      if (!ok) return;
+      await firstValueFrom(this.http.delete(`/api/academic-years/${id}`));
+      await this.loadAll();
+    });
   }
 
-  async createCourse(): Promise<void> {
-    if (!this.newCourse.name) return;
-    await firstValueFrom(this.http.post('/api/courses', this.newCourse));
-    this.newCourse = { name: '' };
-    this.snack.open('Curso creado', '', { duration: 2000 });
-    await this.loadAll();
+  openCourseDialog(course?: Course): void {
+    this.dialog.open(CourseDialogComponent, {
+      width: '420px',
+      data: { mode: course ? 'edit' : 'create', course },
+    }).afterClosed().subscribe(async ok => {
+      if (ok) await this.loadAll();
+    });
   }
 
-  async deleteCourse(id: number): Promise<void> {
-    if (!confirm('¿Eliminar este curso?')) return;
-    await firstValueFrom(this.http.delete(`/api/courses/${id}`));
-    await this.loadAll();
+  deleteCourse(id: number): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: { title: 'Eliminar curso', message: '¿Eliminar este curso? Esta acción no se puede deshacer.' },
+    }).afterClosed().subscribe(async ok => {
+      if (!ok) return;
+      await firstValueFrom(this.http.delete(`/api/courses/${id}`));
+      await this.loadAll();
+    });
   }
 
-  async createUser(): Promise<void> {
-    if (!this.newUser.username || !this.newUser.password) return;
-    await firstValueFrom(this.http.post('/api/users', this.newUser));
-    this.newUser = { username: '', password: '', fullName: '', roleId: null, institutionId: null };
-    this.snack.open('Usuario creado', '', { duration: 2000 });
-    await this.loadAll();
+  openUserDialog(user?: User): void {
+    this.dialog.open(UserDialogComponent, {
+      width: '460px',
+      data: { mode: user ? 'edit' : 'create', user, roles: this.roles(), institutions: this.institutionContext.institutions() },
+    }).afterClosed().subscribe(async ok => {
+      if (ok) await this.loadAll();
+    });
   }
 
-  async createInstitution(): Promise<void> {
-    if (!this.newInstitution.name) return;
-    await firstValueFrom(this.http.post('/api/institutions', this.newInstitution));
-    this.newInstitution = { name: '' };
-    this.snack.open('Institución creada', '', { duration: 2000 });
+  openInstitutionDialog(institution?: Institution): void {
+    this.dialog.open(InstitutionDialogComponent, {
+      width: '420px',
+      data: { mode: institution ? 'edit' : 'create', institution },
+    }).afterClosed().subscribe(async ok => {
+      if (ok) await this.institutionContext.loadInstitutions();
+    });
+  }
+
+  deactivateInstitution(id: number): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: { title: 'Desactivar institución', message: '¿Desactivar esta institución? Dejará de aparecer como opción seleccionable.', confirmLabel: 'Desactivar', icon: 'corporate_fare' },
+    }).afterClosed().subscribe(async ok => {
+      if (!ok) return;
+      await firstValueFrom(this.http.delete(`/api/institutions/${id}`));
+      await this.institutionContext.loadInstitutions();
+    });
+  }
+
+  async updateInstitutionColor(inst: Institution, field: 'primaryColor' | 'secondaryColor', value: string): Promise<void> {
+    await firstValueFrom(this.http.put(`/api/institutions/${inst.id}`, { [field]: value }));
     await this.institutionContext.loadInstitutions();
   }
 
-  async deactivateInstitution(id: number): Promise<void> {
-    if (!confirm('¿Desactivar esta institución?')) return;
-    await firstValueFrom(this.http.delete(`/api/institutions/${id}`));
+  async uploadInstitutionLogo(id: number, event: Event): Promise<void> {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('logo', file);
+    await firstValueFrom(this.http.post(`/api/institutions/${id}/logo/upload`, formData));
     await this.institutionContext.loadInstitutions();
+    this.snack.open('Logo actualizado', '', { duration: 2000 });
   }
 
-  async deleteUser(id: number): Promise<void> {
-    if (!confirm('¿Eliminar este usuario?')) return;
-    await firstValueFrom(this.http.delete(`/api/users/${id}`));
-    await this.loadAll();
+  deleteUser(id: number): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: { title: 'Eliminar usuario', message: '¿Eliminar este usuario? Esta acción no se puede deshacer.' },
+    }).afterClosed().subscribe(async ok => {
+      if (!ok) return;
+      await firstValueFrom(this.http.delete(`/api/users/${id}`));
+      await this.loadAll();
+    });
   }
 
   async updateUserCourses(userId: number, courseIds: number[]): Promise<void> {
     await firstValueFrom(this.http.put(`/api/users/${userId}/courses`, { courseIds }));
     this.snack.open('Cursos actualizados', '', { duration: 2000 });
+    await this.loadAll();
+  }
+
+  readonly navItems = NAV_ITEMS;
+
+  async updateUserModules(userId: number, moduleKeys: string[]): Promise<void> {
+    await firstValueFrom(this.http.put(`/api/users/${userId}/modules`, { moduleKeys }));
+    this.snack.open('Módulos actualizados', '', { duration: 2000 });
     await this.loadAll();
   }
 

@@ -8,9 +8,12 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom, debounceTime, distinctUntilChanged, Subject } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Student, AcademicYear, Course, Enrollment, Guardian } from '../../core/models/index';
+import { Student, AcademicYear, Course, Enrollment } from '../../core/models/index';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { StudentDialogComponent } from './student-dialog.component';
 
 @Component({
   standalone: true,
@@ -34,8 +37,6 @@ import { Student, AcademicYear, Course, Enrollment, Guardian } from '../../core/
       font-size: 22px; font-weight: 600; margin-bottom: 12px;
     }
     .detail-name { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 600; color: var(--ink); }
-    .form-row { padding: 0 20px 16px; }
-    .form-row mat-form-field { width: 100%; }
     .section-note { padding: 0 20px 16px; font-size: 12px; color: var(--muted); }
   `],
   template: `
@@ -127,7 +128,7 @@ import { Student, AcademicYear, Course, Enrollment, Guardian } from '../../core/
       </mat-sidenav-content>
 
       <mat-sidenav #detailPanel position="end" mode="over"
-                   [opened]="!!selected() || isNew()" (openedChange)="onPanelOpenedChange($event)">
+                   [opened]="!!selected()" (openedChange)="onPanelOpenedChange($event)">
         @if (selected()) {
           <div class="detail-header">
             <div class="detail-avatar">{{selected()!.name[0]}}</div>
@@ -135,120 +136,40 @@ import { Student, AcademicYear, Course, Enrollment, Guardian } from '../../core/
             <div style="font-size:12px;color:var(--muted);margin-top:2px">ID: {{selected()!.id}}</div>
           </div>
           <div style="padding:20px 20px 0">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px">
-              {{editMode() ? 'Editar datos' : 'Información'}}
-            </div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px">Información</div>
           </div>
-          @if (!editMode()) {
+          <div style="padding:0 20px">
+            @for (field of detailFields(); track field.label) {
+              <div style="padding:12px 0;border-bottom:1px solid var(--border-soft);display:flex;justify-content:space-between">
+                <span style="font-size:13px;color:var(--muted)">{{field.label}}</span>
+                <span style="font-size:13px;font-weight:500;color:var(--ink-soft)">{{field.value || '—'}}</span>
+              </div>
+            }
+          </div>
+          <div style="padding:16px 20px 0">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px">Representante</div>
+          </div>
+          @if (loadingEnrollment()) {
+            <div class="spinner-center" style="padding:20px 0"><div class="spinner spinner-sm"></div></div>
+          } @else if (currentEnrollment()) {
             <div style="padding:0 20px">
-              @for (field of detailFields(); track field.label) {
+              @for (field of guardianFields(); track field.label) {
                 <div style="padding:12px 0;border-bottom:1px solid var(--border-soft);display:flex;justify-content:space-between">
                   <span style="font-size:13px;color:var(--muted)">{{field.label}}</span>
                   <span style="font-size:13px;font-weight:500;color:var(--ink-soft)">{{field.value || '—'}}</span>
                 </div>
               }
             </div>
-            <div style="padding:16px 20px 0">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px">Representante</div>
-            </div>
-            @if (loadingEnrollment()) {
-              <div class="spinner-center" style="padding:20px 0"><div class="spinner spinner-sm"></div></div>
-            } @else if (currentEnrollment()) {
-              <div style="padding:0 20px">
-                @for (field of guardianFields(); track field.label) {
-                  <div style="padding:12px 0;border-bottom:1px solid var(--border-soft);display:flex;justify-content:space-between">
-                    <span style="font-size:13px;color:var(--muted)">{{field.label}}</span>
-                    <span style="font-size:13px;font-weight:500;color:var(--ink-soft)">{{field.value || '—'}}</span>
-                  </div>
-                }
-              </div>
-            } @else {
-              <div class="section-note">Sin matrícula activa — no se puede asignar representante todavía.</div>
-            }
-            <div style="padding:16px 20px;display:flex;gap:8px">
-              <button mat-flat-button color="primary" style="flex:1" (click)="startEdit()">
-                <mat-icon>edit</mat-icon> Editar
-              </button>
-              <button mat-stroked-button color="warn" (click)="deleteStudent(selected()!.id)">
-                <mat-icon>delete</mat-icon>
-              </button>
-            </div>
           } @else {
-            <div class="form-row"><mat-form-field appearance="outline"><mat-label>Nombre completo</mat-label><input matInput [(ngModel)]="form.name"></mat-form-field></div>
-            <div class="form-row"><mat-form-field appearance="outline"><mat-label>Cédula</mat-label><input matInput [(ngModel)]="form.idNumber"></mat-form-field></div>
-            <div class="form-row">
-              <mat-form-field appearance="outline">
-                <mat-label>Sexo</mat-label>
-                <input matInput [(ngModel)]="form.gender" placeholder="H o M">
-              </mat-form-field>
-            </div>
-            <div class="form-row"><mat-form-field appearance="outline"><mat-label>F. Nacimiento</mat-label><input matInput type="date" [(ngModel)]="form.birthDate"></mat-form-field></div>
-            <div style="padding:0 20px 4px">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">Representante</div>
-            </div>
-            @if (currentEnrollment()) {
-              <div class="form-row"><mat-form-field appearance="outline"><mat-label>Nombre completo</mat-label><input matInput [(ngModel)]="guardianForm.name"></mat-form-field></div>
-              <div class="form-row"><mat-form-field appearance="outline"><mat-label>Cédula</mat-label><input matInput [(ngModel)]="guardianForm.idNumber"></mat-form-field></div>
-              <div class="form-row"><mat-form-field appearance="outline"><mat-label>Teléfono</mat-label><input matInput [(ngModel)]="guardianForm.phone"></mat-form-field></div>
-              <div class="form-row"><mat-form-field appearance="outline"><mat-label>Email</mat-label><input matInput [(ngModel)]="guardianForm.email"></mat-form-field></div>
-            } @else {
-              <div class="section-note">Sin matrícula activa — no se puede asignar representante todavía.</div>
-            }
-            <div style="padding:0 20px;display:flex;gap:8px">
-              <button mat-flat-button color="primary" style="flex:1" (click)="saveEdit()">Guardar</button>
-              <button mat-stroked-button (click)="editMode.set(false)">Cancelar</button>
-            </div>
+            <div class="section-note">Sin matrícula activa — no se puede asignar representante todavía.</div>
           }
-        } @else if (isNew()) {
-          <div class="detail-header">
-            <div class="detail-avatar"><mat-icon>person_add</mat-icon></div>
-            <div class="detail-name">Nuevo estudiante</div>
-          </div>
-          <div style="padding:20px">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:16px">Datos personales</div>
-          </div>
-          <div class="form-row"><mat-form-field appearance="outline"><mat-label>Nombre completo *</mat-label><input matInput [(ngModel)]="form.name"></mat-form-field></div>
-          <div class="form-row"><mat-form-field appearance="outline"><mat-label>Cédula</mat-label><input matInput [(ngModel)]="form.idNumber"></mat-form-field></div>
-          <div class="form-row"><mat-form-field appearance="outline"><mat-label>Sexo (H/M)</mat-label><input matInput [(ngModel)]="form.gender"></mat-form-field></div>
-          <div class="form-row"><mat-form-field appearance="outline"><mat-label>F. Nacimiento</mat-label><input matInput type="date" [(ngModel)]="form.birthDate"></mat-form-field></div>
-
-          <div style="padding:0 20px 4px">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">Matrícula (opcional)</div>
-          </div>
-          <div class="form-row">
-            <mat-form-field appearance="outline">
-              <mat-label>Año lectivo</mat-label>
-              <mat-select [(ngModel)]="newSelYear">
-                <mat-option [value]="null">— Sin matricular por ahora —</mat-option>
-                @for (y of years(); track y.id) { <mat-option [value]="y.id">{{y.name}}</mat-option> }
-              </mat-select>
-            </mat-form-field>
-          </div>
-          @if (newSelYear) {
-            <div class="form-row">
-              <mat-form-field appearance="outline">
-                <mat-label>Curso</mat-label>
-                <mat-select [(ngModel)]="newSelCourse">
-                  <mat-option [value]="null">— Seleccionar —</mat-option>
-                  @for (c of courses(); track c.id) { <mat-option [value]="c.id">{{c.name}}</mat-option> }
-                </mat-select>
-              </mat-form-field>
-            </div>
-          }
-
-          @if (newSelYear && newSelCourse) {
-            <div style="padding:0 20px 4px">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">Representante (opcional)</div>
-            </div>
-            <div class="form-row"><mat-form-field appearance="outline"><mat-label>Nombre completo</mat-label><input matInput [(ngModel)]="guardianForm.name"></mat-form-field></div>
-            <div class="form-row"><mat-form-field appearance="outline"><mat-label>Cédula</mat-label><input matInput [(ngModel)]="guardianForm.idNumber"></mat-form-field></div>
-            <div class="form-row"><mat-form-field appearance="outline"><mat-label>Teléfono</mat-label><input matInput [(ngModel)]="guardianForm.phone"></mat-form-field></div>
-            <div class="form-row"><mat-form-field appearance="outline"><mat-label>Email</mat-label><input matInput [(ngModel)]="guardianForm.email"></mat-form-field></div>
-          }
-
-          <div style="padding:0 20px;display:flex;gap:8px">
-            <button mat-flat-button color="primary" style="flex:1" (click)="createStudent()">Crear</button>
-            <button mat-stroked-button (click)="isNew.set(false)">Cancelar</button>
+          <div style="padding:16px 20px;display:flex;gap:8px">
+            <button mat-flat-button color="primary" style="flex:1" (click)="openEdit()">
+              <mat-icon>edit</mat-icon> Editar
+            </button>
+            <button mat-stroked-button color="warn" (click)="deleteStudent(selected()!.id)">
+              <mat-icon>delete</mat-icon>
+            </button>
           </div>
         }
       </mat-sidenav>
@@ -258,22 +179,17 @@ import { Student, AcademicYear, Course, Enrollment, Guardian } from '../../core/
 export class StudentsComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly snack = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
 
   readonly students = signal<Student[]>([]);
   readonly loading = signal(false);
   readonly selected = signal<Student | null>(null);
-  readonly editMode = signal(false);
-  readonly isNew = signal(false);
   readonly years = signal<AcademicYear[]>([]);
   readonly courses = signal<Course[]>([]);
   readonly currentEnrollment = signal<Enrollment | null>(null);
   readonly loadingEnrollment = signal(false);
 
   searchTerm = '';
-  form = { name: '', idNumber: '', gender: '', birthDate: '' };
-  guardianForm = { name: '', idNumber: '', phone: '', email: '' };
-  newSelYear: number | null = null;
-  newSelCourse: number | null = null;
 
   readonly search$ = new Subject<string>();
 
@@ -322,8 +238,6 @@ export class StudentsComponent implements OnInit {
 
   async selectStudent(s: Student): Promise<void> {
     this.selected.set(s);
-    this.isNew.set(false);
-    this.editMode.set(false);
     this.currentEnrollment.set(null);
     this.loadingEnrollment.set(true);
     try {
@@ -333,70 +247,41 @@ export class StudentsComponent implements OnInit {
   }
 
   onPanelOpenedChange(opened: boolean): void {
-    if (!opened) { this.selected.set(null); this.isNew.set(false); }
+    if (!opened) this.selected.set(null);
   }
 
   openNew(): void {
-    this.selected.set(null);
-    this.isNew.set(true);
-    this.form = { name: '', idNumber: '', gender: '', birthDate: '' };
-    this.guardianForm = { name: '', idNumber: '', phone: '', email: '' };
-    this.newSelYear = null;
-    this.newSelCourse = null;
+    this.dialog.open(StudentDialogComponent, {
+      width: '520px',
+      data: { mode: 'create', years: this.years(), courses: this.courses() },
+    }).afterClosed().subscribe(async ok => {
+      if (ok) await this.loadStudents(this.searchTerm);
+    });
   }
 
-  startEdit(): void {
+  openEdit(): void {
     const s = this.selected()!;
-    this.form = { name: s.name, idNumber: s.idNumber ?? '', gender: s.gender ?? '', birthDate: s.birthDate ?? '' };
-    const e = this.currentEnrollment();
-    this.guardianForm = {
-      name: e?.guardianName ?? '', idNumber: e?.guardianIdNumber ?? '',
-      phone: e?.guardianPhone ?? '', email: e?.guardianEmail ?? '',
-    };
-    this.editMode.set(true);
+    this.dialog.open(StudentDialogComponent, {
+      width: '520px',
+      data: { mode: 'edit', student: s, enrollment: this.currentEnrollment(), years: this.years(), courses: this.courses() },
+    }).afterClosed().subscribe(async ok => {
+      if (!ok) return;
+      await this.loadStudents(this.searchTerm);
+      const updated = this.students().find(x => x.id === s.id);
+      if (updated) await this.selectStudent(updated);
+    });
   }
 
-  async saveEdit(): Promise<void> {
-    await firstValueFrom(this.http.put(`/api/students/${this.selected()!.id}`, this.form));
-    const e = this.currentEnrollment();
-    if (e && this.guardianForm.name) {
-      if (e.guardianId) {
-        await firstValueFrom(this.http.put(`/api/guardians/${e.guardianId}`, this.guardianForm));
-      } else {
-        const guardian = await firstValueFrom(this.http.post<Guardian>('/api/guardians', this.guardianForm));
-        await firstValueFrom(this.http.put(`/api/enrollments/${e.enrollmentId}`, { guardianId: guardian.id }));
-      }
-    }
-    this.snack.open('Guardado', '', { duration: 2000 });
-    this.editMode.set(false);
-    await this.loadStudents(this.searchTerm);
-    const updated = this.students().find(s => s.id === this.selected()!.id);
-    if (updated) await this.selectStudent(updated);
-  }
-
-  async createStudent(): Promise<void> {
-    if (!this.form.name) { this.snack.open('El nombre es requerido', '', { duration: 3000 }); return; }
-    const student = await firstValueFrom(this.http.post<Student>('/api/students', this.form));
-    if (this.newSelYear && this.newSelCourse) {
-      let guardianId: number | undefined;
-      if (this.guardianForm.name) {
-        const guardian = await firstValueFrom(this.http.post<Guardian>('/api/guardians', this.guardianForm));
-        guardianId = guardian.id;
-      }
-      await firstValueFrom(this.http.post('/api/enrollments', {
-        studentId: student.id, courseId: this.newSelCourse, academicYearId: this.newSelYear, guardianId,
-      }));
-    }
-    this.snack.open('Estudiante creado', '', { duration: 2000 });
-    this.isNew.set(false);
-    await this.loadStudents(this.searchTerm);
-  }
-
-  async deleteStudent(id: number): Promise<void> {
-    if (!confirm('¿Eliminar este estudiante?')) return;
-    await firstValueFrom(this.http.delete(`/api/students/${id}`));
-    this.snack.open('Eliminado', '', { duration: 2000 });
-    this.selected.set(null);
-    await this.loadStudents(this.searchTerm);
+  deleteStudent(id: number): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: { title: 'Eliminar estudiante', message: '¿Eliminar este estudiante? Esta acción no se puede deshacer.' },
+    }).afterClosed().subscribe(async ok => {
+      if (!ok) return;
+      await firstValueFrom(this.http.delete(`/api/students/${id}`));
+      this.snack.open('Eliminado', '', { duration: 2000 });
+      this.selected.set(null);
+      await this.loadStudents(this.searchTerm);
+    });
   }
 }

@@ -30,8 +30,17 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
   }
 
   const sql = `
-    SELECT j.*,
-      COALESCE(json_agg(ja.absence_id) FILTER (WHERE ja.absence_id IS NOT NULL), '[]') AS absence_ids
+    SELECT
+      j.id,
+      j.enrollment_id AS "enrollmentId",
+      j.institution_id AS "institutionId",
+      j.reason,
+      j.notified_by AS "notifiedBy",
+      j.is_active AS "isActive",
+      j.deleted_at AS "deletedAt",
+      j.created_at AS "createdAt",
+      j.updated_at AS "updatedAt",
+      COALESCE(json_agg(ja.absence_id) FILTER (WHERE ja.absence_id IS NOT NULL), '[]') AS "absenceIds"
     FROM justifications j
     JOIN enrollments e ON e.id = j.enrollment_id
     LEFT JOIN justification_absences ja ON ja.justification_id = j.id

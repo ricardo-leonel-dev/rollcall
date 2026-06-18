@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, OnInit, signal, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, OnInit, signal, computed, inject } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -13,6 +13,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { ProfileDialogComponent, resolveAvatarPreset } from '../components/profile-dialog/profile-dialog.component';
+import { NAV_ITEMS } from '../../core/nav-items';
 
 @Component({
   standalone: true,
@@ -148,6 +149,11 @@ import { ProfileDialogComponent, resolveAvatarPreset } from '../components/profi
       padding: 24px;
     }
 
+    .content-loading {
+      display: flex; align-items: center; justify-content: center;
+      height: 100%; color: var(--muted-strong); font-size: 14px;
+    }
+
     @media (max-width: 767px) {
       aside { position: fixed; left: 0; top: 0; bottom: 0; z-index: 100; width: 240px; transform: translateX(-100%); }
       aside.mobile-open { transform: translateX(0); }
@@ -163,14 +169,24 @@ import { ProfileDialogComponent, resolveAvatarPreset } from '../components/profi
         @if (!collapsed() || isMobile()) {
           <div class="brand-text">
             <div class="brand-name">Asistencia</div>
-            <div class="brand-sub">Tia Blanquita</div>
+            @if (auth.activeInstitution()?.name) {
+              <div class="brand-sub">{{auth.activeInstitution()!.name}}</div>
+            }
           </div>
         }
       </div>
 
       <nav>
-        <div class="nav-section" *ngIf="!collapsed() || isMobile()">Principal</div>
-        @for (item of mainNav; track item.route) {
+        <a class="nav-item" routerLink="/inicio" routerLinkActive="active"
+           [matTooltip]="collapsed() && !isMobile() ? 'Inicio' : ''" matTooltipPosition="right"
+           (click)="isMobile() && closeMobile()">
+          <mat-icon class="nav-icon">apps</mat-icon>
+          @if (!collapsed() || isMobile()) { <span class="nav-label">Inicio</span> }
+        </a>
+        @if (mainNav().length) {
+          <div class="nav-section" *ngIf="!collapsed() || isMobile()">Principal</div>
+        }
+        @for (item of mainNav(); track item.route) {
           <a class="nav-item" [routerLink]="item.route" routerLinkActive="active"
              [matTooltip]="collapsed() && !isMobile() ? item.label : ''" matTooltipPosition="right"
              (click)="isMobile() && closeMobile()">
@@ -178,8 +194,10 @@ import { ProfileDialogComponent, resolveAvatarPreset } from '../components/profi
             @if (!collapsed() || isMobile()) { <span class="nav-label">{{item.label}}</span> }
           </a>
         }
-        <div class="nav-section" *ngIf="!collapsed() || isMobile()">Gestión</div>
-        @for (item of mgmtNav; track item.route) {
+        @if (mgmtNav().length) {
+          <div class="nav-section" *ngIf="!collapsed() || isMobile()">Gestión</div>
+        }
+        @for (item of mgmtNav(); track item.route) {
           <a class="nav-item" [routerLink]="item.route" routerLinkActive="active"
              [matTooltip]="collapsed() && !isMobile() ? item.label : ''" matTooltipPosition="right"
              (click)="isMobile() && closeMobile()">
@@ -232,7 +250,7 @@ import { ProfileDialogComponent, resolveAvatarPreset } from '../components/profi
         @if (auth.isSuperAdmin()) {
           <mat-select class="institution-switcher" [ngModel]="institutionContext.selectedId()"
                       (ngModelChange)="onInstitutionChange($event)" placeholder="Institución">
-            @for (inst of institutionContext.institutions(); track inst.id) {
+            @for (inst of institutionContext.activeInstitutions(); track inst.id) {
               <mat-option [value]="inst.id">{{inst.name}}</mat-option>
             }
           </mat-select>
@@ -244,7 +262,11 @@ import { ProfileDialogComponent, resolveAvatarPreset } from '../components/profi
         }
       </header>
       <div class="content">
-        <router-outlet />
+        @if (institutionReady()) {
+          <router-outlet />
+        } @else {
+          <div class="content-loading">Cargando…</div>
+        }
       </div>
     </main>
   `,
@@ -256,9 +278,17 @@ export class LayoutComponent implements OnInit {
   private readonly bp = inject(BreakpointObserver);
   private readonly dialog = inject(MatDialog);
 
+  // Superadmin requests need the X-Institution-Id header, which the auth
+  // interceptor only attaches once institutionContext has picked one — gate
+  // the routed page behind that so no child component's ngOnInit fires an
+  // institution-scoped request before the header exists (was a real 400 race).
+  readonly institutionReady = signal(false);
+
   ngOnInit(): void {
     if (this.auth.isSuperAdmin()) {
-      this.institutionContext.loadInstitutions();
+      this.institutionContext.loadInstitutions().finally(() => this.institutionReady.set(true));
+    } else {
+      this.institutionReady.set(true);
     }
   }
 
@@ -297,16 +327,6 @@ export class LayoutComponent implements OnInit {
 
   closeMobile(): void { this.mobileOpen.set(false); }
 
-  readonly mainNav = [
-    { route: '/dashboard',      icon: 'dashboard',     label: 'Dashboard' },
-    { route: '/absences',       icon: 'event_busy',    label: 'Inasistencias' },
-    { route: '/calendar',       icon: 'calendar_month', label: 'Calendario' },
-    { route: '/justifications', icon: 'task_alt',      label: 'Justificaciones' },
-  ];
-
-  readonly mgmtNav = [
-    { route: '/students',    icon: 'groups',              label: 'Estudiantes' },
-    { route: '/enrollments', icon: 'assignment_ind',      label: 'Matrículas' },
-    { route: '/admin',       icon: 'admin_panel_settings', label: 'Administración' },
-  ];
+  readonly mainNav = computed(() => NAV_ITEMS.filter(i => i.section === 'main' && this.auth.canAccessModule(i.key)));
+  readonly mgmtNav = computed(() => NAV_ITEMS.filter(i => i.section === 'mgmt' && this.auth.canAccessModule(i.key)));
 }

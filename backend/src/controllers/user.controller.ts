@@ -33,4 +33,9 @@ router.put('/:id/courses', requireInstitution, requirePermission(R,'update'), as
   res.json({ message: 'Cursos actualizados' });
 });
 
+router.put('/:id/modules', requireInstitution, requirePermission(R,'update'), async (req, res) => {
+  await svc.setModules(req.institutionId!, +req.params.id, req.body.moduleKeys ?? []);
+  res.json({ message: 'Módulos actualizados' });
+});
+
 export default router;

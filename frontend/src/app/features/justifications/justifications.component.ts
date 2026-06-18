@@ -7,8 +7,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { Justification, AcademicYear, Course, Enrollment, Absence } from '../../core/models/index';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 
 interface JustifyGroup { weekKey: string; absences: Absence[]; }
 interface GroupInput { reason: string; notifiedBy: string; }
@@ -163,6 +165,7 @@ interface GroupInput { reason: string; notifiedBy: string; }
 export class JustificationsComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly snack = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
 
   readonly years = signal<AcademicYear[]>([]);
   readonly courses = signal<Course[]>([]);
@@ -326,10 +329,15 @@ export class JustificationsComponent implements OnInit {
     await this.load();
   }
 
-  async remove(id: number): Promise<void> {
-    if (!confirm('¿Eliminar esta justificación?')) return;
-    await firstValueFrom(this.http.delete(`/api/justifications/${id}`));
-    this.snack.open('Eliminada', '', { duration: 2000 });
-    await this.load();
+  remove(id: number): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: { title: 'Eliminar justificación', message: '¿Eliminar esta justificación? Esta acción no se puede deshacer.' },
+    }).afterClosed().subscribe(async ok => {
+      if (!ok) return;
+      await firstValueFrom(this.http.delete(`/api/justifications/${id}`));
+      this.snack.open('Eliminada', '', { duration: 2000 });
+      await this.load();
+    });
   }
 }

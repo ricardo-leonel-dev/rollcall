@@ -88,7 +88,7 @@ import { AuthService } from '../../../core/services/auth.service';
     <div class="left-panel">
       <div style="margin-bottom:48px">
         <div style="font-size:28px;font-weight:700;margin-bottom:8px">Sistema de Asistencia</div>
-        <div style="color:#94a3b8;font-size:16px">Unidad Educativa Particular Tia Blanquita</div>
+        <div style="color:#94a3b8;font-size:16px">Sistema de gestión de asistencia escolar</div>
       </div>
       @for (f of features; track f.label) {
         <div class="feature-item">

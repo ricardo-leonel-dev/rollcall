@@ -109,6 +109,14 @@ export interface DashboardSummary {
   absencesByDay: { date: string; count: number }[];
 }
 
+export interface InstitutionBranding {
+  id: number;
+  name: string;
+  logoUrl: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
+}
+
 export interface User {
   id: number;
   username: string;
@@ -120,11 +128,11 @@ export interface User {
   avatarUrl: string | null;
   isActive: boolean;
   courseIds?: number[];
+  moduleKeys?: string[] | null;
+  institution?: InstitutionBranding | null;
 }
 
-export interface Institution {
-  id: number;
-  name: string;
+export interface Institution extends InstitutionBranding {
   isActive: boolean;
 }
 
@@ -156,6 +164,8 @@ export interface AuthResponse {
     roleId: number | null;
     institutionId: number | null;
     avatarUrl: string | null;
+    institution?: InstitutionBranding | null;
+    moduleKeys?: string[] | null;
   };
 }
 

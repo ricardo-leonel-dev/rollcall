@@ -5,9 +5,32 @@ import path from 'path';
 import { AppDataSource } from '../data-source';
 import { User } from '../entities/User';
 import { Role } from '../entities/Role';
+import { Institution } from '../entities/Institution';
+import { UserModule } from '../entities/UserModule';
 
 const JWT_SECRET = () => process.env.JWT_SECRET || 'secret';
 const JWT_EXPIRES_IN = () => process.env.JWT_EXPIRES_IN || '7d';
+
+async function getInstitutionBranding(institutionId: number | null) {
+  if (institutionId === null) return null;
+  const inst = await AppDataSource.getRepository(Institution).findOne({ where: { id: institutionId } });
+  if (!inst) return null;
+  return {
+    id: inst.id,
+    name: inst.name,
+    logoUrl: inst.logoUrl,
+    primaryColor: inst.primaryColor,
+    secondaryColor: inst.secondaryColor,
+  };
+}
+
+// null = unrestricted (can navigate to every module) — true for superadmin
+// always, and for any other user with zero rows in user_modules.
+async function getModuleKeys(userId: number, roleName: string | null): Promise<string[] | null> {
+  if (roleName === 'superadmin') return null;
+  const rows = await AppDataSource.getRepository(UserModule).find({ where: { userId } });
+  return rows.length ? rows.map(r => r.moduleKey) : null;
+}
 
 export async function login(username: string, password: string) {
   const userRepo = AppDataSource.getRepository(User);
@@ -42,6 +65,8 @@ export async function login(username: string, password: string) {
       roleId: user.roleId,
       institutionId: user.institutionId,
       avatarUrl: user.avatarUrl,
+      institution: await getInstitutionBranding(user.institutionId),
+      moduleKeys: await getModuleKeys(user.id, role?.name ?? null),
     },
   };
 }
@@ -65,6 +90,8 @@ export async function getMe(userId: number) {
     isActive: user.isActive,
     notificationTemplate: user.notificationTemplate,
     avatarUrl: user.avatarUrl,
+    institution: await getInstitutionBranding(user.institutionId),
+    moduleKeys: await getModuleKeys(user.id, role?.name ?? null),
   };
 }
 

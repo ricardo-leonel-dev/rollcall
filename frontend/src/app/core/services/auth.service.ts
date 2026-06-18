@@ -26,6 +26,22 @@ export class AuthService {
   readonly roleName = computed(() => this._user()?.roleName ?? null);
   readonly isSuperAdmin = computed(() => this._user()?.roleName === 'superadmin');
 
+  // Single source of truth for "which institution's branding applies right now":
+  // a superadmin picks one via the switcher, everyone else is bound to their own.
+  readonly activeInstitution = computed(() =>
+    this.isSuperAdmin() ? this.institutionContext.selected() : (this._user()?.institution ?? null)
+  );
+
+  // null = unrestricted (every module). Gates navigation only — not a
+  // data-authorization mechanism (see module.guard.ts).
+  readonly moduleKeys = computed(() => this._user()?.moduleKeys ?? null);
+
+  canAccessModule(key: string): boolean {
+    if (this.isSuperAdmin()) return true;
+    const keys = this.moduleKeys();
+    return keys === null || keys.includes(key);
+  }
+
   // rememberMe=true persists across browser restarts (localStorage);
   // false only lasts for the current browser session (sessionStorage).
   // The JWT itself always expires after JWT_EXPIRES_IN regardless.
@@ -38,7 +54,7 @@ export class AuthService {
     storage.setItem('user', JSON.stringify(resp.user));
     this._token.set(resp.token);
     this._user.set(resp.user);
-    await this.router.navigate(['/dashboard']);
+    await this.router.navigate(['/inicio']);
   }
 
   logout(): void {

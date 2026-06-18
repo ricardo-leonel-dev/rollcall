@@ -16,6 +16,8 @@ const app = express();
 
 const avatarsDir = path.join(process.cwd(), 'uploads', 'avatars');
 fs.mkdirSync(avatarsDir, { recursive: true });
+const logosDir = path.join(process.cwd(), 'uploads', 'logos');
+fs.mkdirSync(logosDir, { recursive: true });
 
 app.use(helmet());
 app.use(cors({ origin: '*', credentials: false }));

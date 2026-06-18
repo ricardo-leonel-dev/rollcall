@@ -17,16 +17,21 @@ export class InstitutionContextService {
   );
 
   readonly institutions = this._institutions.asReadonly();
+  readonly activeInstitutions = computed(() => this._institutions().filter(i => i.isActive));
   readonly selectedId = this._selectedId.asReadonly();
-  readonly selectedName = computed(
-    () => this._institutions().find(i => i.id === this._selectedId())?.name ?? null
+  readonly selected = computed(
+    () => this._institutions().find(i => i.id === this._selectedId()) ?? null
   );
+  readonly selectedName = computed(() => this.selected()?.name ?? null);
 
   async loadInstitutions(): Promise<void> {
     const list = await firstValueFrom(this.http.get<Institution[]>('/api/institutions'));
     this._institutions.set(list);
-    if (this._selectedId() === null && list.length) {
-      this.select(list[0].id);
+    const current = list.find(i => i.id === this._selectedId());
+    if (!current || !current.isActive) {
+      const active = list.filter(i => i.isActive);
+      if (active.length) this.select(active[0].id);
+      else { localStorage.removeItem('selectedInstitutionId'); this._selectedId.set(null); }
     }
   }
 

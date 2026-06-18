@@ -10,10 +10,12 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { AcademicYear, Course, Enrollment, Absence, OcrResult } from '../../core/models/index';
 import { DEFAULT_NOTIFICATION_TEMPLATE } from '../../shared/components/profile-dialog/profile-dialog.component';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 
 @Component({
   standalone: true,
@@ -281,6 +283,7 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
 export class AbsencesComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
 
   readonly years = signal<AcademicYear[]>([]);
   readonly courses = signal<Course[]>([]);
@@ -447,9 +450,14 @@ export class AbsencesComponent implements OnInit {
     this.snackBar.open(`Busca "${name}" en la pestaña Manual`, '', { duration: 2000 });
   }
 
-  async deleteAbsence(id: number): Promise<void> {
-    if (!confirm('¿Eliminar esta inasistencia?')) return;
-    await firstValueFrom(this.http.delete(`/api/absences/${id}`));
-    await this.loadAbsences();
+  deleteAbsence(id: number): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: { title: 'Eliminar inasistencia', message: '¿Eliminar esta inasistencia? Esta acción no se puede deshacer.' },
+    }).afterClosed().subscribe(async ok => {
+      if (!ok) return;
+      await firstValueFrom(this.http.delete(`/api/absences/${id}`));
+      await this.loadAbsences();
+    });
   }
 }

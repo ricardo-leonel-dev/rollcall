@@ -19,4 +19,13 @@ export class ThemeService {
   private apply(dark: boolean): void {
     document.documentElement.classList.toggle('dark', dark);
   }
+
+  // Overrides the brand accent colors for the active institution. Passing
+  // null clears the override and falls back to the default indigo/purple
+  // theme from styles.css.
+  applyInstitutionColors(primary: string | null, secondary: string | null): void {
+    const style = document.documentElement.style;
+    if (primary) style.setProperty('--accent', primary); else style.removeProperty('--accent');
+    if (secondary) style.setProperty('--accent-2', secondary); else style.removeProperty('--accent-2');
+  }
 }
