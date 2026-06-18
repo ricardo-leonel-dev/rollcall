@@ -11,7 +11,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
-import { NotificationSettingsDialogComponent } from '../components/notification-settings-dialog/notification-settings-dialog.component';
+import { ThemeService } from '../../core/services/theme.service';
+import { ProfileDialogComponent, resolveAvatarPreset } from '../components/profile-dialog/profile-dialog.component';
 
 @Component({
   standalone: true,
@@ -190,13 +191,21 @@ import { NotificationSettingsDialogComponent } from '../components/notification-
 
       <div class="user-area">
         <div class="user-card">
-          <div class="avatar">{{initials()}}</div>
+          <div class="avatar" [style.background]="isUploadedAvatar() ? 'transparent' : (avatarPreset()?.color ?? null)">
+            @if (isUploadedAvatar()) {
+              <img [src]="auth.currentUser()?.avatarUrl" style="width:100%;height:100%;border-radius:8px;object-fit:cover">
+            } @else if (avatarPreset()) {
+              <mat-icon style="font-size:18px;width:18px;height:18px">{{avatarPreset()!.icon}}</mat-icon>
+            } @else {
+              {{initials()}}
+            }
+          </div>
           @if (!collapsed() || isMobile()) {
             <div class="user-info">
               <div class="user-name">{{auth.currentUser()?.fullName ?? auth.currentUser()?.username}}</div>
               <div class="user-role">{{auth.roleName()}}</div>
             </div>
-            <button mat-icon-button class="logout-btn" (click)="openNotificationSettings()" matTooltip="Mensaje de notificación">
+            <button mat-icon-button class="logout-btn" (click)="openProfile()" matTooltip="Mi perfil">
               <mat-icon>settings</mat-icon>
             </button>
             <button mat-icon-button class="logout-btn" (click)="auth.logout()" matTooltip="Cerrar sesión">
@@ -217,6 +226,9 @@ import { NotificationSettingsDialogComponent } from '../components/notification-
           <mat-icon>{{isMobile() ? 'menu' : (collapsed() ? 'menu_open' : 'menu')}}</mat-icon>
         </button>
         <span style="flex:1"></span>
+        <button mat-icon-button style="color:var(--muted-strong)" (click)="theme.toggle()" [matTooltip]="theme.dark() ? 'Modo claro' : 'Modo oscuro'">
+          <mat-icon>{{theme.dark() ? 'light_mode' : 'dark_mode'}}</mat-icon>
+        </button>
         @if (auth.isSuperAdmin()) {
           <mat-select class="institution-switcher" [ngModel]="institutionContext.selectedId()"
                       (ngModelChange)="onInstitutionChange($event)" placeholder="Institución">
@@ -240,6 +252,7 @@ import { NotificationSettingsDialogComponent } from '../components/notification-
 export class LayoutComponent implements OnInit {
   readonly auth = inject(AuthService);
   readonly institutionContext = inject(InstitutionContextService);
+  readonly theme = inject(ThemeService);
   private readonly bp = inject(BreakpointObserver);
   private readonly dialog = inject(MatDialog);
 
@@ -254,9 +267,12 @@ export class LayoutComponent implements OnInit {
     location.reload();
   }
 
-  openNotificationSettings(): void {
-    this.dialog.open(NotificationSettingsDialogComponent, { width: '480px' });
+  openProfile(): void {
+    this.dialog.open(ProfileDialogComponent, { width: '520px' });
   }
+
+  readonly avatarPreset = () => resolveAvatarPreset(this.auth.currentUser()?.avatarUrl);
+  readonly isUploadedAvatar = () => !!this.auth.currentUser()?.avatarUrl?.startsWith('/api/uploads/');
 
   readonly isMobile = toSignal(
     this.bp.observe('(max-width: 767px)').pipe(map(r => r.matches)),

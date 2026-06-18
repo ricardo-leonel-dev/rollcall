@@ -14,11 +14,12 @@ interface AbsenceFilters {
   isJustified?: string;
 }
 
-export async function findAll(institutionId: number, filters: AbsenceFilters) {
+export async function findAll(institutionId: number, courseIds: number[] | null, filters: AbsenceFilters) {
   const conditions: string[] = ['a.deleted_at IS NULL', 'm.deleted_at IS NULL', 'a.institution_id = $1'];
   const params: any[] = [institutionId];
   let i = 2;
 
+  if (courseIds !== null)     { conditions.push(`m.course_id = ANY($${i++})`); params.push(courseIds); }
   if (filters.enrollmentId)   { conditions.push(`a.enrollment_id = $${i++}`);   params.push(filters.enrollmentId); }
   if (filters.courseId)       { conditions.push(`m.course_id = $${i++}`);        params.push(filters.courseId); }
   if (filters.academicYearId) { conditions.push(`m.academic_year_id = $${i++}`); params.push(filters.academicYearId); }
@@ -52,37 +53,81 @@ export async function findAll(institutionId: number, filters: AbsenceFilters) {
   return AppDataSource.query(sql, params);
 }
 
-export async function findById(institutionId: number, id: number) {
+async function assertEnrollmentInScope(institutionId: number, courseIds: number[] | null, enrollmentId: number): Promise<Enrollment> {
+  const enrollment = await AppDataSource.getRepository(Enrollment).findOne({ where: { id: enrollmentId, institutionId } });
+  if (!enrollment || (courseIds !== null && !courseIds.includes(enrollment.courseId))) {
+    throw Object.assign(new Error('Enrollment not found'), { status: 404 });
+  }
+  return enrollment;
+}
+
+export async function findById(institutionId: number, courseIds: number[] | null, id: number) {
   const a = await repo().findOne({ where: { id, institutionId, deletedAt: null as any } });
   if (!a) throw Object.assign(new Error('Absence not found'), { status: 404 });
+  if (courseIds !== null) await assertEnrollmentInScope(institutionId, courseIds, a.enrollmentId);
   return a;
 }
 
-export async function create(institutionId: number, data: {
-  enrollmentId: number; date: string; type: 'F' | 'AT';
-  notes?: string; photoSource?: string;
-}) {
+// Monday–Friday only between dateFrom/dateTo inclusive — same business-day
+// rule already used by excel-service's diasHabiles for the attendance export.
+function businessDaysInRange(dateFrom: string, dateTo: string): string[] {
+  const [fy, fm, fd] = dateFrom.split('-').map(Number);
+  const [ty, tm, td] = dateTo.split('-').map(Number);
+  const start = Date.UTC(fy, fm - 1, fd);
+  const end = Date.UTC(ty, tm - 1, td);
+  const days: string[] = [];
+  for (let t = start; t <= end; t += 86400000) {
+    const d = new Date(t);
+    if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6) days.push(d.toISOString().split('T')[0]);
+  }
+  return days;
+}
+
+export async function createRange(institutionId: number, courseIds: number[] | null, data: {
+  enrollmentId: number; type: 'F' | 'AT'; dateFrom: string; dateTo: string; notes?: string;
+}): Promise<{ created: number; skipped: number }> {
   if (!['F', 'AT'].includes(data.type)) {
     throw Object.assign(new Error('Invalid type. Only F or AT'), { status: 400 });
   }
-  const enrollment = await AppDataSource.getRepository(Enrollment).findOne({ where: { id: data.enrollmentId, institutionId } });
-  if (!enrollment) throw Object.assign(new Error('Enrollment not found'), { status: 404 });
+  if (data.dateFrom > data.dateTo) {
+    throw Object.assign(new Error('dateFrom must be on or before dateTo'), { status: 400 });
+  }
+  await assertEnrollmentInScope(institutionId, courseIds, data.enrollmentId);
 
-  const a = repo().create({
-    institutionId,
-    enrollmentId: data.enrollmentId,
-    date: data.date,
-    type: data.type,
-    notes: data.notes ?? null,
-    photoSource: data.photoSource ?? null,
-  });
-  return repo().save(a);
+  const days = businessDaysInRange(data.dateFrom, data.dateTo);
+  if (!days.length) {
+    throw Object.assign(new Error('El rango no contiene días hábiles'), { status: 400 });
+  }
+
+  const existingRows = await AppDataSource.query(
+    `SELECT date::text AS date FROM absences WHERE enrollment_id = $1 AND date = ANY($2) AND deleted_at IS NULL`,
+    [data.enrollmentId, days]
+  );
+  const existingDates = new Set(existingRows.map((r: { date: string }) => r.date));
+  const toCreate = days.filter(d => !existingDates.has(d));
+
+  if (toCreate.length) {
+    await AppDataSource.transaction(async (em) => {
+      for (const date of toCreate) {
+        const a = em.create(Absence, {
+          institutionId,
+          enrollmentId: data.enrollmentId,
+          date,
+          type: data.type,
+          notes: data.notes ?? null,
+        });
+        await em.save(a);
+      }
+    });
+  }
+
+  return { created: toCreate.length, skipped: days.length - toCreate.length };
 }
 
-export async function update(institutionId: number, id: number, data: Partial<{
+export async function update(institutionId: number, courseIds: number[] | null, id: number, data: Partial<{
   date: string; type: 'F' | 'AT'; notes: string; photoSource: string;
 }>) {
-  const a = await findById(institutionId, id);
+  const a = await findById(institutionId, courseIds, id);
   if (data.type && !['F', 'AT'].includes(data.type)) {
     throw Object.assign(new Error('Invalid type. Only F or AT'), { status: 400 });
   }
@@ -93,8 +138,8 @@ export async function update(institutionId: number, id: number, data: Partial<{
   return repo().save(a);
 }
 
-export async function remove(institutionId: number, id: number) {
-  const a = await findById(institutionId, id);
+export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
+  const a = await findById(institutionId, courseIds, id);
   a.deletedAt = new Date();
   a.isActive = false;
   await repo().save(a);

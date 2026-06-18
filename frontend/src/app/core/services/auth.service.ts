@@ -5,15 +5,19 @@ import { firstValueFrom } from 'rxjs';
 import { AuthResponse } from '../models/index';
 import { InstitutionContextService } from './institution-context.service';
 
+function readStored(key: string): string | null {
+  return sessionStorage.getItem(key) ?? localStorage.getItem(key);
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly institutionContext = inject(InstitutionContextService);
 
-  private readonly _token = signal<string | null>(localStorage.getItem('token'));
+  private readonly _token = signal<string | null>(readStored('token'));
   private readonly _user = signal<AuthResponse['user'] | null>(
-    (() => { try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch { return null; } })()
+    (() => { try { return JSON.parse(readStored('user') || 'null'); } catch { return null; } })()
   );
 
   readonly token = this._token.asReadonly();
@@ -22,24 +26,39 @@ export class AuthService {
   readonly roleName = computed(() => this._user()?.roleName ?? null);
   readonly isSuperAdmin = computed(() => this._user()?.roleName === 'superadmin');
 
-  async login(username: string, password: string): Promise<void> {
+  // rememberMe=true persists across browser restarts (localStorage);
+  // false only lasts for the current browser session (sessionStorage).
+  // The JWT itself always expires after JWT_EXPIRES_IN regardless.
+  async login(username: string, password: string, rememberMe = true): Promise<void> {
     const resp = await firstValueFrom(
       this.http.post<AuthResponse>('/api/auth/login', { username, password })
     );
-    localStorage.setItem('token', resp.token);
-    localStorage.setItem('user', JSON.stringify(resp.user));
+    const storage = rememberMe ? localStorage : sessionStorage;
+    storage.setItem('token', resp.token);
+    storage.setItem('user', JSON.stringify(resp.user));
     this._token.set(resp.token);
     this._user.set(resp.user);
     await this.router.navigate(['/dashboard']);
   }
 
   logout(): void {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    for (const storage of [localStorage, sessionStorage]) {
+      storage.removeItem('token');
+      storage.removeItem('user');
+    }
     this._token.set(null);
     this._user.set(null);
     this.institutionContext.clear();
     this.router.navigate(['/login']);
+  }
+
+  // Refreshes the cached user (e.g. after the profile dialog changes the
+  // avatar) without a full re-login.
+  updateLocalUser(partial: Partial<AuthResponse['user']>): void {
+    const updated = { ...this._user(), ...partial } as AuthResponse['user'];
+    this._user.set(updated);
+    const storage = sessionStorage.getItem('user') ? sessionStorage : localStorage;
+    storage.setItem('user', JSON.stringify(updated));
   }
 
   hasPermission(role: string): boolean {

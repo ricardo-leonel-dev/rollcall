@@ -1,9 +1,10 @@
 import { AppDataSource } from '../data-source';
 
-export async function getSummary(institutionId: number, courseId?: number, academicYearId?: number) {
+export async function getSummary(institutionId: number, courseIds: number[] | null, courseId?: number, academicYearId?: number) {
   const filters: string[] = ['a.deleted_at IS NULL', 'm.deleted_at IS NULL', 'a.institution_id = $1'];
   const params: any[] = [institutionId];
   let i = 2;
+  if (courseIds !== null) { filters.push(`m.course_id = ANY($${i++})`); params.push(courseIds); }
   if (courseId)       { filters.push(`m.course_id = $${i++}`);        params.push(courseId); }
   if (academicYearId) { filters.push(`m.academic_year_id = $${i++}`); params.push(academicYearId); }
 
@@ -30,6 +31,7 @@ export async function getSummary(institutionId: number, courseId?: number, acade
     JOIN students e        ON e.id = m.student_id
     JOIN courses c         ON c.id = m.course_id
     WHERE ${where}
+      AND NOT EXISTS (SELECT 1 FROM justification_absences ja WHERE ja.absence_id = a.id)
     GROUP BY e.id, e.name, m.roster_number, c.name
     ORDER BY "totalAbsences" DESC, "totalTardies" DESC
     LIMIT 10

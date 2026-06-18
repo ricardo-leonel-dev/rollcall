@@ -19,6 +19,10 @@ router.post('/process-photo', requirePermission('absences', 'create'),
       res.status(400).json({ error: 'course_id y academic_year_id son requeridos' });
       return;
     }
+    if (req.courseIds && !req.courseIds.includes(courseId)) {
+      res.status(404).json({ error: 'Course not found' });
+      return;
+    }
 
     const ocrResp = await svc.processPhoto(req.institutionId!, courseId, academicYearId, req.body.date, req.file);
     res.setHeader('Content-Type', ocrResp.headers.get('content-type') || 'application/json');

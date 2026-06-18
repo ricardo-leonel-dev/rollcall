@@ -28,4 +28,9 @@ router.delete('/:id', requireInstitution, requirePermission(R,'delete'), async (
   res.status(204).send();
 });
 
+router.put('/:id/courses', requireInstitution, requirePermission(R,'update'), async (req, res) => {
+  await svc.setCourses(req.institutionId!, +req.params.id, req.body.courseIds ?? []);
+  res.json({ message: 'Cursos actualizados' });
+});
+
 export default router;

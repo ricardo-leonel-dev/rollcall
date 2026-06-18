@@ -8,8 +8,21 @@ const repo = () => AppDataSource.getRepository(Justification);
 const jaRepo = () => AppDataSource.getRepository(JustificationAbsence);
 const absRepo = () => AppDataSource.getRepository(Absence);
 
-export async function findAll(institutionId: number, enrollmentId?: number) {
+async function assertEnrollmentInScope(institutionId: number, courseIds: number[] | null, enrollmentId: number): Promise<Enrollment> {
+  const enrollment = await AppDataSource.getRepository(Enrollment).findOne({ where: { id: enrollmentId, institutionId } });
+  if (!enrollment || (courseIds !== null && !courseIds.includes(enrollment.courseId))) {
+    throw Object.assign(new Error('Enrollment not found'), { status: 404 });
+  }
+  return enrollment;
+}
+
+export async function findAll(institutionId: number, courseIds: number[] | null, enrollmentId?: number) {
   const params: any[] = [institutionId];
+  let courseFilter = '';
+  if (courseIds !== null) {
+    params.push(courseIds);
+    courseFilter = `AND e.course_id = ANY($${params.length})`;
+  }
   let enrollmentFilter = '';
   if (enrollmentId) {
     params.push(enrollmentId);
@@ -20,8 +33,10 @@ export async function findAll(institutionId: number, enrollmentId?: number) {
     SELECT j.*,
       COALESCE(json_agg(ja.absence_id) FILTER (WHERE ja.absence_id IS NOT NULL), '[]') AS absence_ids
     FROM justifications j
+    JOIN enrollments e ON e.id = j.enrollment_id
     LEFT JOIN justification_absences ja ON ja.justification_id = j.id
     WHERE j.institution_id = $1 AND j.deleted_at IS NULL
+    ${courseFilter}
     ${enrollmentFilter}
     GROUP BY j.id
     ORDER BY j.created_at DESC
@@ -29,13 +44,14 @@ export async function findAll(institutionId: number, enrollmentId?: number) {
   return AppDataSource.query(sql, params);
 }
 
-export async function findById(institutionId: number, id: number) {
+export async function findById(institutionId: number, courseIds: number[] | null, id: number) {
   const j = await repo().findOne({ where: { id, institutionId, deletedAt: null as any } });
   if (!j) throw Object.assign(new Error('Justification not found'), { status: 404 });
+  if (courseIds !== null) await assertEnrollmentInScope(institutionId, courseIds, j.enrollmentId);
   return j;
 }
 
-export async function create(institutionId: number, data: {
+export async function create(institutionId: number, courseIds: number[] | null, data: {
   enrollmentId: number; reason: string;
   notifiedBy?: string; absenceIds: number[];
 }) {
@@ -43,8 +59,7 @@ export async function create(institutionId: number, data: {
     throw Object.assign(new Error('At least one absence is required'), { status: 400 });
   }
 
-  const enrollment = await AppDataSource.getRepository(Enrollment).findOne({ where: { id: data.enrollmentId, institutionId } });
-  if (!enrollment) throw Object.assign(new Error('Enrollment not found'), { status: 404 });
+  await assertEnrollmentInScope(institutionId, courseIds, data.enrollmentId);
 
   for (const absId of data.absenceIds) {
     const abs = await absRepo().findOne({ where: { id: absId, institutionId, deletedAt: null as any } });
@@ -80,10 +95,10 @@ export async function create(institutionId: number, data: {
   });
 }
 
-export async function update(institutionId: number, id: number, data: {
+export async function update(institutionId: number, courseIds: number[] | null, id: number, data: {
   reason?: string; notifiedBy?: string; absenceIds?: number[];
 }) {
-  const j = await findById(institutionId, id);
+  const j = await findById(institutionId, courseIds, id);
 
   if (data.reason) j.reason = data.reason;
   if (data.notifiedBy !== undefined) j.notifiedBy = data.notifiedBy;
@@ -103,8 +118,8 @@ export async function update(institutionId: number, id: number, data: {
   });
 }
 
-export async function remove(institutionId: number, id: number) {
-  const j = await findById(institutionId, id);
+export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
+  const j = await findById(institutionId, courseIds, id);
 
   return AppDataSource.transaction(async (em) => {
     await em.delete(JustificationAbsence, { justificationId: id });

@@ -5,12 +5,13 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule],
+  imports: [FormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatCheckboxModule],
   styles: [`
     :host {
       display: flex;
@@ -125,6 +126,9 @@ import { AuthService } from '../../../core/services/auth.service';
               </button>
             </mat-form-field>
           </div>
+          <div class="field-wrap" style="margin-bottom:8px">
+            <mat-checkbox [(ngModel)]="rememberMe" name="rememberMe">Recuérdame</mat-checkbox>
+          </div>
           @if (error()) {
             <div class="error-box">{{error()}}</div>
           }
@@ -143,6 +147,7 @@ export class LoginComponent {
   private readonly auth = inject(AuthService);
   username = '';
   password = '';
+  rememberMe = true;
   readonly loading = signal(false);
   readonly error = signal('');
   readonly showPass = signal(false);
@@ -159,7 +164,7 @@ export class LoginComponent {
     this.loading.set(true);
     this.error.set('');
     try {
-      await this.auth.login(this.username, this.password);
+      await this.auth.login(this.username, this.password, this.rememberMe);
     } catch (err: any) {
       this.error.set(err?.error?.error ?? 'Usuario o contraseña incorrectos');
     } finally {

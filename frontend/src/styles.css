@@ -35,6 +35,51 @@
   --accent-soft: #eef2ff;
 }
 
+html.dark {
+  --page-bg: #18140f;
+  --paper: #221c15;
+  --paper-deep: #1c1712;
+  --ink: #f3ede3;
+  --ink-soft: #d8cfc2;
+  --muted: #8a8074;
+  --muted-strong: #a89a8c;
+  --border: #3a3025;
+  --border-soft: #2c2419;
+  --stripe: #c1504f;
+  --accent: #818cf8;
+  --accent-2: #a78bfa;
+  --accent-soft: #2a2a4a;
+}
+
+/* Material's compiled prebuilt theme doesn't respond to our CSS variables —
+   best-effort overrides for the overlay surfaces users see most (dialogs,
+   select/autocomplete panels, snackbars, menus). Not a full Material dark
+   theme. */
+html.dark .mat-mdc-dialog-surface,
+html.dark .mat-mdc-select-panel,
+html.dark .mat-mdc-autocomplete-panel,
+html.dark .mat-mdc-menu-panel,
+html.dark .mat-mdc-snack-bar-container .mdc-snackbar__surface {
+  background: var(--paper) !important;
+  color: var(--ink-soft) !important;
+}
+html.dark .mat-mdc-option,
+html.dark .mat-mdc-menu-item {
+  color: var(--ink-soft) !important;
+}
+html.dark .mat-mdc-option:hover:not(.mdc-list-item--disabled),
+html.dark .mat-mdc-menu-item:hover:not([disabled]) {
+  background: var(--paper-deep) !important;
+}
+html.dark .mat-mdc-text-field-wrapper {
+  background: var(--paper) !important;
+}
+html.dark input.mat-mdc-input-element,
+html.dark .mat-mdc-form-field-text-input,
+html.dark textarea.mat-mdc-input-element {
+  color: var(--ink-soft) !important;
+}
+
 /* ─── Base ─────────────────────────────────────────────────────────────── */
 html, body { height: 100%; margin: 0; }
 body {

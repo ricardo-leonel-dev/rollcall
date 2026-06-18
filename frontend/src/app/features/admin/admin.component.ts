@@ -185,7 +185,7 @@ import { InstitutionContextService } from '../../core/services/institution-conte
             </div>
           </div>
           @for (u of users(); track u.id) {
-            <div class="list-item">
+            <div class="list-item" style="flex-wrap:wrap">
               <div style="display:flex;align-items:center;gap:12px">
                 <div class="user-avatar">{{(u.fullName || u.username)[0].toUpperCase()}}</div>
                 <div>
@@ -193,7 +193,17 @@ import { InstitutionContextService } from '../../core/services/institution-conte
                   <div style="font-size:12px;color:var(--muted)">@{{u.username}} · <span style="color:#4f46e5">{{u.roleName}}</span></div>
                 </div>
               </div>
-              <button mat-icon-button style="color:#b91c1c" (click)="deleteUser(u.id)"><mat-icon>delete_outline</mat-icon></button>
+              <div style="display:flex;align-items:center;gap:8px">
+                @if (u.roleName !== 'superadmin') {
+                  <mat-form-field appearance="outline" style="width:240px;margin:0">
+                    <mat-label>{{u.courseIds?.length ? 'Cursos asignados' : 'Ve todos los cursos'}}</mat-label>
+                    <mat-select multiple [ngModel]="u.courseIds" (ngModelChange)="updateUserCourses(u.id, $event)">
+                      @for (c of courses(); track c.id) { <mat-option [value]="c.id">{{c.name}}</mat-option> }
+                    </mat-select>
+                  </mat-form-field>
+                }
+                <button mat-icon-button style="color:#b91c1c" (click)="deleteUser(u.id)"><mat-icon>delete_outline</mat-icon></button>
+              </div>
             </div>
           }
         </div>
@@ -394,6 +404,12 @@ export class AdminComponent implements OnInit {
   async deleteUser(id: number): Promise<void> {
     if (!confirm('¿Eliminar este usuario?')) return;
     await firstValueFrom(this.http.delete(`/api/users/${id}`));
+    await this.loadAll();
+  }
+
+  async updateUserCourses(userId: number, courseIds: number[]): Promise<void> {
+    await firstValueFrom(this.http.put(`/api/users/${userId}/courses`, { courseIds }));
+    this.snack.open('Cursos actualizados', '', { duration: 2000 });
     await this.loadAll();
   }
 

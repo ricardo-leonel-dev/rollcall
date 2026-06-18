@@ -12,7 +12,7 @@ import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
 import { AcademicYear, Course, Enrollment, Absence, OcrResult } from '../../core/models/index';
-import { DEFAULT_NOTIFICATION_TEMPLATE } from '../../shared/components/notification-settings-dialog/notification-settings-dialog.component';
+import { DEFAULT_NOTIFICATION_TEMPLATE } from '../../shared/components/profile-dialog/profile-dialog.component';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 
 @Component({
@@ -28,6 +28,11 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
       transition: background 0.1s;
     }
     .enroll-row:hover { background: var(--paper-deep); }
+    .marked-today { font-size: 11px; color: #15803d; display: flex; align-items: center; gap: 2px; margin-right: 6px; }
+    .range-form {
+      padding: 14px 16px; background: var(--paper-deep); border-bottom: 1px solid var(--border-soft);
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+    }
   `],
   template: `
     <div class="page-header">
@@ -141,7 +146,7 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
             </div>
           } @else {
             <div style="padding:12px 16px;background:var(--paper-deep);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted-strong)">
-              {{enrollments().length}} estudiantes — haz clic en A (Ausente) o AT (Atraso)
+              {{enrollments().length}} estudiantes — haz clic en Falta o Atrasado (puedes elegir un rango de días)
             </div>
             @for (e of enrollments(); track e.enrollmentId) {
               <div class="enroll-row">
@@ -151,15 +156,37 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
                   </div>
                   <span style="font-size:14px;font-weight:500">{{e.fullName}}</span>
                 </div>
-                <div style="display:flex;gap:6px">
-                  <button class="action-pill action-pill-f" (click)="addAbsence(e.enrollmentId, 'F')">
+                <div style="display:flex;align-items:center;gap:6px">
+                  @if (markedToday(e.enrollmentId, 'F')) { <span class="marked-today"><mat-icon style="font-size:14px;width:14px;height:14px">check</mat-icon> Falta hoy</span> }
+                  @if (markedToday(e.enrollmentId, 'AT')) { <span class="marked-today"><mat-icon style="font-size:14px;width:14px;height:14px">check</mat-icon> Atraso hoy</span> }
+                  <button class="action-pill action-pill-f" (click)="openRangeForm(e.enrollmentId, 'F')">
                     <mat-icon style="font-size:14px;width:14px;height:14px">event_busy</mat-icon> Falta
                   </button>
-                  <button class="action-pill action-pill-at" (click)="addAbsence(e.enrollmentId, 'AT')">
+                  <button class="action-pill action-pill-at" (click)="openRangeForm(e.enrollmentId, 'AT')">
                     <mat-icon style="font-size:14px;width:14px;height:14px">schedule</mat-icon> Atrasado
                   </button>
                 </div>
               </div>
+              @if (rangeForm()?.enrollmentId === e.enrollmentId) {
+                <div class="range-form">
+                  <mat-form-field appearance="outline" style="width:150px">
+                    <mat-label>Desde</mat-label>
+                    <input matInput type="date" [ngModel]="rangeForm()!.dateFrom" (ngModelChange)="updateRangeForm('dateFrom', $event)">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" style="width:150px">
+                    <mat-label>Hasta</mat-label>
+                    <input matInput type="date" [ngModel]="rangeForm()!.dateTo" (ngModelChange)="updateRangeForm('dateTo', $event)">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" style="flex:1;min-width:200px">
+                    <mat-label>Motivo (opcional)</mat-label>
+                    <input matInput [ngModel]="rangeForm()!.notes" (ngModelChange)="updateRangeForm('notes', $event)">
+                  </mat-form-field>
+                  <button mat-flat-button color="primary" style="height:56px" (click)="confirmRangeForm()">
+                    <mat-icon>check</mat-icon> Confirmar
+                  </button>
+                  <button mat-stroked-button style="height:56px" (click)="rangeForm.set(null)">Cancelar</button>
+                </div>
+              }
             }
           }
         </div>
@@ -190,11 +217,6 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
                 <mat-option value="AT">Atrasado</mat-option>
               </mat-select>
             </mat-form-field>
-            @if (selectedAbsences().length) {
-              <button mat-flat-button color="primary" style="align-self:center" (click)="openJustifyDialog()">
-                <mat-icon>task_alt</mat-icon> Justificar ({{selectedAbsences().length}})
-              </button>
-            }
           </div>
 
           @if (absLoading()) {
@@ -211,9 +233,6 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th style="width:40px">
-                      <mat-checkbox (change)="toggleAll($event.checked)"></mat-checkbox>
-                    </th>
                     <th>Estudiante</th>
                     <th>Fecha</th>
                     <th>Tipo</th>
@@ -225,11 +244,6 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
                 <tbody>
                   @for (a of absences(); track a.id) {
                     <tr>
-                      <td>
-                        @if (!a.isJustified) {
-                          <mat-checkbox [checked]="isSelected(a.id)" (change)="toggleAbsence(a, $event.checked)"></mat-checkbox>
-                        }
-                      </td>
                       <td style="font-weight:500">{{a.studentName}}</td>
                       <td style="color:var(--muted-strong);white-space:nowrap">{{a.date}}</td>
                       <td><span [class]="'badge-' + a.type">{{typeLabel(a.type)}}</span></td>
@@ -262,38 +276,6 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
         </div>
       </mat-tab>
     </mat-tab-group>
-
-    <!-- Modal justificación -->
-    @if (showJustifyForm()) {
-      <div class="modal-overlay">
-        <div class="modal-panel">
-          <div style="font-family:'Fraunces',serif;font-size:19px;font-weight:600;color:var(--ink);margin-bottom:4px">Justificar inasistencias</div>
-          <div style="font-size:13px;color:var(--muted);margin-bottom:16px">{{selectedAbsences().length}} falta(s) seleccionadas</div>
-          <div style="background:var(--paper-deep);border-radius:10px;padding:12px;margin-bottom:16px">
-            @for (a of selectedAbsences(); track a.id) {
-              <div style="font-size:13px;padding:4px 0;color:var(--muted-strong)">
-                <strong style="color:var(--ink-soft)">{{a.studentName}}</strong> — {{a.date}}
-                <span [class]="'badge-' + a.type" style="margin-left:6px">{{typeLabel(a.type)}}</span>
-              </div>
-            }
-          </div>
-          <mat-form-field appearance="outline" style="width:100%;margin-bottom:12px">
-            <mat-label>Motivo *</mat-label>
-            <textarea matInput [(ngModel)]="justifyReason" rows="3" placeholder="Describe el motivo de la justificación..."></textarea>
-          </mat-form-field>
-          <mat-form-field appearance="outline" style="width:100%;margin-bottom:16px">
-            <mat-label>Quién notificó</mat-label>
-            <input matInput [(ngModel)]="justifyNotifiedBy" placeholder="Representante, médico, etc.">
-          </mat-form-field>
-          <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button mat-stroked-button (click)="showJustifyForm.set(false)">Cancelar</button>
-            <button mat-flat-button color="primary" (click)="submitJustification()" [disabled]="!justifyReason">
-              Guardar justificación
-            </button>
-          </div>
-        </div>
-      </div>
-    }
   `,
 })
 export class AbsencesComponent implements OnInit {
@@ -308,8 +290,8 @@ export class AbsencesComponent implements OnInit {
   readonly ocrLoading = signal(false);
   readonly enrollLoading = signal(false);
   readonly absLoading = signal(false);
-  readonly selectedAbsences = signal<Absence[]>([]);
-  readonly showJustifyForm = signal(false);
+  readonly todayAbsences = signal<Absence[]>([]);
+  readonly rangeForm = signal<{ enrollmentId: number; type: 'F' | 'AT'; dateFrom: string; dateTo: string; notes: string } | null>(null);
 
   selYear: number | null = null;
   selCourse: number | null = null;
@@ -317,8 +299,6 @@ export class AbsencesComponent implements OnInit {
   dateFrom = '';
   dateTo = '';
   filterType = '';
-  justifyReason = '';
-  justifyNotifiedBy = '';
   private notificationTemplate = DEFAULT_NOTIFICATION_TEMPLATE;
 
   async ngOnInit(): Promise<void> {
@@ -334,6 +314,8 @@ export class AbsencesComponent implements OnInit {
     if (me.notificationTemplate) this.notificationTemplate = me.notificationTemplate;
   }
 
+  private todayStr(): string { return new Date().toISOString().split('T')[0]; }
+
   async onFiltersChange(): Promise<void> {
     if (this.selCourse && this.selYear) {
       this.enrollLoading.set(true);
@@ -343,8 +325,21 @@ export class AbsencesComponent implements OnInit {
         );
         this.enrollments.set(data);
       } finally { this.enrollLoading.set(false); }
-      await this.loadAbsences();
+      await Promise.all([this.loadAbsences(), this.loadTodayAbsences()]);
     }
+  }
+
+  async loadTodayAbsences(): Promise<void> {
+    if (!this.selCourse) { this.todayAbsences.set([]); return; }
+    const today = this.todayStr();
+    const data = await firstValueFrom(
+      this.http.get<Absence[]>(`/api/absences?course_id=${this.selCourse}&date_from=${today}&date_to=${today}`)
+    );
+    this.todayAbsences.set(data);
+  }
+
+  markedToday(enrollmentId: number, type: 'F' | 'AT'): boolean {
+    return this.todayAbsences().some(a => a.enrollmentId === enrollmentId && a.type === type);
   }
 
   async loadAbsences(): Promise<void> {
@@ -397,19 +392,38 @@ export class AbsencesComponent implements OnInit {
     return type === 'F' ? 'Falta' : 'Atrasado';
   }
 
-  async addAbsence(enrollmentId: number, type: 'F' | 'AT'): Promise<void> {
-    const today = new Date().toISOString().split('T')[0];
+  openRangeForm(enrollmentId: number, type: 'F' | 'AT'): void {
+    const today = this.todayStr();
+    this.rangeForm.set({ enrollmentId, type, dateFrom: today, dateTo: today, notes: '' });
+  }
+
+  updateRangeForm(field: 'dateFrom' | 'dateTo' | 'notes', value: string): void {
+    const f = this.rangeForm();
+    if (f) this.rangeForm.set({ ...f, [field]: value });
+  }
+
+  async confirmRangeForm(): Promise<void> {
+    const f = this.rangeForm();
+    if (!f) return;
     try {
-      await firstValueFrom(this.http.post('/api/absences', { enrollmentId, date: today, type }));
-      const enrollment = this.enrollments().find(e => e.enrollmentId === enrollmentId);
+      const result = await firstValueFrom(this.http.post<{ created: number; skipped: number }>('/api/absences', {
+        enrollmentId: f.enrollmentId, type: f.type, dateFrom: f.dateFrom, dateTo: f.dateTo,
+        notes: f.notes || undefined,
+      }));
+      const msg = result.skipped > 0
+        ? `${result.created} registro(s) creado(s), ${result.skipped} ya existían`
+        : `${result.created} registro(s) creado(s)`;
+      const enrollment = this.enrollments().find(e => e.enrollmentId === f.enrollmentId);
       const link = enrollment?.whatsappLink;
-      const ref = this.snackBar.open(`${this.typeLabel(type)} registrada`, link ? 'Notificar' : '', { duration: 4000 });
-      if (link) {
-        ref.onAction().subscribe(() => this.notifyGuardian(link, enrollment!.fullName, today, type, enrollment!.course));
+      const ref = this.snackBar.open(msg, link ? 'Notificar' : '', { duration: 4000 });
+      if (link && enrollment) {
+        const dateLabel = f.dateFrom === f.dateTo ? f.dateFrom : `${f.dateFrom} al ${f.dateTo}`;
+        ref.onAction().subscribe(() => this.notifyGuardian(link, enrollment.fullName, dateLabel, f.type, enrollment.course));
       }
-      await this.loadAbsences();
+      this.rangeForm.set(null);
+      await Promise.all([this.loadTodayAbsences(), this.loadAbsences()]);
     } catch (err: any) {
-      this.snackBar.open('Error: ' + (err?.error?.error ?? 'ya existe un registro este día'), '', { duration: 3000 });
+      this.snackBar.open('Error: ' + (err?.error?.error ?? 'No se pudo guardar'), '', { duration: 4000 });
     }
   }
 
@@ -431,43 +445,6 @@ export class AbsencesComponent implements OnInit {
 
   openManualAdd(name: string): void {
     this.snackBar.open(`Busca "${name}" en la pestaña Manual`, '', { duration: 2000 });
-  }
-
-  isSelected(id: number): boolean { return this.selectedAbsences().some(a => a.id === id); }
-
-  toggleAbsence(absence: Absence, checked: boolean): void {
-    if (checked) this.selectedAbsences.update(s => [...s, absence]);
-    else this.selectedAbsences.update(s => s.filter(a => a.id !== absence.id));
-  }
-
-  toggleAll(checked: boolean): void {
-    if (checked) this.selectedAbsences.set(this.absences().filter(a => !a.isJustified));
-    else this.selectedAbsences.set([]);
-  }
-
-  openJustifyDialog(): void {
-    this.justifyReason = '';
-    this.justifyNotifiedBy = '';
-    this.showJustifyForm.set(true);
-  }
-
-  async submitJustification(): Promise<void> {
-    const sel = this.selectedAbsences();
-    if (!sel.length || !this.justifyReason) return;
-    try {
-      await firstValueFrom(this.http.post('/api/justifications', {
-        enrollmentId: sel[0].enrollmentId,
-        reason: this.justifyReason,
-        notifiedBy: this.justifyNotifiedBy || null,
-        absenceIds: sel.map(a => a.id),
-      }));
-      this.snackBar.open('Justificación guardada', '', { duration: 2000 });
-      this.showJustifyForm.set(false);
-      this.selectedAbsences.set([]);
-      await this.loadAbsences();
-    } catch (err: any) {
-      this.snackBar.open('Error: ' + (err?.error?.error ?? 'Error al guardar'), '', { duration: 4000 });
-    }
   }
 
   async deleteAbsence(id: number): Promise<void> {

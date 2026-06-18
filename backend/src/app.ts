@@ -2,6 +2,8 @@ import 'reflect-metadata';
 import dotenv from 'dotenv';
 dotenv.config();
 
+import fs from 'fs';
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -12,11 +14,15 @@ import { errorMiddleware } from './middleware/error.middleware';
 
 const app = express();
 
+const avatarsDir = path.join(process.cwd(), 'uploads', 'avatars');
+fs.mkdirSync(avatarsDir, { recursive: true });
+
 app.use(helmet());
 app.use(cors({ origin: '*', credentials: false }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+app.use('/api/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use('/api', routes);
 
 app.use(errorMiddleware);

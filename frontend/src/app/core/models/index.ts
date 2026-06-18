@@ -117,7 +117,9 @@ export interface User {
   roleId: number | null;
   roleName: string | null;
   institutionId: number | null;
+  avatarUrl: string | null;
   isActive: boolean;
+  courseIds?: number[];
 }
 
 export interface Institution {
@@ -153,6 +155,7 @@ export interface AuthResponse {
     roleName: string | null;
     roleId: number | null;
     institutionId: number | null;
+    avatarUrl: string | null;
   };
 }
 

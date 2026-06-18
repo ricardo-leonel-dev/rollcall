@@ -7,7 +7,7 @@ import { Guardian } from '../entities/Guardian';
 
 const repo = () => AppDataSource.getRepository(Enrollment);
 
-async function assertOwnership(institutionId: number, data: {
+async function assertOwnership(institutionId: number, courseIds: number[] | null, data: {
   studentId?: number; courseId?: number; academicYearId?: number; guardianId?: number | null;
 }) {
   if (data.studentId !== undefined) {
@@ -15,6 +15,9 @@ async function assertOwnership(institutionId: number, data: {
     if (!s) throw Object.assign(new Error('Student not found'), { status: 404 });
   }
   if (data.courseId !== undefined) {
+    if (courseIds !== null && !courseIds.includes(data.courseId)) {
+      throw Object.assign(new Error('Course not found'), { status: 404 });
+    }
     const c = await AppDataSource.getRepository(Course).findOne({ where: { id: data.courseId, institutionId } });
     if (!c) throw Object.assign(new Error('Course not found'), { status: 404 });
   }
@@ -28,10 +31,11 @@ async function assertOwnership(institutionId: number, data: {
   }
 }
 
-export async function findAll(institutionId: number, courseId?: number, academicYearId?: number, studentId?: number) {
+export async function findAll(institutionId: number, courseIds: number[] | null, courseId?: number, academicYearId?: number, studentId?: number) {
   const conditions: string[] = ['institution_id = $1'];
-  const params: number[] = [institutionId];
+  const params: any[] = [institutionId];
   let i = 2;
+  if (courseIds !== null)  { conditions.push(`course_id = ANY($${i++})`); params.push(courseIds); }
   if (courseId)       { conditions.push(`course_id = $${i++}`);        params.push(courseId); }
   if (academicYearId) { conditions.push(`academic_year_id = $${i++}`); params.push(academicYearId); }
   if (studentId)      { conditions.push(`student_id = $${i++}`);       params.push(studentId); }
@@ -68,34 +72,36 @@ export async function findAll(institutionId: number, courseId?: number, academic
   );
 }
 
-export async function findById(institutionId: number, id: number) {
+export async function findById(institutionId: number, courseIds: number[] | null, id: number) {
   const e = await repo().findOne({ where: { id, institutionId, deletedAt: null as any } });
-  if (!e) throw Object.assign(new Error('Enrollment not found'), { status: 404 });
+  if (!e || (courseIds !== null && !courseIds.includes(e.courseId))) {
+    throw Object.assign(new Error('Enrollment not found'), { status: 404 });
+  }
   return e;
 }
 
-export async function create(institutionId: number, data: {
+export async function create(institutionId: number, courseIds: number[] | null, data: {
   studentId: number; courseId: number; academicYearId: number;
   guardianId?: number; rosterNumber?: number; isEnrolled?: boolean;
   studentPhone?: string; studentEmail?: string;
 }) {
-  await assertOwnership(institutionId, data);
+  await assertOwnership(institutionId, courseIds, data);
   const e = repo().create({ ...data, institutionId });
   return repo().save(e);
 }
 
-export async function update(institutionId: number, id: number, data: Partial<{
+export async function update(institutionId: number, courseIds: number[] | null, id: number, data: Partial<{
   guardianId: number; rosterNumber: number; isEnrolled: boolean;
   studentPhone: string; studentEmail: string; isActive: boolean;
 }>) {
-  const e = await findById(institutionId, id);
-  if (data.guardianId !== undefined) await assertOwnership(institutionId, { guardianId: data.guardianId });
+  const e = await findById(institutionId, courseIds, id);
+  if (data.guardianId !== undefined) await assertOwnership(institutionId, courseIds, { guardianId: data.guardianId });
   Object.assign(e, data);
   return repo().save(e);
 }
 
-export async function remove(institutionId: number, id: number) {
-  const e = await findById(institutionId, id);
+export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
+  const e = await findById(institutionId, courseIds, id);
   e.deletedAt = new Date();
   e.isActive = false;
   await repo().save(e);

@@ -13,6 +13,10 @@ router.get('/excel', requirePermission('export','read'), async (req, res) => {
     res.status(400).json({ error: 'course_id, academic_year_id, date_from, date_to son requeridos' });
     return;
   }
+  if (req.courseIds && !req.courseIds.includes(+course_id)) {
+    res.status(404).json({ error: 'Course not found' });
+    return;
+  }
 
   const ocrResp = await svc.exportExcel(req.institutionId!, +course_id, +academic_year_id, date_from, date_to);
 

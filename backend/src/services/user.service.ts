@@ -1,8 +1,11 @@
 import bcrypt from 'bcrypt';
+import { In } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import { User } from '../entities/User';
 import { Role } from '../entities/Role';
 import { Institution } from '../entities/Institution';
+import { Course } from '../entities/Course';
+import { UserCourse } from '../entities/UserCourse';
 
 const repo = () => AppDataSource.getRepository(User);
 
@@ -16,7 +19,19 @@ async function assertRoleAssignable(roleId: number | undefined, isActorSuperAdmi
 
 export async function findAll(institutionId: number) {
   const users = await repo().find({ where: { institutionId, deletedAt: null as any }, order: { username: 'ASC' } });
-  return users.map(u => { const { passwordHash, ...rest } = u; return rest; });
+  const userIds = users.map(u => u.id);
+  const assignments = userIds.length
+    ? await AppDataSource.getRepository(UserCourse).find({ where: { userId: In(userIds) } })
+    : [];
+  const courseIdsByUser = new Map<number, number[]>();
+  for (const a of assignments) {
+    if (!courseIdsByUser.has(a.userId)) courseIdsByUser.set(a.userId, []);
+    courseIdsByUser.get(a.userId)!.push(a.courseId);
+  }
+  return users.map(u => {
+    const { passwordHash, ...rest } = u;
+    return { ...rest, courseIds: courseIdsByUser.get(u.id) ?? [] };
+  });
 }
 
 export async function findById(institutionId: number, id: number) {
@@ -79,4 +94,24 @@ export async function remove(institutionId: number, id: number) {
   u.deletedAt = new Date();
   u.isActive = false;
   await repo().save(u);
+}
+
+// Replaces all of a user's course assignments. Empty array = unrestricted
+// (sees every course in the institution).
+export async function setCourses(institutionId: number, userId: number, courseIds: number[]) {
+  await findById(institutionId, userId);
+
+  if (courseIds.length) {
+    const validCourses = await AppDataSource.getRepository(Course).find({ where: { id: In(courseIds), institutionId } });
+    if (validCourses.length !== courseIds.length) {
+      throw Object.assign(new Error('One or more courses not found'), { status: 404 });
+    }
+  }
+
+  await AppDataSource.transaction(async (em) => {
+    await em.delete(UserCourse, { userId });
+    for (const courseId of courseIds) {
+      await em.save(em.create(UserCourse, { userId, courseId }));
+    }
+  });
 }

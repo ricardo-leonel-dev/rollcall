@@ -39,6 +39,8 @@ services:
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/01_init.sql
       - ./postgres/02_auth_schema.sql:/docker-entrypoint-initdb.d/02_auth_schema.sql
       - ./postgres/03_multi_tenant.sql:/docker-entrypoint-initdb.d/03_multi_tenant.sql
+      - ./postgres/04_user_avatar.sql:/docker-entrypoint-initdb.d/04_user_avatar.sql
+      - ./postgres/05_course_scope.sql:/docker-entrypoint-initdb.d/05_course_scope.sql
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -229,6 +231,8 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    volumes:
+      - avatars_data:/app/uploads
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - DB_SCHEMA=${DB_SCHEMA}
@@ -270,6 +274,7 @@ volumes:
   webui_data:
   postgres_data:
   excel_output:
+  avatars_data:
 
 networks:
   default:
