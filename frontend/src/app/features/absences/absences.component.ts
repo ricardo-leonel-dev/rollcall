@@ -265,7 +265,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
                             <app-whatsapp-icon [size]="20" />
                           </button>
                         }
-                        <button mat-icon-button style="color:#b91c1c" (click)="deleteAbsence(a.id)">
+                        <button mat-icon-button style="color:#b91c1c" (click)="deleteAbsence(a)">
                           <mat-icon>delete_outline</mat-icon>
                         </button>
                       </td>
@@ -450,13 +450,16 @@ export class AbsencesComponent implements OnInit {
     this.snackBar.open(`Busca "${name}" en la pestaña Manual`, '', { duration: 2000 });
   }
 
-  deleteAbsence(id: number): void {
+  deleteAbsence(a: Absence): void {
+    const message = a.isJustified
+      ? 'Esta falta ya está justificada. Si la eliminas, también se quitará de esa justificación (y la justificación se eliminará si no le queda ninguna otra falta). Esta acción no se puede deshacer.'
+      : '¿Eliminar esta inasistencia? Esta acción no se puede deshacer.';
     this.dialog.open(ConfirmDialogComponent, {
       width: '420px',
-      data: { title: 'Eliminar inasistencia', message: '¿Eliminar esta inasistencia? Esta acción no se puede deshacer.' },
+      data: { title: 'Eliminar inasistencia', message },
     }).afterClosed().subscribe(async ok => {
       if (!ok) return;
-      await firstValueFrom(this.http.delete(`/api/absences/${id}`));
+      await firstValueFrom(this.http.delete(`/api/absences/${a.id}`));
       await this.loadAbsences();
     });
   }

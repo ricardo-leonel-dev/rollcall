@@ -385,7 +385,7 @@ export class AdminComponent implements OnInit {
   deleteYear(id: number): void {
     this.dialog.open(ConfirmDialogComponent, {
       width: '420px',
-      data: { title: 'Eliminar año lectivo', message: '¿Eliminar este año lectivo? Esta acción no se puede deshacer.' },
+      data: { title: 'Eliminar año lectivo', message: '¿Eliminar este año lectivo? También se eliminarán las matrículas, faltas y justificaciones asociadas a él. Esta acción no se puede deshacer.' },
     }).afterClosed().subscribe(async ok => {
       if (!ok) return;
       await firstValueFrom(this.http.delete(`/api/academic-years/${id}`));
@@ -405,7 +405,7 @@ export class AdminComponent implements OnInit {
   deleteCourse(id: number): void {
     this.dialog.open(ConfirmDialogComponent, {
       width: '420px',
-      data: { title: 'Eliminar curso', message: '¿Eliminar este curso? Esta acción no se puede deshacer.' },
+      data: { title: 'Eliminar curso', message: '¿Eliminar este curso? También se eliminarán las matrículas, faltas y justificaciones asociadas a él. Esta acción no se puede deshacer.' },
     }).afterClosed().subscribe(async ok => {
       if (!ok) return;
       await firstValueFrom(this.http.delete(`/api/courses/${id}`));

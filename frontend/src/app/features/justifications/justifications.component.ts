@@ -332,7 +332,7 @@ export class JustificationsComponent implements OnInit {
   remove(id: number): void {
     this.dialog.open(ConfirmDialogComponent, {
       width: '420px',
-      data: { title: 'Eliminar justificación', message: '¿Eliminar esta justificación? Esta acción no se puede deshacer.' },
+      data: { title: 'Eliminar justificación', message: '¿Eliminar esta justificación? Las faltas asociadas no se eliminan, solo dejan de estar justificadas. Esta acción no se puede deshacer.' },
     }).afterClosed().subscribe(async ok => {
       if (!ok) return;
       await firstValueFrom(this.http.delete(`/api/justifications/${id}`));

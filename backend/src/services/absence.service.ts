@@ -1,8 +1,30 @@
+import { EntityManager } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import { Absence } from '../entities/Absence';
 import { Enrollment } from '../entities/Enrollment';
+import { JustificationAbsence } from '../entities/JustificationAbsence';
+import { Justification } from '../entities/Justification';
 
 const repo = () => AppDataSource.getRepository(Absence);
+
+// Deleting an absence shouldn't leave a justification silently pointing at
+// a row that no longer exists — drop the link, and if that was the last
+// absence backing a justification, the justification is meaningless on its
+// own and gets soft-deleted too.
+export async function cascadeSoftDeleteAbsence(em: EntityManager, absenceId: number): Promise<void> {
+  const links = await em.find(JustificationAbsence, { where: { absenceId } });
+  if (links.length) {
+    await em.delete(JustificationAbsence, { absenceId });
+    const justificationIds = [...new Set(links.map(l => l.justificationId))];
+    for (const justificationId of justificationIds) {
+      const remaining = await em.count(JustificationAbsence, { where: { justificationId } });
+      if (remaining === 0) {
+        await em.update(Justification, { id: justificationId }, { deletedAt: new Date(), isActive: false });
+      }
+    }
+  }
+  await em.update(Absence, { id: absenceId }, { deletedAt: new Date(), isActive: false });
+}
 
 interface AbsenceFilters {
   enrollmentId?: number;
@@ -139,8 +161,6 @@ export async function update(institutionId: number, courseIds: number[] | null, 
 }
 
 export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
-  const a = await findById(institutionId, courseIds, id);
-  a.deletedAt = new Date();
-  a.isActive = false;
-  await repo().save(a);
+  await findById(institutionId, courseIds, id);
+  await AppDataSource.transaction(em => cascadeSoftDeleteAbsence(em, id));
 }

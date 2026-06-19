@@ -1,6 +1,8 @@
 import { AppDataSource } from '../data-source';
 import { Course } from '../entities/Course';
+import { Enrollment } from '../entities/Enrollment';
 import { In } from 'typeorm';
+import { cascadeSoftDeleteEnrollment } from './enrollment.service';
 
 const repo = () => AppDataSource.getRepository(Course);
 
@@ -36,8 +38,10 @@ export async function update(institutionId: number, courseIds: number[] | null, 
 }
 
 export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
-  const c = await findById(institutionId, courseIds, id);
-  c.deletedAt = new Date();
-  c.isActive = false;
-  await repo().save(c);
+  await findById(institutionId, courseIds, id);
+  await AppDataSource.transaction(async (em) => {
+    const enrollments = await em.find(Enrollment, { where: { courseId: id, deletedAt: null as any } });
+    for (const e of enrollments) await cascadeSoftDeleteEnrollment(em, e.id);
+    await em.update(Course, { id }, { deletedAt: new Date(), isActive: false });
+  });
 }

@@ -1,11 +1,20 @@
+import { EntityManager } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import { Enrollment } from '../entities/Enrollment';
 import { Student } from '../entities/Student';
 import { Course } from '../entities/Course';
 import { AcademicYear } from '../entities/AcademicYear';
 import { Guardian } from '../entities/Guardian';
+import { Absence } from '../entities/Absence';
+import { cascadeSoftDeleteAbsence } from './absence.service';
 
 const repo = () => AppDataSource.getRepository(Enrollment);
+
+export async function cascadeSoftDeleteEnrollment(em: EntityManager, enrollmentId: number): Promise<void> {
+  const absences = await em.find(Absence, { where: { enrollmentId, deletedAt: null as any } });
+  for (const a of absences) await cascadeSoftDeleteAbsence(em, a.id);
+  await em.update(Enrollment, { id: enrollmentId }, { deletedAt: new Date(), isActive: false });
+}
 
 async function assertOwnership(institutionId: number, courseIds: number[] | null, data: {
   studentId?: number; courseId?: number; academicYearId?: number; guardianId?: number | null;
@@ -101,8 +110,6 @@ export async function update(institutionId: number, courseIds: number[] | null, 
 }
 
 export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
-  const e = await findById(institutionId, courseIds, id);
-  e.deletedAt = new Date();
-  e.isActive = false;
-  await repo().save(e);
+  await findById(institutionId, courseIds, id);
+  await AppDataSource.transaction(em => cascadeSoftDeleteEnrollment(em, id));
 }

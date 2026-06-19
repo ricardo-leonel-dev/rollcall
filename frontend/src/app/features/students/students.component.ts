@@ -172,7 +172,7 @@ export class StudentsComponent implements OnInit {
   deleteStudent(id: number): void {
     this.dialog.open(ConfirmDialogComponent, {
       width: '420px',
-      data: { title: 'Eliminar estudiante', message: '¿Eliminar este estudiante? Esta acción no se puede deshacer.' },
+      data: { title: 'Eliminar estudiante', message: '¿Eliminar este estudiante? También se eliminarán sus matrículas, faltas y justificaciones asociadas. Esta acción no se puede deshacer.' },
     }).afterClosed().subscribe(async ok => {
       if (!ok) return;
       await firstValueFrom(this.http.delete(`/api/students/${id}`));
