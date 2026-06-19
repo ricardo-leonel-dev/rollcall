@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { In } from 'typeorm';
+import { In, IsNull } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import { User } from '../entities/User';
 import { Role } from '../entities/Role';
@@ -23,7 +23,7 @@ async function assertRoleAssignable(roleId: number | undefined, isActorSuperAdmi
 }
 
 export async function findAll(institutionId: number) {
-  const users = await repo().find({ where: { institutionId, deletedAt: null as any }, order: { username: 'ASC' } });
+  const users = await repo().find({ where: { institutionId, deletedAt: IsNull() }, order: { username: 'ASC' } });
   const userIds = users.map(u => u.id);
   const roleIds = [...new Set(users.map(u => u.roleId).filter((id): id is number => id != null))];
   const [assignments, moduleAssignments, roles] = await Promise.all([
@@ -54,7 +54,7 @@ export async function findAll(institutionId: number) {
 }
 
 export async function findById(institutionId: number, id: number) {
-  const u = await repo().findOne({ where: { id, institutionId, deletedAt: null as any } });
+  const u = await repo().findOne({ where: { id, institutionId, deletedAt: IsNull() } });
   if (!u) throw Object.assign(new Error('Usuario no encontrado'), { status: 404 });
   return u;
 }

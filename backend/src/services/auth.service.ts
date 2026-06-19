@@ -1,3 +1,4 @@
+import { IsNull } from 'typeorm';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import fs from 'fs';
@@ -34,7 +35,7 @@ async function getModuleKeys(userId: number, roleName: string | null): Promise<s
 
 export async function login(username: string, password: string) {
   const userRepo = AppDataSource.getRepository(User);
-  const user = await userRepo.findOne({ where: { username, isActive: true, deletedAt: null as any } });
+  const user = await userRepo.findOne({ where: { username, isActive: true, deletedAt: IsNull() } });
 
   if (!user) throw Object.assign(new Error('Credenciales inválidas'), { status: 401 });
 

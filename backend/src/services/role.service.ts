@@ -1,3 +1,4 @@
+import { IsNull } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import { Role } from '../entities/Role';
 import { RolePermission } from '../entities/RolePermission';
@@ -6,11 +7,11 @@ const repo = () => AppDataSource.getRepository(Role);
 const permRepo = () => AppDataSource.getRepository(RolePermission);
 
 export async function findAll() {
-  return repo().find({ where: { deletedAt: null as any }, order: { name: 'ASC' } });
+  return repo().find({ where: { deletedAt: IsNull() }, order: { name: 'ASC' } });
 }
 
 export async function findById(id: number) {
-  const r = await repo().findOne({ where: { id, deletedAt: null as any } });
+  const r = await repo().findOne({ where: { id, deletedAt: IsNull() } });
   if (!r) throw Object.assign(new Error('Rol no encontrado'), { status: 404 });
   return r;
 }

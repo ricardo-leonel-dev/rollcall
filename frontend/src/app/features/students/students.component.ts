@@ -60,7 +60,7 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
               <tr style="cursor:pointer" (click)="openDetail(s)">
                 <td>
                   <div style="display:flex;align-items:center;gap:10px">
-                    <div style="width:32px;height:32px;border-radius:8px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#4f46e5;flex-shrink:0">
+                    <div style="width:32px;height:32px;border-radius:8px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0">
                       {{s.name[0]}}
                     </div>
                     <span style="font-weight:500">{{s.name}}</span>
@@ -91,7 +91,7 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
         @for (s of students(); track s.id) {
           <div class="card" style="cursor:pointer;padding:14px 16px" (click)="openDetail(s)">
             <div style="display:flex;align-items:center;gap:12px">
-              <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#4f46e5;flex-shrink:0">{{s.name[0]}}</div>
+              <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--accent);flex-shrink:0">{{s.name[0]}}</div>
               <div>
                 <div style="font-weight:600;font-size:14px">{{s.name}}</div>
                 <div style="font-size:12px;color:var(--muted);margin-top:2px">{{s.idNumber ?? 'Sin cédula'}} · {{s.gender ?? ''}} · {{s.birthDate ?? ''}}</div>

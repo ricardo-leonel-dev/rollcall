@@ -21,13 +21,13 @@ export type StudentDetailResult = { action: 'edit'; enrollment: Enrollment | nul
     .detail-header { padding: 4px 0 16px; }
     .detail-avatar {
       width: 56px; height: 56px; border-radius: 14px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: white;
       display: flex; align-items: center; justify-content: center;
-      font-family: 'Fraunces', serif;
+      font-family: 'Nunito', sans-serif;
       font-size: 22px; font-weight: 600; margin-bottom: 12px;
     }
-    .detail-name { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 600; color: var(--ink); }
+    .detail-name { font-family: 'Nunito', sans-serif; font-size: 17px; font-weight: 600; color: var(--ink); }
     .section-title {
       font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
       color: var(--muted); margin: 16px 0 4px;

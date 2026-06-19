@@ -46,7 +46,7 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
         <input matInput type="date" [(ngModel)]="dateTo">
       </mat-form-field>
       @if (enrollments().length) {
-        <div style="align-self:center;background:var(--accent-soft);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:#4f46e5">
+        <div style="align-self:center;background:var(--accent-soft);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--accent)">
           {{enrollments().length}} estudiantes
         </div>
       }
@@ -91,7 +91,7 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
                 <td style="color:var(--muted);font-weight:600;font-size:13px">{{e.rosterNumber}}</td>
                 <td>
                   <div style="display:flex;align-items:center;gap:10px">
-                    <div style="width:32px;height:32px;border-radius:8px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#4f46e5;flex-shrink:0">
+                    <div style="width:32px;height:32px;border-radius:8px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0">
                       {{e.fullName?.[0] ?? '?'}}
                     </div>
                     <div>
@@ -123,7 +123,7 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
         @for (e of enrollments(); track e.enrollmentId) {
           <div class="card" style="padding:14px 16px">
             <div style="display:flex;align-items:center;gap:12px">
-              <div style="width:36px;height:36px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#4f46e5;flex-shrink:0">
+              <div style="width:36px;height:36px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--accent);flex-shrink:0">
                 {{e.rosterNumber}}
               </div>
               <div style="flex:1;min-width:0">

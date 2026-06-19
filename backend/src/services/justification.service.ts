@@ -1,3 +1,4 @@
+import { IsNull } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import { Justification } from '../entities/Justification';
 import { JustificationAbsence } from '../entities/JustificationAbsence';
@@ -54,7 +55,7 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
 }
 
 export async function findById(institutionId: number, courseIds: number[] | null, id: number) {
-  const j = await repo().findOne({ where: { id, institutionId, deletedAt: null as any } });
+  const j = await repo().findOne({ where: { id, institutionId, deletedAt: IsNull() } });
   if (!j) throw Object.assign(new Error('Justification not found'), { status: 404 });
   if (courseIds !== null) await assertEnrollmentInScope(institutionId, courseIds, j.enrollmentId);
   return j;
@@ -71,7 +72,7 @@ export async function create(institutionId: number, courseIds: number[] | null, 
   await assertEnrollmentInScope(institutionId, courseIds, data.enrollmentId);
 
   for (const absId of data.absenceIds) {
-    const abs = await absRepo().findOne({ where: { id: absId, institutionId, deletedAt: null as any } });
+    const abs = await absRepo().findOne({ where: { id: absId, institutionId, deletedAt: IsNull() } });
     if (!abs) throw Object.assign(new Error(`Absence ${absId} not found`), { status: 404 });
     if (abs.enrollmentId !== data.enrollmentId) {
       throw Object.assign(new Error(`Absence ${absId} does not belong to this enrollment`), { status: 400 });

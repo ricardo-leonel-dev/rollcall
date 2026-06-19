@@ -1,4 +1,4 @@
-import { EntityManager } from 'typeorm';
+import { EntityManager, IsNull } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import { Enrollment } from '../entities/Enrollment';
 import { Student } from '../entities/Student';
@@ -11,7 +11,7 @@ import { cascadeSoftDeleteAbsence } from './absence.service';
 const repo = () => AppDataSource.getRepository(Enrollment);
 
 export async function cascadeSoftDeleteEnrollment(em: EntityManager, enrollmentId: number): Promise<void> {
-  const absences = await em.find(Absence, { where: { enrollmentId, deletedAt: null as any } });
+  const absences = await em.find(Absence, { where: { enrollmentId, deletedAt: IsNull() } });
   for (const a of absences) await cascadeSoftDeleteAbsence(em, a.id);
   await em.update(Enrollment, { id: enrollmentId }, { deletedAt: new Date(), isActive: false });
 }
@@ -82,7 +82,7 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
 }
 
 export async function findById(institutionId: number, courseIds: number[] | null, id: number) {
-  const e = await repo().findOne({ where: { id, institutionId, deletedAt: null as any } });
+  const e = await repo().findOne({ where: { id, institutionId, deletedAt: IsNull() } });
   if (!e || (courseIds !== null && !courseIds.includes(e.courseId))) {
     throw Object.assign(new Error('Enrollment not found'), { status: 404 });
   }

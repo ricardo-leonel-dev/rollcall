@@ -34,7 +34,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
       display: flex; align-items: center; justify-content: center;
     }
     .module-label {
-      font-family: 'Fraunces', serif;
+      font-family: 'Nunito', sans-serif;
       color: var(--ink);
       font-size: 18px; font-weight: 600;
     }

@@ -1,3 +1,4 @@
+import { IsNull } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import { AcademicYear } from '../entities/AcademicYear';
 import { Enrollment } from '../entities/Enrollment';
@@ -7,13 +8,13 @@ const repo = () => AppDataSource.getRepository(AcademicYear);
 
 export async function findAll(institutionId: number) {
   return repo().find({
-    where: { institutionId, deletedAt: null as any },
+    where: { institutionId, deletedAt: IsNull() },
     order: { name: 'DESC' },
   });
 }
 
 export async function findById(institutionId: number, id: number) {
-  const ay = await repo().findOne({ where: { id, institutionId, deletedAt: null as any } });
+  const ay = await repo().findOne({ where: { id, institutionId, deletedAt: IsNull() } });
   if (!ay) throw Object.assign(new Error('Academic year not found'), { status: 404 });
   return ay;
 }
@@ -38,7 +39,7 @@ export async function update(institutionId: number, id: number, data: Partial<{ 
 export async function remove(institutionId: number, id: number) {
   await findById(institutionId, id);
   await AppDataSource.transaction(async (em) => {
-    const enrollments = await em.find(Enrollment, { where: { academicYearId: id, deletedAt: null as any } });
+    const enrollments = await em.find(Enrollment, { where: { academicYearId: id, deletedAt: IsNull() } });
     for (const e of enrollments) await cascadeSoftDeleteEnrollment(em, e.id);
     await em.update(AcademicYear, { id }, { deletedAt: new Date(), isActive: false });
   });

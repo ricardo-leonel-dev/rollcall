@@ -1,4 +1,4 @@
-import { EntityManager } from 'typeorm';
+import { EntityManager, IsNull } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import { Absence } from '../entities/Absence';
 import { Enrollment } from '../entities/Enrollment';
@@ -84,7 +84,7 @@ async function assertEnrollmentInScope(institutionId: number, courseIds: number[
 }
 
 export async function findById(institutionId: number, courseIds: number[] | null, id: number) {
-  const a = await repo().findOne({ where: { id, institutionId, deletedAt: null as any } });
+  const a = await repo().findOne({ where: { id, institutionId, deletedAt: IsNull() } });
   if (!a) throw Object.assign(new Error('Absence not found'), { status: 404 });
   if (courseIds !== null) await assertEnrollmentInScope(institutionId, courseIds, a.enrollmentId);
   return a;

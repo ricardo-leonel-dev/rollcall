@@ -19,7 +19,7 @@ export interface AcademicYearDialogData {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatSnackBarModule],
   template: `
-    <h2 mat-dialog-title style="font-family:'Fraunces',serif">{{data.mode === 'edit' ? 'Editar año lectivo' : 'Nuevo año lectivo'}}</h2>
+    <h2 mat-dialog-title style="font-family:'Nunito',sans-serif">{{data.mode === 'edit' ? 'Editar año lectivo' : 'Nuevo año lectivo'}}</h2>
     <mat-dialog-content>
       <mat-form-field appearance="outline" style="width:100%;margin-top:4px">
         <mat-label>Nombre (ej: 2026-2027)</mat-label>

@@ -45,7 +45,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
     }
     .user-avatar {
       width: 36px; height: 36px; border-radius: 9px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: white; display: flex; align-items: center; justify-content: center;
       font-size: 14px; font-weight: 700; flex-shrink: 0;
     }
@@ -77,7 +77,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
                     @if (inst.logoUrl) {
                       <img [src]="inst.logoUrl" alt="" style="width:100%;height:100%;object-fit:cover">
                     } @else {
-                      <mat-icon style="color:#4f46e5">corporate_fare</mat-icon>
+                      <mat-icon style="color:var(--accent)">corporate_fare</mat-icon>
                     }
                   </div>
                   <div style="font-weight:600">{{inst.name}}</div>
@@ -118,7 +118,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
             <div class="admin-row">
               <div style="display:flex;align-items:center;gap:12px">
                 <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center">
-                  <mat-icon style="color:#4f46e5">calendar_today</mat-icon>
+                  <mat-icon style="color:var(--accent)">calendar_today</mat-icon>
                 </div>
                 <div>
                   <div style="font-weight:600">{{y.name}}</div>
@@ -200,7 +200,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
                 <div class="user-avatar">{{(u.fullName || u.username)[0].toUpperCase()}}</div>
                 <div>
                   <div style="font-weight:600">{{u.fullName || u.username}}</div>
-                  <div style="font-size:12px;color:var(--muted)">@{{u.username}} · <span style="color:#4f46e5">{{u.roleName}}</span></div>
+                  <div style="font-size:12px;color:var(--muted)">@{{u.username}} · <span style="color:var(--accent)">{{u.roleName}}</span></div>
                 </div>
               </div>
               <div class="admin-row-actions">
@@ -233,8 +233,8 @@ import { NAV_ITEMS } from '../../core/nav-items';
           Permisos
         </ng-template>
         <div class="tab-content">
-          <div style="display:flex;align-items:flex-end;gap:8px;margin-bottom:16px">
-            <mat-form-field appearance="outline" style="width:200px;margin:0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:200px;margin:0">
               <mat-label>Rol</mat-label>
               <mat-select [(ngModel)]="selRole" (ngModelChange)="loadPermissions()">
                 @for (r of roles(); track r.id) { <mat-option [value]="r.id">{{r.name}}</mat-option> }
@@ -312,19 +312,19 @@ import { NAV_ITEMS } from '../../core/nav-items';
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
                 <div style="background:var(--paper);border-radius:8px;padding:10px 14px">
-                  <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.coursesProcessed}}</div>
+                  <div style="font-family:'Nunito',sans-serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.coursesProcessed}}</div>
                   <div style="font-size:12px;color:var(--muted-strong)">Cursos procesados</div>
                 </div>
                 <div style="background:var(--paper);border-radius:8px;padding:10px 14px">
-                  <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.studentsCreated}}</div>
+                  <div style="font-family:'Nunito',sans-serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.studentsCreated}}</div>
                   <div style="font-size:12px;color:var(--muted-strong)">Estudiantes creados</div>
                 </div>
                 <div style="background:var(--paper);border-radius:8px;padding:10px 14px">
-                  <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.studentsUpdated}}</div>
+                  <div style="font-family:'Nunito',sans-serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.studentsUpdated}}</div>
                   <div style="font-size:12px;color:var(--muted-strong)">Actualizados</div>
                 </div>
                 <div style="background:var(--paper);border-radius:8px;padding:10px 14px">
-                  <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.enrollmentsCreated}}</div>
+                  <div style="font-family:'Nunito',sans-serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.enrollmentsCreated}}</div>
                   <div style="font-size:12px;color:var(--muted-strong)">Matrículas creadas</div>
                 </div>
               </div>

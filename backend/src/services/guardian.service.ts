@@ -1,6 +1,6 @@
 import { AppDataSource } from '../data-source';
 import { Guardian } from '../entities/Guardian';
-import { ILike } from 'typeorm';
+import { ILike, IsNull } from 'typeorm';
 
 const repo = () => AppDataSource.getRepository(Guardian);
 
@@ -13,13 +13,13 @@ function buildWhatsappLink(phone?: string | null): string | null {
 }
 
 export async function findAll(institutionId: number, search?: string) {
-  const where: any = { institutionId, deletedAt: null as any };
+  const where: any = { institutionId, deletedAt: IsNull() };
   if (search) where.name = ILike(`%${search}%`);
   return repo().find({ where, order: { name: 'ASC' } });
 }
 
 export async function findById(institutionId: number, id: number) {
-  const g = await repo().findOne({ where: { id, institutionId, deletedAt: null as any } });
+  const g = await repo().findOne({ where: { id, institutionId, deletedAt: IsNull() } });
   if (!g) throw Object.assign(new Error('Guardian not found'), { status: 404 });
   return g;
 }

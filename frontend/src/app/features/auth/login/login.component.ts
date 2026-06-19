@@ -69,7 +69,7 @@ import { AuthService } from '../../../core/services/auth.service';
       display: flex; align-items: center; justify-content: center;
       margin-bottom: 20px; color: white;
     }
-    h2 { font-family: 'Fraunces', serif; color: var(--ink); font-size: 26px; font-weight: 600; margin: 0 0 6px; }
+    h2 { font-family: 'Nunito', sans-serif; color: var(--ink); font-size: 26px; font-weight: 600; margin: 0 0 6px; }
     .subtitle { color: var(--muted-strong); font-size: 14px; margin: 0 0 28px; }
     .field-wrap { margin-bottom: 16px; }
     .field-wrap mat-form-field { width: 100%; }

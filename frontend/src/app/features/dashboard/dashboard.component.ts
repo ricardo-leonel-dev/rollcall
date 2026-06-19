@@ -140,7 +140,7 @@ Chart.register(...registerables);
             <div style="position:relative;width:160px;height:160px">
               <canvas #donutChart></canvas>
               <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column">
-                <div style="font-family:'Fraunces',serif;font-size:24px;font-weight:600;color:var(--ink)">{{summary()!.totalAbsences + summary()!.totalTardies}}</div>
+                <div style="font-family:'Nunito',sans-serif;font-size:24px;font-weight:600;color:var(--ink)">{{summary()!.totalAbsences + summary()!.totalTardies}}</div>
                 <div style="font-size:11px;color:var(--muted)">total</div>
               </div>
             </div>
@@ -260,6 +260,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.donutChart?.destroy();
 
     const days = data.absencesByDay ?? [];
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#6366f1';
     if (this.barChartEl?.nativeElement) {
       this.barChart = new Chart(this.barChartEl.nativeElement, {
         type: 'bar',
@@ -267,8 +268,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           labels: days.map(d => d.date.slice(5)),
           datasets: [{
             data: days.map(d => d.count),
-            backgroundColor: 'rgba(99,102,241,0.7)',
-            hoverBackgroundColor: '#6366f1',
+            backgroundColor: accent + 'b3',
+            hoverBackgroundColor: accent,
             borderRadius: 6,
             borderSkipped: false,
           }],

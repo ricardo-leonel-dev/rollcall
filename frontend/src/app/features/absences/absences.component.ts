@@ -7,7 +7,6 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
@@ -16,12 +15,14 @@ import { AcademicYear, Course, Enrollment, Absence, OcrResult } from '../../core
 import { DEFAULT_NOTIFICATION_TEMPLATE } from '../../shared/components/profile-dialog/profile-dialog.component';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { AbsenceRangeDialogComponent, AbsenceRangeDialogResult } from './absence-range-dialog.component';
+import { AbsenceSavedSnackbarComponent } from '../../shared/components/absence-saved-snackbar/absence-saved-snackbar.component';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule,
-            MatButtonModule, MatIconModule, MatCheckboxModule, MatSnackBarModule, MatTooltipModule, WhatsappIconComponent],
+            MatButtonModule, MatIconModule, MatSnackBarModule, MatTooltipModule, WhatsappIconComponent],
   styles: [`
     .tab-content { padding: 20px 0; }
     .enroll-row {
@@ -31,10 +32,6 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
     }
     .enroll-row:hover { background: var(--paper-deep); }
     .marked-today { font-size: 11px; color: #15803d; display: flex; align-items: center; gap: 2px; margin-right: 6px; }
-    .range-form {
-      padding: 14px 16px; background: var(--paper-deep); border-bottom: 1px solid var(--border-soft);
-      display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
-    }
   `],
   template: `
     <div class="page-header">
@@ -80,7 +77,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
             <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
               <label>
                 <input type="file" style="display:none" accept="image/*" (change)="onFileSelect($event)">
-                <span style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#6366f1;color:white;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">
+                <span style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--accent);color:white;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">
                   <mat-icon style="font-size:16px;width:16px;height:16px">upload_file</mat-icon> Subir imagen
                 </span>
               </label>
@@ -153,7 +150,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
             @for (e of enrollments(); track e.enrollmentId) {
               <div class="enroll-row">
                 <div style="display:flex;align-items:center;gap:10px">
-                  <div style="width:28px;height:28px;border-radius:7px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4f46e5;flex-shrink:0">
+                  <div style="width:28px;height:28px;border-radius:7px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);flex-shrink:0">
                     {{e.rosterNumber}}
                   </div>
                   <span style="font-size:14px;font-weight:500">{{e.fullName}}</span>
@@ -161,34 +158,14 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
                 <div style="display:flex;align-items:center;gap:6px">
                   @if (markedToday(e.enrollmentId, 'F')) { <span class="marked-today"><mat-icon style="font-size:14px;width:14px;height:14px">check</mat-icon> Falta hoy</span> }
                   @if (markedToday(e.enrollmentId, 'AT')) { <span class="marked-today"><mat-icon style="font-size:14px;width:14px;height:14px">check</mat-icon> Atraso hoy</span> }
-                  <button class="action-pill action-pill-f" (click)="openRangeForm(e.enrollmentId, 'F')">
+                  <button class="action-pill action-pill-f" (click)="openRangeForm(e, 'F')">
                     <mat-icon style="font-size:14px;width:14px;height:14px">event_busy</mat-icon> Falta
                   </button>
-                  <button class="action-pill action-pill-at" (click)="openRangeForm(e.enrollmentId, 'AT')">
+                  <button class="action-pill action-pill-at" (click)="openRangeForm(e, 'AT')">
                     <mat-icon style="font-size:14px;width:14px;height:14px">schedule</mat-icon> Atrasado
                   </button>
                 </div>
               </div>
-              @if (rangeForm()?.enrollmentId === e.enrollmentId) {
-                <div class="range-form">
-                  <mat-form-field appearance="outline" style="width:150px">
-                    <mat-label>Desde</mat-label>
-                    <input matInput type="date" [ngModel]="rangeForm()!.dateFrom" (ngModelChange)="updateRangeForm('dateFrom', $event)">
-                  </mat-form-field>
-                  <mat-form-field appearance="outline" style="width:150px">
-                    <mat-label>Hasta</mat-label>
-                    <input matInput type="date" [ngModel]="rangeForm()!.dateTo" (ngModelChange)="updateRangeForm('dateTo', $event)">
-                  </mat-form-field>
-                  <mat-form-field appearance="outline" style="flex:1;min-width:200px">
-                    <mat-label>Motivo (opcional)</mat-label>
-                    <input matInput [ngModel]="rangeForm()!.notes" (ngModelChange)="updateRangeForm('notes', $event)">
-                  </mat-form-field>
-                  <button mat-flat-button color="primary" style="height:56px" (click)="confirmRangeForm()">
-                    <mat-icon>check</mat-icon> Confirmar
-                  </button>
-                  <button mat-stroked-button style="height:56px" (click)="rangeForm.set(null)">Cancelar</button>
-                </div>
-              }
             }
           }
         </div>
@@ -201,8 +178,8 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
           Listado
         </ng-template>
         <div class="tab-content" style="padding:16px">
-          <!-- Sub-filtros -->
-          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+          <!-- Sub-filtros — vacíos/"Todos" por defecto, que ya equivale a ver todo -->
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;align-items:center">
             <mat-form-field appearance="outline" style="width:150px">
               <mat-label>Desde</mat-label>
               <input matInput type="date" [(ngModel)]="dateFrom" (change)="loadAbsences()">
@@ -294,7 +271,6 @@ export class AbsencesComponent implements OnInit {
   readonly enrollLoading = signal(false);
   readonly absLoading = signal(false);
   readonly todayAbsences = signal<Absence[]>([]);
-  readonly rangeForm = signal<{ enrollmentId: number; type: 'F' | 'AT'; dateFrom: string; dateTo: string; notes: string } | null>(null);
 
   selYear: number | null = null;
   selCourse: number | null = null;
@@ -395,35 +371,33 @@ export class AbsencesComponent implements OnInit {
     return type === 'F' ? 'Falta' : 'Atrasado';
   }
 
-  openRangeForm(enrollmentId: number, type: 'F' | 'AT'): void {
-    const today = this.todayStr();
-    this.rangeForm.set({ enrollmentId, type, dateFrom: today, dateTo: today, notes: '' });
+  openRangeForm(enrollment: Enrollment, type: 'F' | 'AT'): void {
+    this.dialog.open(AbsenceRangeDialogComponent, {
+      width: '420px',
+      data: { fullName: enrollment.fullName, type },
+    }).afterClosed().subscribe((result?: AbsenceRangeDialogResult) => {
+      if (result) this.saveAbsenceRange(enrollment, type, result);
+    });
   }
 
-  updateRangeForm(field: 'dateFrom' | 'dateTo' | 'notes', value: string): void {
-    const f = this.rangeForm();
-    if (f) this.rangeForm.set({ ...f, [field]: value });
-  }
-
-  async confirmRangeForm(): Promise<void> {
-    const f = this.rangeForm();
-    if (!f) return;
+  private async saveAbsenceRange(enrollment: Enrollment, type: 'F' | 'AT', f: AbsenceRangeDialogResult): Promise<void> {
     try {
       const result = await firstValueFrom(this.http.post<{ created: number; skipped: number }>('/api/absences', {
-        enrollmentId: f.enrollmentId, type: f.type, dateFrom: f.dateFrom, dateTo: f.dateTo,
+        enrollmentId: enrollment.enrollmentId, type, dateFrom: f.dateFrom, dateTo: f.dateTo,
         notes: f.notes || undefined,
       }));
       const msg = result.skipped > 0
         ? `${result.created} registro(s) creado(s), ${result.skipped} ya existían`
         : `${result.created} registro(s) creado(s)`;
-      const enrollment = this.enrollments().find(e => e.enrollmentId === f.enrollmentId);
-      const link = enrollment?.whatsappLink;
-      const ref = this.snackBar.open(msg, link ? 'Notificar' : '', { duration: 4000 });
-      if (link && enrollment) {
-        const dateLabel = f.dateFrom === f.dateTo ? f.dateFrom : `${f.dateFrom} al ${f.dateTo}`;
-        ref.onAction().subscribe(() => this.notifyGuardian(link, enrollment.fullName, dateLabel, f.type, enrollment.course));
-      }
-      this.rangeForm.set(null);
+      const link = enrollment.whatsappLink;
+      const dateLabel = f.dateFrom === f.dateTo ? f.dateFrom : `${f.dateFrom} al ${f.dateTo}`;
+      this.snackBar.openFromComponent(AbsenceSavedSnackbarComponent, {
+        duration: 10000,
+        data: {
+          message: msg,
+          onNotify: link ? () => this.notifyGuardian(link, enrollment.fullName, dateLabel, type, enrollment.course) : undefined,
+        },
+      });
       await Promise.all([this.loadTodayAbsences(), this.loadAbsences()]);
     } catch (err: any) {
       this.snackBar.open('Error: ' + (err?.error?.error ?? 'No se pudo guardar'), '', { duration: 4000 });

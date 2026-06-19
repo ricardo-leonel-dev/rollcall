@@ -1,13 +1,13 @@
 import { AppDataSource } from '../data-source';
 import { Course } from '../entities/Course';
 import { Enrollment } from '../entities/Enrollment';
-import { In } from 'typeorm';
+import { In, IsNull } from 'typeorm';
 import { cascadeSoftDeleteEnrollment } from './enrollment.service';
 
 const repo = () => AppDataSource.getRepository(Course);
 
 export async function findAll(institutionId: number, courseIds: number[] | null) {
-  const where: any = { institutionId, deletedAt: null as any };
+  const where: any = { institutionId, deletedAt: IsNull() };
   if (courseIds !== null) where.id = In(courseIds);
   return repo().find({ where, order: { name: 'ASC' } });
 }
@@ -16,7 +16,7 @@ export async function findById(institutionId: number, courseIds: number[] | null
   if (courseIds !== null && !courseIds.includes(id)) {
     throw Object.assign(new Error('Course not found'), { status: 404 });
   }
-  const c = await repo().findOne({ where: { id, institutionId, deletedAt: null as any } });
+  const c = await repo().findOne({ where: { id, institutionId, deletedAt: IsNull() } });
   if (!c) throw Object.assign(new Error('Course not found'), { status: 404 });
   return c;
 }
@@ -40,7 +40,7 @@ export async function update(institutionId: number, courseIds: number[] | null, 
 export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
   await findById(institutionId, courseIds, id);
   await AppDataSource.transaction(async (em) => {
-    const enrollments = await em.find(Enrollment, { where: { courseId: id, deletedAt: null as any } });
+    const enrollments = await em.find(Enrollment, { where: { courseId: id, deletedAt: IsNull() } });
     for (const e of enrollments) await cascadeSoftDeleteEnrollment(em, e.id);
     await em.update(Course, { id }, { deletedAt: new Date(), isActive: false });
   });

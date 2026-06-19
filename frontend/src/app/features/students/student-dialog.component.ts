@@ -31,7 +31,7 @@ export interface StudentDialogData {
     mat-form-field { width: 100%; }
   `],
   template: `
-    <h2 mat-dialog-title style="font-family:'Fraunces',serif">{{data.mode === 'edit' ? 'Editar estudiante' : 'Nuevo estudiante'}}</h2>
+    <h2 mat-dialog-title style="font-family:'Nunito',sans-serif">{{data.mode === 'edit' ? 'Editar estudiante' : 'Nuevo estudiante'}}</h2>
     <mat-dialog-content>
       <div class="section-title">Datos personales</div>
       <mat-form-field appearance="outline"><mat-label>Nombre completo *</mat-label><input matInput [(ngModel)]="name"></mat-form-field>

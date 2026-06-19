@@ -67,7 +67,7 @@ interface Me {
     .current-avatar { width: 56px; height: 56px; border-radius: 14px; object-fit: cover; display: block; margin-bottom: 12px; }
   `],
   template: `
-    <h2 mat-dialog-title style="font-family:'Fraunces',serif">Mi perfil</h2>
+    <h2 mat-dialog-title style="font-family:'Nunito',sans-serif">Mi perfil</h2>
     <mat-dialog-content>
 
       <div class="section">

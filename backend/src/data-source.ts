@@ -17,10 +17,21 @@ import { Institution } from './entities/Institution';
 import { UserCourse } from './entities/UserCourse';
 import { UserModule } from './entities/UserModule';
 
+const dbSchema = process.env.DB_SCHEMA || 'attendance';
+
 export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
-  schema: process.env.DB_SCHEMA || 'attendance',
+  schema: dbSchema,
+  // TypeORM only schema-qualifies queries built from entity metadata
+  // (repositories/QueryBuilder) — raw AppDataSource.query() calls have no
+  // metadata to qualify and rely entirely on the connection's search_path,
+  // which Postgres defaults to "$user", public. Without this, every raw
+  // query (dashboard, enrollment/absence/justification listings, etc.)
+  // fails with "relation does not exist" on any non-public schema.
+  extra: {
+    options: `-c search_path=${dbSchema},public`,
+  },
   synchronize: false,
   logging: process.env.NODE_ENV !== 'production',
   entities: [

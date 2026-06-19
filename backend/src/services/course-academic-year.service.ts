@@ -1,3 +1,4 @@
+import { IsNull } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import { CourseAcademicYear } from '../entities/CourseAcademicYear';
 import { Course } from '../entities/Course';
@@ -16,7 +17,7 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
 }
 
 export async function findById(institutionId: number, courseIds: number[] | null, id: number) {
-  const ca = await repo().findOne({ where: { id, institutionId, deletedAt: null as any } });
+  const ca = await repo().findOne({ where: { id, institutionId, deletedAt: IsNull() } });
   if (!ca || (courseIds !== null && !courseIds.includes(ca.courseId))) {
     throw Object.assign(new Error('Assignment not found'), { status: 404 });
   }

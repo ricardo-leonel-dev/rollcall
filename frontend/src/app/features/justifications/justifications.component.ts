@@ -44,6 +44,8 @@ interface GroupInput { reason: string; notifiedBy: string; }
       <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-strong);margin-bottom:12px">Nueva justificación</div>
       @if (!selYear || !selCourse) {
         <div style="font-size:13px;color:var(--muted)">Selecciona año lectivo y un curso específico arriba para elegir un estudiante.</div>
+      } @else if (!studentEnrollments().length) {
+        <div style="font-size:13px;color:var(--muted)">Nadie en este curso tiene faltas pendientes de justificar.</div>
       } @else {
         <mat-form-field appearance="outline" style="width:280px;margin-bottom:12px">
           <mat-label>Estudiante</mat-label>
@@ -215,10 +217,12 @@ export class JustificationsComponent implements OnInit {
     this.selectedIds.set(new Set());
     this.groupInputs.set({});
     if (this.selYear && this.selCourse) {
-      const data = await firstValueFrom(
-        this.http.get<Enrollment[]>(`/api/enrollments?course_id=${this.selCourse}&academic_year_id=${this.selYear}`)
-      );
-      this.studentEnrollments.set(data);
+      const [enrollments, pending] = await Promise.all([
+        firstValueFrom(this.http.get<Enrollment[]>(`/api/enrollments?course_id=${this.selCourse}&academic_year_id=${this.selYear}`)),
+        firstValueFrom(this.http.get<Absence[]>(`/api/absences?course_id=${this.selCourse}&academic_year_id=${this.selYear}&is_justified=false`)),
+      ]);
+      const pendingEnrollmentIds = new Set(pending.map(a => a.enrollmentId));
+      this.studentEnrollments.set(enrollments.filter(e => pendingEnrollmentIds.has(e.enrollmentId)));
     } else {
       this.studentEnrollments.set([]);
     }

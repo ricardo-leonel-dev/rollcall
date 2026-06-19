@@ -55,7 +55,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
     .brand-icon {
       width: 40px;
       height: 40px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
       border-radius: 10px;
       display: flex;
       align-items: center;
@@ -64,7 +64,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
       color: white;
     }
     .brand-text { overflow: hidden; }
-    .brand-name { font-family: 'Fraunces', serif; color: #f5f0e8; font-weight: 600; font-size: 16px; white-space: nowrap; }
+    .brand-name { font-family: 'Nunito', sans-serif; color: #f5f0e8; font-weight: 600; font-size: 16px; white-space: nowrap; }
     .brand-sub  { color: #a89a8c; font-size: 11px; white-space: nowrap; }
 
     nav { flex: 1; padding: 12px 8px; overflow-y: auto; }
@@ -83,8 +83,8 @@ import { NAV_ITEMS } from '../../core/nav-items';
       overflow: hidden;
     }
     .nav-item:hover { background: rgba(255,237,213,0.07); color: #f5f0e8; }
-    .nav-item.active { background: rgba(99,102,241,0.22); color: #c7d2fe; }
-    .nav-item.active .nav-icon { color: #a5b4fc; }
+    .nav-item.active { background: color-mix(in srgb, var(--accent) 25%, transparent); color: color-mix(in srgb, var(--accent) 55%, white); }
+    .nav-item.active .nav-icon { color: color-mix(in srgb, var(--accent) 70%, white); }
     .nav-icon { font-size: 20px !important; width: 20px !important; height: 20px !important; flex-shrink: 0; }
     .nav-label { font-size: 14px; font-weight: 500; }
 

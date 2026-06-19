@@ -1,3 +1,4 @@
+import { IsNull } from 'typeorm';
 import * as XLSX from 'xlsx';
 import { AppDataSource } from '../data-source';
 import { Course } from '../entities/Course';
@@ -30,7 +31,7 @@ export async function importRoster(institutionId: number, buffer: Buffer): Promi
   const enrollRepo   = AppDataSource.getRepository(Enrollment);
   const ayRepo       = AppDataSource.getRepository(AcademicYear);
 
-  const activeYear = await ayRepo.findOne({ where: { institutionId, isActive: true, deletedAt: null as any } });
+  const activeYear = await ayRepo.findOne({ where: { institutionId, isActive: true, deletedAt: IsNull() } });
   if (!activeYear) throw Object.assign(new Error('No active academic year found'), { status: 400 });
 
   const stats = { coursesProcessed: 0, studentsCreated: 0, studentsUpdated: 0, enrollmentsCreated: 0, errors: [] as string[] };
@@ -56,7 +57,7 @@ export async function importRoster(institutionId: number, buffer: Buffer): Promi
     const colEnroll = colIndex('MATRICULADO');
 
     const courseName = normalizeStr(sheetName);
-    let course = await courseRepo.findOne({ where: { institutionId, name: courseName, deletedAt: null as any } });
+    let course = await courseRepo.findOne({ where: { institutionId, name: courseName, deletedAt: IsNull() } });
     if (!course) {
       course = courseRepo.create({ institutionId, name: courseName, shift: 'MATUTINA' });
       course = await courseRepo.save(course);
@@ -85,8 +86,8 @@ export async function importRoster(institutionId: number, buffer: Buffer): Promi
         }
 
         let student: Student | null = null;
-        if (idNumber) student = await studentRepo.findOne({ where: { institutionId, idNumber, deletedAt: null as any } });
-        if (!student) student = await studentRepo.findOne({ where: { institutionId, name: rawName, deletedAt: null as any } });
+        if (idNumber) student = await studentRepo.findOne({ where: { institutionId, idNumber, deletedAt: IsNull() } });
+        if (!student) student = await studentRepo.findOne({ where: { institutionId, name: rawName, deletedAt: IsNull() } });
 
         if (student) {
           student.name = rawName;
@@ -105,7 +106,7 @@ export async function importRoster(institutionId: number, buffer: Buffer): Promi
         if (colGuard >= 0 && row[colGuard]) {
           const guardName = normalizeStr(String(row[colGuard]));
           if (guardName) {
-            guardian = await guardianRepo.findOne({ where: { institutionId, name: guardName, deletedAt: null as any } });
+            guardian = await guardianRepo.findOne({ where: { institutionId, name: guardName, deletedAt: IsNull() } });
             if (!guardian) {
               const phone = colPhone >= 0 ? String(row[colPhone] ?? '').trim() : undefined;
               guardian = guardianRepo.create({
@@ -122,7 +123,7 @@ export async function importRoster(institutionId: number, buffer: Buffer): Promi
         const existing = await enrollRepo.findOne({
           where: {
             institutionId, studentId: student.id, courseId: course.id,
-            academicYearId: activeYear.id, deletedAt: null as any,
+            academicYearId: activeYear.id, deletedAt: IsNull(),
           },
         });
 

@@ -1,12 +1,8 @@
-@import '@fontsource/inter/300.css';
-@import '@fontsource/inter/400.css';
-@import '@fontsource/inter/500.css';
-@import '@fontsource/inter/600.css';
-@import '@fontsource/inter/700.css';
-@import '@fontsource/fraunces/400.css';
-@import '@fontsource/fraunces/500.css';
-@import '@fontsource/fraunces/600.css';
-@import '@fontsource/fraunces/700.css';
+@import '@fontsource/nunito/300.css';
+@import '@fontsource/nunito/400.css';
+@import '@fontsource/nunito/500.css';
+@import '@fontsource/nunito/600.css';
+@import '@fontsource/nunito/700.css';
 @import 'material-icons/iconfont/round.css';
 
 @tailwind base;
@@ -83,7 +79,7 @@ html.dark textarea.mat-mdc-input-element {
 /* ─── Base ─────────────────────────────────────────────────────────────── */
 html, body { height: 100%; margin: 0; }
 body {
-  font-family: 'Inter', 'Helvetica Neue', sans-serif;
+  font-family: 'Nunito', 'Helvetica Neue', sans-serif;
   background: var(--page-bg);
   color: var(--ink-soft);
 }
@@ -108,41 +104,61 @@ body {
 .mat-mdc-form-field .mdc-notched-outline__notch    { border-radius: 0 !important; }
 
 /* Tighter field height — default MDC outlined fields run tall/empty-looking
-   for a single line of text. */
+   for a single line of text. Horizontal padding is explicit here too —
+   Tailwind's preflight resets padding to 0 on every element, which was
+   stripping the ~16px inset MDC normally provides, leaving the value text
+   flush against the outline border. */
 .mat-mdc-text-field-wrapper { --mat-form-field-container-height: 50px; }
-.mat-mdc-form-field-infix { min-height: 26px !important; padding-top: 12px !important; padding-bottom: 12px !important; }
+.mat-mdc-form-field-infix {
+  min-height: 26px !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+}
 
 .mat-mdc-form-field.mat-focused .mdc-notched-outline__leading,
 .mat-mdc-form-field.mat-focused .mdc-notched-outline__notch,
 .mat-mdc-form-field.mat-focused .mdc-notched-outline__trailing {
-  border-color: #6366f1 !important;
+  border-color: var(--accent) !important;
 }
 
 /* Select/autocomplete dropdown panels — the indigo-pink theme ships these as
    stark white MDC overlays with Roboto typography baked in; bring them back
-   into the warm paper palette + Inter so they don't look like a foreign
-   widget bolted onto the page. */
+   into the warm paper palette + Nunito so they don't look like a foreign
+   widget bolted onto the page. Shadow is tinted from --ink (warm near-black)
+   instead of a generic cool slate, to match the rest of the paper palette. */
 .mat-mdc-select-panel, .mat-mdc-autocomplete-panel {
   background: var(--paper) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 12px !important;
-  box-shadow: 0 16px 32px -12px rgba(15, 23, 42, .22) !important;
+  border: 1px solid var(--border-soft) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 2px 6px rgba(30, 27, 22, .06), 0 16px 40px -16px rgba(30, 27, 22, .18) !important;
   min-width: 280px !important;
-  padding: 6px !important;
+  padding: 8px !important;
 }
 .mat-mdc-option {
-  font-family: 'Inter', 'Helvetica Neue', sans-serif !important;
+  font-family: 'Nunito', 'Helvetica Neue', sans-serif !important;
+  /* Nunito reads noticeably heavier than Inter at the same 400 weight —
+     drop unselected rows to 300 so they don't look bold next to the
+     genuinely-bold 600 used for the selected option below. */
+  font-weight: 300 !important;
   color: var(--ink-soft) !important;
-  border-radius: 8px !important;
-  min-height: 40px !important;
+  border-radius: 10px !important;
+  min-height: 44px !important;
+  padding: 0 14px !important;
 }
+/* Hover is a neutral nudge — only the actual selection gets the accent
+   treatment + checkmark below, so the two states stay visually distinct. */
 .mat-mdc-option:hover:not(.mdc-list-item--disabled),
 .mat-mdc-option.mat-mdc-option-active {
-  background: var(--accent-soft) !important;
+  background: var(--paper-deep) !important;
 }
+/* mat-select already draws a minimal checkmark on the selected option
+   (mat-pseudo-checkbox) that inherits this color via currentColor — no
+   need for a second hand-rolled checkmark on top of it. */
 .mat-mdc-option.mdc-list-item--selected:not(.mat-mdc-option-multiple) {
   background: var(--accent-soft) !important;
-  color: #4338ca !important;
+  color: var(--accent) !important;
   font-weight: 600 !important;
 }
 .mat-mdc-option .mdc-list-item__primary-text { color: inherit !important; }
@@ -158,7 +174,7 @@ body {
 
 .mat-mdc-unelevated-button.mat-primary,
 .mat-mdc-raised-button.mat-primary {
-  background-color: #6366f1 !important;
+  background-color: var(--accent) !important;
   border-radius: 10px !important;
   font-weight: 600 !important;
   letter-spacing: 0 !important;
@@ -171,9 +187,14 @@ body {
   letter-spacing: 0 !important;
 }
 
+.mat-mdc-outlined-button.mat-primary {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
 .mat-mdc-tab-label-container { border-bottom: 1px solid #e2e8f0 !important; }
-.mdc-tab--active .mdc-tab__text-label { color: #6366f1 !important; font-weight: 600 !important; }
-.mdc-tab-indicator__content--underline { border-color: #6366f1 !important; }
+.mdc-tab--active .mdc-tab__text-label { color: var(--accent) !important; font-weight: 600 !important; }
+.mdc-tab-indicator__content--underline { border-color: var(--accent) !important; }
 
 .mat-mdc-snack-bar-container { border-radius: 12px !important; }
 
@@ -185,7 +206,7 @@ body {
     @apply flex items-center justify-between flex-wrap gap-2 mb-6;
   }
   .page-title {
-    font-family: 'Fraunces', serif;
+    font-family: 'Nunito', sans-serif;
     color: var(--ink);
     @apply text-3xl font-semibold tracking-tight;
   }
@@ -216,7 +237,7 @@ body {
     @apply w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0;
   }
   .stat-value {
-    font-family: 'Fraunces', serif;
+    font-family: 'Nunito', sans-serif;
     color: var(--ink);
     @apply text-3xl font-semibold leading-none;
   }
@@ -278,7 +299,7 @@ body {
      (table cells keep the flatter .badge-* pills above; dense data shouldn't
      wear a costume). */
   .stamp {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Nunito', sans-serif;
     font-size: 10px;
     font-weight: 700;
     padding: 2px 6px;
