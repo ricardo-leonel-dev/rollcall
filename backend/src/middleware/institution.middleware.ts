@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
+import { IsNull } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import { UserCourse } from '../entities/UserCourse';
+import { AcademicYear } from '../entities/AcademicYear';
 
 // Institution-bound users (institutionId set) can never escape their own
 // institution — any client-supplied override is ignored. Only a superadmin
@@ -11,7 +13,7 @@ export async function institutionMiddleware(req: Request, _res: Response, next: 
 
   if (req.user.institutionId !== null) {
     req.institutionId = req.user.institutionId;
-    req.courseIds = await resolveCourseIds(req.user.id);
+    req.courseIds = await resolveCourseIds(req.user.id, req.user.institutionId);
     next();
     return;
   }
@@ -28,11 +30,19 @@ export async function institutionMiddleware(req: Request, _res: Response, next: 
   next();
 }
 
-// A user with zero rows in user_courses sees every course in their
-// institution (rector, admin, "inspector general"); one or more rows
-// scopes them to just those courses (teacher, "inspector de bloque").
-async function resolveCourseIds(userId: number): Promise<number[] | null> {
-  const rows = await AppDataSource.getRepository(UserCourse).find({ where: { userId } });
+// A user with zero rows in user_courses for the institution's currently
+// active academic year sees every course (rector, admin, "inspector
+// general"); one or more rows scopes them to just those courses (teacher,
+// "inspector de bloque"). Resolved server-side from the institution's own
+// active year — never trusts a client-supplied year for this, since it
+// decides which rows a user is allowed to see at all.
+async function resolveCourseIds(userId: number, institutionId: number): Promise<number[] | null> {
+  const activeYear = await AppDataSource.getRepository(AcademicYear).findOne({
+    where: { institutionId, isActive: true, deletedAt: IsNull() },
+  });
+  if (!activeYear) return null;
+
+  const rows = await AppDataSource.getRepository(UserCourse).find({ where: { userId, academicYearId: activeYear.id } });
   return rows.length ? rows.map(r => r.courseId) : null;
 }
 

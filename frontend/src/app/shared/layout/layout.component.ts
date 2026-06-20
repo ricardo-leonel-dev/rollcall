@@ -11,6 +11,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
+import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { ProfileDialogComponent, resolveAvatarPreset } from '../components/profile-dialog/profile-dialog.component';
 import { NAV_ITEMS } from '../../core/nav-items';
@@ -142,6 +143,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
 
     .menu-toggle { color: var(--muted-strong) !important; }
     .institution-switcher { width: 240px; }
+    .year-switcher { width: 160px; }
 
     .content {
       flex: 1;
@@ -255,6 +257,14 @@ import { NAV_ITEMS } from '../../core/nav-items';
             }
           </mat-select>
         }
+        @if (academicYearContext.years().length) {
+          <mat-select class="year-switcher" [ngModel]="academicYearContext.selectedId()"
+                      (ngModelChange)="onYearChange($event)" placeholder="Año lectivo">
+            @for (y of academicYearContext.years(); track y.id) {
+              <mat-option [value]="y.id">{{y.name}}</mat-option>
+            }
+          </mat-select>
+        }
         @if (isMobile()) {
           <button mat-icon-button style="color:var(--muted-strong)" (click)="auth.logout()">
             <mat-icon>logout</mat-icon>
@@ -274,6 +284,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
 export class LayoutComponent implements OnInit {
   readonly auth = inject(AuthService);
   readonly institutionContext = inject(InstitutionContextService);
+  readonly academicYearContext = inject(AcademicYearContextService);
   readonly theme = inject(ThemeService);
   private readonly bp = inject(BreakpointObserver);
   private readonly dialog = inject(MatDialog);
@@ -282,18 +293,25 @@ export class LayoutComponent implements OnInit {
   // interceptor only attaches once institutionContext has picked one — gate
   // the routed page behind that so no child component's ngOnInit fires an
   // institution-scoped request before the header exists (was a real 400 race).
+  // Also waits for academicYearContext: every page now defaults its year
+  // selector to the resolved active year instead of guessing on its own.
   readonly institutionReady = signal(false);
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
     if (this.auth.isSuperAdmin()) {
-      this.institutionContext.loadInstitutions().finally(() => this.institutionReady.set(true));
-    } else {
-      this.institutionReady.set(true);
+      await this.institutionContext.loadInstitutions();
     }
+    await this.academicYearContext.load();
+    this.institutionReady.set(true);
   }
 
   onInstitutionChange(id: number): void {
     this.institutionContext.select(id);
+    location.reload();
+  }
+
+  onYearChange(id: number): void {
+    this.academicYearContext.select(id);
     location.reload();
   }
 

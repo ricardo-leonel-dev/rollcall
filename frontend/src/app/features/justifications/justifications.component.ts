@@ -9,8 +9,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
-import { Justification, AcademicYear, Course, Enrollment, Absence } from '../../core/models/index';
+import { Justification, Course, Enrollment, Absence } from '../../core/models/index';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 
 interface JustifyGroup { weekKey: string; absences: Absence[]; }
 interface GroupInput { reason: string; notifiedBy: string; }
@@ -25,12 +26,6 @@ interface GroupInput { reason: string; notifiedBy: string; }
     </div>
 
     <div class="filter-bar">
-      <mat-form-field appearance="outline" style="width:180px">
-        <mat-label>Año lectivo</mat-label>
-        <mat-select [(ngModel)]="selYear" (ngModelChange)="onFiltersChange()">
-          @for (y of years(); track y.id) { <mat-option [value]="y.id">{{y.name}}</mat-option> }
-        </mat-select>
-      </mat-form-field>
       <mat-form-field appearance="outline" style="width:220px">
         <mat-label>Curso</mat-label>
         <mat-select [(ngModel)]="selCourse" (ngModelChange)="onFiltersChange()">
@@ -168,8 +163,8 @@ export class JustificationsComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly snack = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);
+  readonly academicYearContext = inject(AcademicYearContextService);
 
-  readonly years = signal<AcademicYear[]>([]);
   readonly courses = signal<Course[]>([]);
   readonly justifications = signal<Justification[]>([]);
   readonly loading = signal(false);
@@ -188,13 +183,8 @@ export class JustificationsComponent implements OnInit {
   editNotifiedBy = '';
 
   async ngOnInit(): Promise<void> {
-    const [years, courses] = await Promise.all([
-      firstValueFrom(this.http.get<AcademicYear[]>('/api/academic-years')),
-      firstValueFrom(this.http.get<Course[]>('/api/courses')),
-    ]);
-    this.years.set(years);
-    this.courses.set(courses);
-    const active = years.find(y => y.isActive);
+    this.courses.set(await firstValueFrom(this.http.get<Course[]>('/api/courses')));
+    const active = this.academicYearContext.selected();
     if (active) { this.selYear = active.id; await this.load(); }
   }
 

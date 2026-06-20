@@ -5,7 +5,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { firstValueFrom } from 'rxjs';
-import { AcademicYear, Course, Absence } from '../../core/models/index';
+import { Course, Absence } from '../../core/models/index';
+import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 
 interface DayCell {
   iso: string;
@@ -29,12 +30,6 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     </div>
 
     <div class="filter-bar">
-      <mat-form-field appearance="outline" style="width:180px">
-        <mat-label>Año lectivo</mat-label>
-        <mat-select [(ngModel)]="selYear" (ngModelChange)="onFiltersChange()">
-          @for (y of years(); track y.id) { <mat-option [value]="y.id">{{y.name}}</mat-option> }
-        </mat-select>
-      </mat-form-field>
       <mat-form-field appearance="outline" style="width:220px">
         <mat-label>Curso</mat-label>
         <mat-select [(ngModel)]="selCourse" (ngModelChange)="onFiltersChange()">
@@ -185,8 +180,8 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 })
 export class CalendarComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  readonly academicYearContext = inject(AcademicYearContextService);
 
-  readonly years = signal<AcademicYear[]>([]);
   readonly courses = signal<Course[]>([]);
   readonly absences = signal<Absence[]>([]);
   readonly loading = signal(false);
@@ -271,14 +266,8 @@ export class CalendarComponent implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    const [years, courses] = await Promise.all([
-      firstValueFrom(this.http.get<AcademicYear[]>('/api/academic-years')),
-      firstValueFrom(this.http.get<Course[]>('/api/courses')),
-    ]);
-    this.years.set(years);
-    this.courses.set(courses);
-    const active = years.find(y => y.isActive);
-    if (active) this.selYear = active.id;
+    this.courses.set(await firstValueFrom(this.http.get<Course[]>('/api/courses')));
+    this.selYear = this.academicYearContext.selected()?.id ?? null;
     await this.loadMonth();
   }
 

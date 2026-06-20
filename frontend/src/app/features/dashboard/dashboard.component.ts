@@ -5,9 +5,10 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { FormsModule } from '@angular/forms';
-import { DashboardSummary, AcademicYear, Course } from '../../core/models/index';
+import { DashboardSummary, Course } from '../../core/models/index';
 import { firstValueFrom } from 'rxjs';
 import { Chart, registerables } from 'chart.js';
+import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 
 Chart.register(...registerables);
 
@@ -39,15 +40,6 @@ Chart.register(...registerables);
 
     <!-- Filtros -->
     <div class="filter-bar">
-      <mat-form-field appearance="outline" style="width:180px">
-        <mat-label>Año lectivo</mat-label>
-        <mat-select [(ngModel)]="selectedYear" (ngModelChange)="loadSummary()">
-          <mat-option [value]="null">Todos</mat-option>
-          @for (y of years(); track y.id) {
-            <mat-option [value]="y.id">{{y.name}}</mat-option>
-          }
-        </mat-select>
-      </mat-form-field>
       <mat-form-field appearance="outline" style="width:220px">
         <mat-label>Curso</mat-label>
         <mat-select [(ngModel)]="selectedCourse" (ngModelChange)="loadSummary()">
@@ -200,6 +192,7 @@ Chart.register(...registerables);
 })
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly http = inject(HttpClient);
+  readonly academicYearContext = inject(AcademicYearContextService);
 
   @ViewChild('barChart')   barChartEl!: ElementRef<HTMLCanvasElement>;
   @ViewChild('donutChart') donutChartEl!: ElementRef<HTMLCanvasElement>;
@@ -207,7 +200,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private barChart: Chart | null = null;
   private donutChart: Chart | null = null;
 
-  readonly years = signal<AcademicYear[]>([]);
   readonly courses = signal<Course[]>([]);
   readonly summary = signal<DashboardSummary | null>(null);
   readonly loading = signal(false);
@@ -222,14 +214,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly today = new Date().toLocaleDateString('es-EC', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   async ngOnInit(): Promise<void> {
-    const [years, courses] = await Promise.all([
-      firstValueFrom(this.http.get<AcademicYear[]>('/api/academic-years')),
-      firstValueFrom(this.http.get<Course[]>('/api/courses')),
-    ]);
-    this.years.set(years);
-    this.courses.set(courses);
-    const active = years.find(y => y.isActive);
-    if (active) this.selectedYear = active.id;
+    this.courses.set(await firstValueFrom(this.http.get<Course[]>('/api/courses')));
+    this.selectedYear = this.academicYearContext.selected()?.id ?? null;
     await this.loadSummary();
   }
 

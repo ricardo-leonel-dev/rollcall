@@ -127,6 +127,12 @@ async def process_photo(
     conn = get_db()
     cur  = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
+    cur.execute("SELECT institution_id FROM courses WHERE id = %s", (course_id,))
+    course_row = cur.fetchone()
+    if not course_row:
+        raise HTTPException(404, "Course not found")
+    institution_id = course_row['institution_id']
+
     cur.execute("""
         SELECT m.id AS enrollment_id, e.name
         FROM enrollments m
@@ -154,20 +160,20 @@ async def process_photo(
         if matched:
             enroll_id = enrollments[matched]
             cur.execute("""
-                INSERT INTO absences (enrollment_id, date, type, photo_source)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO absences (institution_id, enrollment_id, date, type, photo_source)
+                VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (enrollment_id, date)
                 DO UPDATE SET type = EXCLUDED.type, updated_at = NOW()
-            """, (enroll_id, fecha_uso, tipo, foto.filename))
+            """, (institution_id, enroll_id, fecha_uso, tipo, foto.filename))
             creados += 1
         else:
             no_encontrados.append(nombre)
 
     cur.execute("""
         INSERT INTO photo_logs
-          (filename, list_date, course_id, academic_year_id, records_created, records_not_found)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """, (foto.filename, fecha_uso, course_id, academic_year_id, creados, no_encontrados))
+          (institution_id, filename, list_date, course_id, academic_year_id, records_created, records_not_found)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    """, (institution_id, foto.filename, fecha_uso, course_id, academic_year_id, creados, no_encontrados))
 
     conn.commit()
     cur.close()

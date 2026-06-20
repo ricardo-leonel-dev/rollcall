@@ -10,6 +10,7 @@ import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import { Enrollment, AcademicYear, Course } from '../../core/models/index';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
+import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 
 @Component({
   standalone: true,
@@ -24,12 +25,6 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
     </div>
 
     <div class="filter-bar">
-      <mat-form-field appearance="outline" style="width:180px">
-        <mat-label>Año lectivo</mat-label>
-        <mat-select [(ngModel)]="selYear" (ngModelChange)="onYearChange()">
-          @for (y of years(); track y.id) { <mat-option [value]="y.id">{{y.name}}</mat-option> }
-        </mat-select>
-      </mat-form-field>
       <mat-form-field appearance="outline" style="width:220px">
         <mat-label>Curso</mat-label>
         <mat-select [(ngModel)]="selCourse" (ngModelChange)="load()">
@@ -145,8 +140,8 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
 export class EnrollmentsComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly snack = inject(MatSnackBar);
+  readonly academicYearContext = inject(AcademicYearContextService);
 
-  readonly years = signal<AcademicYear[]>([]);
   readonly courses = signal<Course[]>([]);
   readonly enrollments = signal<Enrollment[]>([]);
   readonly loading = signal(false);
@@ -157,23 +152,12 @@ export class EnrollmentsComponent implements OnInit {
   dateTo = new Date().toISOString().split('T')[0];
 
   async ngOnInit(): Promise<void> {
-    const [years, courses] = await Promise.all([
-      firstValueFrom(this.http.get<AcademicYear[]>('/api/academic-years')),
-      firstValueFrom(this.http.get<Course[]>('/api/courses')),
-    ]);
-    this.years.set(years);
-    this.courses.set(courses);
-    const active = years.find(y => y.isActive);
+    this.courses.set(await firstValueFrom(this.http.get<Course[]>('/api/courses')));
+    const active = this.academicYearContext.selected();
     if (active) {
       this.selYear = active.id;
       this.setDefaultTrimester(active);
     }
-  }
-
-  onYearChange(): void {
-    const year = this.years().find(y => y.id === this.selYear);
-    if (year) this.setDefaultTrimester(year);
-    this.load();
   }
 
   /** Marca por defecto el trimestre actual, dividiendo el año lectivo en 3

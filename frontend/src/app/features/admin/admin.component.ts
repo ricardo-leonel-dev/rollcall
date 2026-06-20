@@ -14,6 +14,7 @@ import { firstValueFrom } from 'rxjs';
 import { AcademicYear, Course, User, Role, RolePermission, Institution } from '../../core/models/index';
 import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
+import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { InstitutionDialogComponent } from './institution-dialog.component';
 import { AcademicYearDialogComponent } from './academic-year-dialog.component';
@@ -127,6 +128,9 @@ import { NAV_ITEMS } from '../../core/nav-items';
               </div>
               <div class="admin-row-actions">
                 <span [class]="y.isActive ? 'badge-J' : 'badge-gray'">{{y.isActive ? 'Activo' : 'Inactivo'}}</span>
+                @if (!y.isActive) {
+                  <button mat-icon-button style="color:var(--accent)" title="Marcar como año activo" (click)="activateYear(y.id)"><mat-icon>check_circle</mat-icon></button>
+                }
                 <button mat-icon-button style="color:var(--muted-strong)" (click)="openYearDialog(y)"><mat-icon>edit</mat-icon></button>
                 <button mat-icon-button style="color:#b91c1c" (click)="deleteYear(y.id)"><mat-icon>delete_outline</mat-icon></button>
               </div>
@@ -189,7 +193,12 @@ import { NAV_ITEMS } from '../../core/nav-items';
           Usuarios
         </ng-template>
         <div class="tab-content">
-          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+            @if (academicYearContext.selected(); as activeYear) {
+              <span style="font-size:13px;color:var(--muted)">Asignando cursos para el año <strong>{{activeYear.name}}</strong> — cambialo con el selector de año arriba.</span>
+            } @else {
+              <span style="font-size:13px;color:var(--muted)">Crea un año lectivo primero para poder asignar cursos a los usuarios.</span>
+            }
             <button mat-flat-button color="primary" (click)="openUserDialog()">
               <mat-icon>person_add</mat-icon> Nuevo usuario
             </button>
@@ -206,12 +215,14 @@ import { NAV_ITEMS } from '../../core/nav-items';
               <div class="admin-row-actions">
                 @if (u.roleName !== 'superadmin') {
                   <button mat-icon-button style="color:var(--muted-strong)" (click)="openUserDialog(u)"><mat-icon>edit</mat-icon></button>
-                  <mat-form-field appearance="outline" style="width:240px;margin:0">
-                    <mat-label>{{u.courseIds?.length ? 'Cursos asignados' : 'Ve todos los cursos'}}</mat-label>
-                    <mat-select multiple [(ngModel)]="u.courseIds" (closed)="updateUserCourses(u.id, u.courseIds ?? [])">
-                      @for (c of courses(); track c.id) { <mat-option [value]="c.id">{{c.name}}</mat-option> }
-                    </mat-select>
-                  </mat-form-field>
+                  @if (academicYearContext.selectedId()) {
+                    <mat-form-field appearance="outline" style="width:240px;margin:0">
+                      <mat-label>{{u.courseIds?.length ? 'Cursos asignados' : 'Ve todos los cursos'}}</mat-label>
+                      <mat-select multiple [(ngModel)]="u.courseIds" (closed)="updateUserCourses(u.id, u.courseIds ?? [])">
+                        @for (c of courses(); track c.id) { <mat-option [value]="c.id">{{c.name}}</mat-option> }
+                      </mat-select>
+                    </mat-form-field>
+                  }
                   <mat-form-field appearance="outline" style="width:240px;margin:0">
                     <mat-label>{{u.moduleKeys?.length ? 'Acceso limitado' : 'Acceso a todo'}}</mat-label>
                     <mat-select multiple [(ngModel)]="u.moduleKeys" (closed)="updateUserModules(u.id, u.moduleKeys ?? [])">
@@ -341,8 +352,9 @@ export class AdminComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   readonly auth = inject(AuthService);
   readonly institutionContext = inject(InstitutionContextService);
+  readonly academicYearContext = inject(AcademicYearContextService);
 
-  readonly years = signal<AcademicYear[]>([]);
+  readonly years = this.academicYearContext.years;
   readonly courses = signal<Course[]>([]);
   readonly users = signal<User[]>([]);
   readonly roles = signal<Role[]>([]);
@@ -357,19 +369,26 @@ export class AdminComponent implements OnInit {
     // institution-scoped endpoint below will succeed — load/auto-select
     // first. A brand-new superadmin with zero institutions yet simply gets
     // empty lists below until they create one in the Instituciones tab.
+    // academicYearContext is already loaded by layout.component.ts before
+    // this page mounts.
     if (this.auth.isSuperAdmin()) await this.institutionContext.loadInstitutions();
     await this.loadAll();
   }
 
   async loadAll(): Promise<void> {
     const noInstitutionYet = this.auth.isSuperAdmin() && this.institutionContext.selectedId() === null;
-    const [years, courses, users, roles] = await Promise.all([
-      noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<AcademicYear[]>('/api/academic-years')).catch(() => []),
+    // Re-fetched here (not just relying on layout's initial load) because
+    // this is the screen that creates/activates/edits academic years —
+    // other tabs only ever read this context, this one mutates it.
+    if (!noInstitutionYet) await this.academicYearContext.load();
+    const yearId = this.academicYearContext.selectedId();
+    const usersUrl = yearId ? `/api/users?academic_year_id=${yearId}` : '/api/users';
+    const [courses, users, roles] = await Promise.all([
       noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<Course[]>('/api/courses')).catch(() => []),
-      noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<User[]>('/api/users')).catch(() => []),
+      noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<User[]>(usersUrl)).catch(() => []),
       firstValueFrom(this.http.get<Role[]>('/api/roles')),
     ]);
-    this.years.set(years); this.courses.set(courses);
+    this.courses.set(courses);
     this.users.set(users); this.roles.set(roles);
   }
 
@@ -380,6 +399,12 @@ export class AdminComponent implements OnInit {
     }).afterClosed().subscribe(async ok => {
       if (ok) await this.loadAll();
     });
+  }
+
+  async activateYear(id: number): Promise<void> {
+    await firstValueFrom(this.http.put(`/api/academic-years/${id}`, { isActive: true }));
+    this.snack.open('Año lectivo activado', '', { duration: 2000 });
+    await this.loadAll();
   }
 
   deleteYear(id: number): void {
@@ -469,7 +494,9 @@ export class AdminComponent implements OnInit {
   }
 
   async updateUserCourses(userId: number, courseIds: number[]): Promise<void> {
-    await firstValueFrom(this.http.put(`/api/users/${userId}/courses`, { courseIds }));
+    const academicYearId = this.academicYearContext.selectedId();
+    if (!academicYearId) return;
+    await firstValueFrom(this.http.put(`/api/users/${userId}/courses`, { academicYearId, courseIds }));
     this.snack.open('Cursos actualizados', '', { duration: 2000 });
     await this.loadAll();
   }

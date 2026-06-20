@@ -7,7 +7,8 @@ const router = Router();
 const R = 'users';
 
 router.get('/', requireInstitution, requirePermission(R,'read'), async (req, res) => {
-  res.json(await svc.findAll(req.institutionId!));
+  const academicYearId = req.query.academic_year_id ? +req.query.academic_year_id : undefined;
+  res.json(await svc.findAll(req.institutionId!, academicYearId));
 });
 
 router.post('/', requirePermission(R,'create'), async (req, res) => {
@@ -29,7 +30,7 @@ router.delete('/:id', requireInstitution, requirePermission(R,'delete'), async (
 });
 
 router.put('/:id/courses', requireInstitution, requirePermission(R,'update'), async (req, res) => {
-  await svc.setCourses(req.institutionId!, +req.params.id, req.body.courseIds ?? []);
+  await svc.setCourses(req.institutionId!, +req.params.id, +req.body.academicYearId, req.body.courseIds ?? []);
   res.json({ message: 'Cursos actualizados' });
 });
 

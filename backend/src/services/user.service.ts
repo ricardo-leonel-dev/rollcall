@@ -7,6 +7,7 @@ import { Institution } from '../entities/Institution';
 import { Course } from '../entities/Course';
 import { UserCourse } from '../entities/UserCourse';
 import { UserModule } from '../entities/UserModule';
+import { AcademicYear } from '../entities/AcademicYear';
 
 const repo = () => AppDataSource.getRepository(User);
 
@@ -22,12 +23,14 @@ async function assertRoleAssignable(roleId: number | undefined, isActorSuperAdmi
   }
 }
 
-export async function findAll(institutionId: number) {
+export async function findAll(institutionId: number, academicYearId?: number) {
   const users = await repo().find({ where: { institutionId, deletedAt: IsNull() }, order: { username: 'ASC' } });
   const userIds = users.map(u => u.id);
   const roleIds = [...new Set(users.map(u => u.roleId).filter((id): id is number => id != null))];
   const [assignments, moduleAssignments, roles] = await Promise.all([
-    userIds.length ? AppDataSource.getRepository(UserCourse).find({ where: { userId: In(userIds) } }) : [],
+    userIds.length && academicYearId
+      ? AppDataSource.getRepository(UserCourse).find({ where: { userId: In(userIds), academicYearId } })
+      : [],
     userIds.length ? AppDataSource.getRepository(UserModule).find({ where: { userId: In(userIds) } }) : [],
     roleIds.length ? AppDataSource.getRepository(Role).find({ where: { id: In(roleIds) } }) : [],
   ]);
@@ -115,10 +118,15 @@ export async function remove(institutionId: number, id: number) {
   await repo().save(u);
 }
 
-// Replaces all of a user's course assignments. Empty array = unrestricted
-// (sees every course in the institution).
-export async function setCourses(institutionId: number, userId: number, courseIds: number[]) {
+// Replaces a user's course assignments for one academic year. Empty array =
+// unrestricted for that year (sees every course in the institution).
+// Assignments of other years are untouched — cada año lectivo arranca vacío
+// y se asigna por separado, no se copia del año anterior.
+export async function setCourses(institutionId: number, userId: number, academicYearId: number, courseIds: number[]) {
   await findById(institutionId, userId);
+
+  const year = await AppDataSource.getRepository(AcademicYear).findOne({ where: { id: academicYearId, institutionId } });
+  if (!year) throw Object.assign(new Error('Academic year not found'), { status: 404 });
 
   if (courseIds.length) {
     const validCourses = await AppDataSource.getRepository(Course).find({ where: { id: In(courseIds), institutionId } });
@@ -128,9 +136,9 @@ export async function setCourses(institutionId: number, userId: number, courseId
   }
 
   await AppDataSource.transaction(async (em) => {
-    await em.delete(UserCourse, { userId });
+    await em.delete(UserCourse, { userId, academicYearId });
     for (const courseId of courseIds) {
-      await em.save(em.create(UserCourse, { userId, courseId }));
+      await em.save(em.create(UserCourse, { userId, courseId, academicYearId }));
     }
   });
 }

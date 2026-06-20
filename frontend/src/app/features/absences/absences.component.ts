@@ -11,7 +11,8 @@ import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
-import { AcademicYear, Course, Enrollment, Absence, OcrResult } from '../../core/models/index';
+import { Course, Enrollment, Absence, OcrResult } from '../../core/models/index';
+import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { DEFAULT_NOTIFICATION_TEMPLATE } from '../../shared/components/profile-dialog/profile-dialog.component';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -40,12 +41,6 @@ import { AbsenceSavedSnackbarComponent } from '../../shared/components/absence-s
 
     <!-- Filtros comunes -->
     <div class="filter-bar">
-      <mat-form-field appearance="outline" style="width:180px">
-        <mat-label>Año lectivo</mat-label>
-        <mat-select [(ngModel)]="selYear" (ngModelChange)="onFiltersChange()">
-          @for (y of years(); track y.id) { <mat-option [value]="y.id">{{y.name}}</mat-option> }
-        </mat-select>
-      </mat-form-field>
       <mat-form-field appearance="outline" style="width:220px">
         <mat-label>Curso</mat-label>
         <mat-select [(ngModel)]="selCourse" (ngModelChange)="onFiltersChange()">
@@ -261,8 +256,8 @@ export class AbsencesComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly snackBar = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);
+  readonly academicYearContext = inject(AcademicYearContextService);
 
-  readonly years = signal<AcademicYear[]>([]);
   readonly courses = signal<Course[]>([]);
   readonly enrollments = signal<Enrollment[]>([]);
   readonly absences = signal<Absence[]>([]);
@@ -281,15 +276,12 @@ export class AbsencesComponent implements OnInit {
   private notificationTemplate = DEFAULT_NOTIFICATION_TEMPLATE;
 
   async ngOnInit(): Promise<void> {
-    const [years, courses, me] = await Promise.all([
-      firstValueFrom(this.http.get<AcademicYear[]>('/api/academic-years')),
+    const [courses, me] = await Promise.all([
       firstValueFrom(this.http.get<Course[]>('/api/courses')),
       firstValueFrom(this.http.get<{ notificationTemplate: string | null }>('/api/auth/me')),
     ]);
-    this.years.set(years);
     this.courses.set(courses);
-    const active = years.find(y => y.isActive);
-    if (active) this.selYear = active.id;
+    this.selYear = this.academicYearContext.selected()?.id ?? null;
     if (me.notificationTemplate) this.notificationTemplate = me.notificationTemplate;
   }
 

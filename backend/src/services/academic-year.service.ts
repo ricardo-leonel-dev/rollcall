@@ -19,19 +19,32 @@ export async function findById(institutionId: number, id: number) {
   return ay;
 }
 
+// Solo un año lectivo puede estar activo por institución a la vez (también
+// forzado por un índice único parcial en BD) — activar uno desactiva
+// automáticamente cualquier otro que lo estuviera.
 export async function create(institutionId: number, data: { name: string; startDate?: string; endDate?: string }) {
-  const ay = repo().create({
-    institutionId,
-    name: data.name,
-    startDate: data.startDate ?? null,
-    endDate: data.endDate ?? null,
-    isActive: true,
+  return AppDataSource.transaction(async (em) => {
+    await em.update(AcademicYear, { institutionId, isActive: true }, { isActive: false });
+    const ay = em.create(AcademicYear, {
+      institutionId,
+      name: data.name,
+      startDate: data.startDate ?? null,
+      endDate: data.endDate ?? null,
+      isActive: true,
+    });
+    return em.save(ay);
   });
-  return repo().save(ay);
 }
 
 export async function update(institutionId: number, id: number, data: Partial<{ name: string; startDate: string; endDate: string; isActive: boolean }>) {
   const ay = await findById(institutionId, id);
+  if (data.isActive === true && !ay.isActive) {
+    return AppDataSource.transaction(async (em) => {
+      await em.update(AcademicYear, { institutionId, isActive: true }, { isActive: false });
+      Object.assign(ay, data);
+      return em.save(ay);
+    });
+  }
   Object.assign(ay, data);
   return repo().save(ay);
 }

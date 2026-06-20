@@ -1,0 +1,124 @@
+# ─────────────────────────────────────────────────────────────────
+# STACK DEMO — copia aislada para pruebas/demos, sin tocar datos reales.
+# Red propia (demo-stack), puertos distintos, reusa las imágenes ya
+# construidas del stack principal (sin rebuild). demo-ocr-service se
+# conecta también a la red "ai-stack" para usar el mismo vllm-vision
+# ya corriendo (evita levantar un segundo modelo de visión, que es lo
+# que de verdad consume RAM/VRAM en este rig).
+#
+# Levantar:   docker compose -f docker-compose.demo.yml up -d
+# Apagar:     docker compose -f docker-compose.demo.yml down
+# URLs:       frontend http://localhost:8080  |  backend http://localhost:3010
+# ─────────────────────────────────────────────────────────────────
+services:
+
+  demo-postgres:
+    image: postgres:16-alpine
+    container_name: demo-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    volumes:
+      - demo_postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=attendance
+      - POSTGRES_USER=attendance
+      - POSTGRES_PASSWORD=asistencia_local_2026
+    networks:
+      demo-stack:
+        aliases: [postgres]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attendance -d attendance"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  demo-backend:
+    image: ai-personal-backend:latest
+    container_name: demo-backend
+    restart: unless-stopped
+    ports:
+      - "3010:3000"
+    environment:
+      - DATABASE_URL=postgresql://attendance:asistencia_local_2026@postgres:5432/attendance
+      - DB_SCHEMA=public
+      - JWT_SECRET=demo_jwt_secret_no_usar_en_produccion
+      - JWT_EXPIRES_IN=7d
+      - OCR_SERVICE_URL=http://ocr-service:8001
+      - EXCEL_SERVICE_URL=http://excel-service:8002
+      - NODE_ENV=production
+    depends_on:
+      demo-postgres:
+        condition: service_healthy
+    networks:
+      demo-stack:
+        aliases: [backend]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  demo-excel-service:
+    image: ai-personal-excel-service:latest
+    container_name: demo-excel-service
+    restart: unless-stopped
+    ports:
+      - "8012:8002"
+    volumes:
+      - ./agente-ocr/plantilla_asistencia.xlsx:/app/plantilla_asistencia.xlsx:ro
+      - demo_excel_output:/app/output
+    environment:
+      - DATABASE_URL=postgresql://attendance:asistencia_local_2026@postgres:5432/attendance
+      - DB_SCHEMA=public
+    depends_on:
+      demo-postgres:
+        condition: service_healthy
+    networks:
+      demo-stack:
+        aliases: [excel-service]
+
+  demo-ocr-service:
+    image: ai-personal-ocr-service:latest
+    container_name: demo-ocr-service
+    restart: unless-stopped
+    ports:
+      - "8011:8001"
+    environment:
+      - DATABASE_URL=postgresql://attendance:asistencia_local_2026@postgres:5432/attendance
+      - DB_SCHEMA=public
+      - VLLM_URL=http://vllm-vision:8000
+      - VISION_MODEL=Qwen/Qwen2.5-VL-3B-Instruct-AWQ
+    depends_on:
+      demo-postgres:
+        condition: service_healthy
+    networks:
+      demo-stack:
+        aliases: [ocr-service]
+      ai-stack:
+        aliases: [demo-ocr-service]
+
+  demo-frontend:
+    image: ai-personal-frontend:latest
+    container_name: demo-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      demo-backend:
+        condition: service_healthy
+    networks:
+      demo-stack:
+        aliases: [frontend]
+
+volumes:
+  demo_postgres_data:
+  demo_excel_output:
+
+networks:
+  demo-stack:
+    name: demo-stack
+  ai-stack:
+    external: true
