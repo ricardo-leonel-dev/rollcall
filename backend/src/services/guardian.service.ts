@@ -7,7 +7,7 @@ const repo = () => AppDataSource.getRepository(Guardian);
 // Derived from phone, not user-editable directly — keeps the WhatsApp deep
 // link in sync whenever the phone number changes (Ecuador mobile numbers:
 // drop the leading 0, prefix the 593 country code).
-function buildWhatsappLink(phone?: string | null): string | null {
+export function buildWhatsappLink(phone?: string | null): string | null {
   if (!phone) return null;
   return `https://wa.me/593${phone.replace(/^0/, '')}`;
 }

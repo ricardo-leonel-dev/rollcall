@@ -6,6 +6,7 @@ import { Student } from '../entities/Student';
 import { Guardian } from '../entities/Guardian';
 import { Enrollment } from '../entities/Enrollment';
 import { AcademicYear } from '../entities/AcademicYear';
+import { buildWhatsappLink } from './guardian.service';
 
 function normalizeStr(s: string | null | undefined): string {
   return (s ?? '').toString().trim().toUpperCase();
@@ -20,8 +21,9 @@ function padIdNumber(raw: string): string {
 }
 
 export async function importRoster(institutionId: number, buffer: Buffer): Promise<{
-  coursesProcessed: number; studentsCreated: number;
-  studentsUpdated: number; enrollmentsCreated: number; errors: string[];
+  coursesProcessed: number; studentsCreated: number; studentsUpdated: number;
+  enrollmentsCreated: number; enrollmentsUpdated: number; guardiansUpdated: number;
+  errors: string[];
 }> {
   const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true });
 
@@ -34,7 +36,11 @@ export async function importRoster(institutionId: number, buffer: Buffer): Promi
   const activeYear = await ayRepo.findOne({ where: { institutionId, isActive: true, deletedAt: IsNull() } });
   if (!activeYear) throw Object.assign(new Error('No active academic year found'), { status: 400 });
 
-  const stats = { coursesProcessed: 0, studentsCreated: 0, studentsUpdated: 0, enrollmentsCreated: 0, errors: [] as string[] };
+  const stats = {
+    coursesProcessed: 0, studentsCreated: 0, studentsUpdated: 0,
+    enrollmentsCreated: 0, enrollmentsUpdated: 0, guardiansUpdated: 0,
+    errors: [] as string[],
+  };
 
   for (const sheetName of wb.SheetNames) {
     const ws = wb.Sheets[sheetName];
@@ -44,17 +50,24 @@ export async function importRoster(institutionId: number, buffer: Buffer): Promi
     if (rows.length < 7) continue;
 
     const headers = (rows[5] as any[]).map(h => normalizeStr(String(h)));
-    const colIndex = (name: string) => headers.findIndex(h => h.includes(name));
+    const colIndexAll = (...needles: string[]) => headers.findIndex(h => needles.every(n => h.includes(n)));
+    const colIndex = (name: string) => colIndexAll(name);
 
     const colNum    = colIndex('N°') >= 0 ? colIndex('N°') : colIndex('NO');
     const colCed    = colIndex('CEDULA');
     const colName   = colIndex('APELLIDOS');
     const colSex    = colIndex('SEXO');
     const colBirth  = colIndex('NACIMIENTO');
-    const colPhone  = colIndex('TELEFONO');
-    const colEmail  = colIndex('EMAIL');
-    const colGuard  = colIndex('REPRESENTANTE');
     const colEnroll = colIndex('MATRICULADO');
+
+    // El Excel trae columnas separadas para estudiante y representante que comparten
+    // la misma palabra clave (TELEFONO / CORREO) — hace falta el segundo substring
+    // para no confundir el teléfono/correo del estudiante con el del representante.
+    const colGuard       = colIndexAll('REPRESENTANTE', 'LEGAL');
+    const colStudPhone   = colIndexAll('TELEFONO', 'ESTUDIANTE');
+    const colStudEmail   = colIndexAll('CORREO', 'ESTUDIANTE');
+    const colGuardPhone  = colIndexAll('TELEFONO', 'REPRESENTANTE');
+    const colGuardEmail  = colIndexAll('CORREO', 'REPRESENTANTE');
 
     const courseName = normalizeStr(sheetName);
     let course = await courseRepo.findOne({ where: { institutionId, name: courseName, deletedAt: IsNull() } });
@@ -85,6 +98,11 @@ export async function importRoster(institutionId: number, buffer: Buffer): Promi
           }
         }
 
+        const studentPhone = colStudPhone  >= 0 ? String(row[colStudPhone]  ?? '').trim() || null : null;
+        const studentEmail = colStudEmail  >= 0 ? String(row[colStudEmail]  ?? '').trim() || null : null;
+        const guardPhone    = colGuardPhone >= 0 ? String(row[colGuardPhone] ?? '').trim() || null : null;
+        const guardEmail    = colGuardEmail >= 0 ? String(row[colGuardEmail] ?? '').trim() || null : null;
+
         let student: Student | null = null;
         if (idNumber) student = await studentRepo.findOne({ where: { institutionId, idNumber, deletedAt: IsNull() } });
         if (!student) student = await studentRepo.findOne({ where: { institutionId, name: rawName, deletedAt: IsNull() } });
@@ -108,14 +126,29 @@ export async function importRoster(institutionId: number, buffer: Buffer): Promi
           if (guardName) {
             guardian = await guardianRepo.findOne({ where: { institutionId, name: guardName, deletedAt: IsNull() } });
             if (!guardian) {
-              const phone = colPhone >= 0 ? String(row[colPhone] ?? '').trim() : undefined;
               guardian = guardianRepo.create({
                 institutionId,
                 name: guardName,
-                phone: phone || null,
-                whatsappLink: phone ? `https://wa.me/593${phone.replace(/^0/, '')}` : null,
+                phone: guardPhone,
+                email: guardEmail,
+                whatsappLink: buildWhatsappLink(guardPhone),
               });
               guardian = await guardianRepo.save(guardian);
+            } else {
+              let guardianChanged = false;
+              if (guardPhone && guardian.phone !== guardPhone) {
+                guardian.phone = guardPhone;
+                guardian.whatsappLink = buildWhatsappLink(guardPhone);
+                guardianChanged = true;
+              }
+              if (guardEmail && guardian.email !== guardEmail) {
+                guardian.email = guardEmail;
+                guardianChanged = true;
+              }
+              if (guardianChanged) {
+                guardian = await guardianRepo.save(guardian);
+                stats.guardiansUpdated++;
+              }
             }
           }
         }
@@ -127,12 +160,10 @@ export async function importRoster(institutionId: number, buffer: Buffer): Promi
           },
         });
 
-        if (!existing) {
-          const num = colNum >= 0 ? parseInt(String(row[colNum] ?? '0')) || null : null;
-          const phone = colPhone >= 0 ? String(row[colPhone] ?? '').trim() || null : null;
-          const email = colEmail >= 0 ? String(row[colEmail] ?? '').trim() || null : null;
-          const enrolled = colEnroll >= 0 ? String(row[colEnroll] ?? '').trim().toUpperCase() !== 'NO' : true;
+        const num = colNum >= 0 ? parseInt(String(row[colNum] ?? '0')) || null : null;
+        const enrolled = colEnroll >= 0 ? String(row[colEnroll] ?? '').trim().toUpperCase() !== 'NO' : true;
 
+        if (!existing) {
           await enrollRepo.save(enrollRepo.create({
             institutionId,
             studentId: student.id,
@@ -141,10 +172,21 @@ export async function importRoster(institutionId: number, buffer: Buffer): Promi
             guardianId: guardian?.id ?? null,
             rosterNumber: num,
             isEnrolled: enrolled,
-            studentPhone: phone,
-            studentEmail: email,
+            studentPhone,
+            studentEmail,
           }));
           stats.enrollmentsCreated++;
+        } else {
+          let enrollmentChanged = false;
+          if (num !== null && existing.rosterNumber !== num) { existing.rosterNumber = num; enrollmentChanged = true; }
+          if (existing.isEnrolled !== enrolled) { existing.isEnrolled = enrolled; enrollmentChanged = true; }
+          if (studentPhone && existing.studentPhone !== studentPhone) { existing.studentPhone = studentPhone; enrollmentChanged = true; }
+          if (studentEmail && existing.studentEmail !== studentEmail) { existing.studentEmail = studentEmail; enrollmentChanged = true; }
+          if (guardian && existing.guardianId !== guardian.id) { existing.guardianId = guardian.id; enrollmentChanged = true; }
+          if (enrollmentChanged) {
+            await enrollRepo.save(existing);
+            stats.enrollmentsUpdated++;
+          }
         }
       } catch (err: any) {
         stats.errors.push(`Row ${r + 1}: ${err.message}`);

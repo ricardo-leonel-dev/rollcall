@@ -338,6 +338,14 @@ import { NAV_ITEMS } from '../../core/nav-items';
                   <div style="font-family:'Nunito',sans-serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.enrollmentsCreated}}</div>
                   <div style="font-size:12px;color:var(--muted-strong)">Matrículas creadas</div>
                 </div>
+                <div style="background:var(--paper);border-radius:8px;padding:10px 14px">
+                  <div style="font-family:'Nunito',sans-serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.enrollmentsUpdated}}</div>
+                  <div style="font-size:12px;color:var(--muted-strong)">Matrículas actualizadas</div>
+                </div>
+                <div style="background:var(--paper);border-radius:8px;padding:10px 14px">
+                  <div style="font-family:'Nunito',sans-serif;font-size:20px;font-weight:600;color:var(--ink)">{{importResult()!.guardiansUpdated}}</div>
+                  <div style="font-size:12px;color:var(--muted-strong)">Representantes actualizados</div>
+                </div>
               </div>
             </div>
           }
