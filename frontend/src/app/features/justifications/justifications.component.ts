@@ -12,14 +12,58 @@ import { firstValueFrom } from 'rxjs';
 import { Justification, Course, Enrollment, Absence } from '../../core/models/index';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
-
-interface JustifyGroup { weekKey: string; absences: Absence[]; }
-interface GroupInput { reason: string; notifiedBy: string; }
+import { JustificationCreateDialogComponent, JustifyGroup } from './justification-create-dialog.component';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule, MatSnackBarModule],
+  styles: [`
+    /* Same pinned-evidence language as the "Nueva justificación" wizard, so a
+       photo looks like the same object whether it's mid-upload there or
+       already filed here. */
+    .evidence-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 4px; }
+    .evidence-tile {
+      position: relative; display: block;
+      width: 56px; height: 56px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, .14);
+      transform: rotate(var(--r, 0deg));
+      transition: transform .15s ease;
+    }
+    .evidence-tile:hover { transform: rotate(0deg) scale(1.1); z-index: 2; }
+    .evidence-tile img { width: 100%; height: 100%; object-fit: cover; border-radius: 2px; display: block; }
+    .evidence-tile-doc {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; background: var(--paper-deep); border-style: dashed; border-color: var(--muted);
+    }
+    .evidence-tile-doc mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--muted-strong); }
+    .evidence-tile-doc span {
+      display: block; max-width: 46px; font-size: 8px; color: var(--muted-strong);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px;
+    }
+    .evidence-remove {
+      position: absolute; top: -8px; right: -8px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #fff; border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; padding: 0;
+    }
+    .evidence-remove mat-icon { font-size: 12px; width: 12px; height: 12px; color: #b91c1c; }
+    .evidence-add-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      height: 32px; padding: 0 12px;
+      border-radius: 8px; border: 1px dashed var(--muted);
+      background: transparent; color: var(--muted-strong);
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      transition: all .15s ease;
+    }
+    .evidence-add-pill:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+    .evidence-add-pill mat-icon { font-size: 16px; width: 16px; height: 16px; }
+  `],
   template: `
     <div class="page-header">
       <h1 class="page-title">Justificaciones</h1>
@@ -66,23 +110,11 @@ interface GroupInput { reason: string; notifiedBy: string; }
         }
 
         @if (groups().length) {
-          @for (g of groups(); track g.weekKey) {
-            <div style="background:var(--paper-deep);border-radius:10px;padding:14px;margin-bottom:12px">
-              <div style="font-size:12px;font-weight:600;color:var(--muted-strong);margin-bottom:8px">
-                Semana del {{g.weekKey}} — {{g.absences.length}} falta(s): {{datesLabel(g.absences)}}
-              </div>
-              <mat-form-field appearance="outline" style="width:100%;margin-bottom:8px">
-                <mat-label>Motivo *</mat-label>
-                <textarea matInput rows="2" [ngModel]="groupInput(g.weekKey).reason" (ngModelChange)="updateGroupInput(g.weekKey, 'reason', $event)"></textarea>
-              </mat-form-field>
-              <mat-form-field appearance="outline" style="width:100%">
-                <mat-label>Quién notificó</mat-label>
-                <input matInput [ngModel]="groupInput(g.weekKey).notifiedBy" (ngModelChange)="updateGroupInput(g.weekKey, 'notifiedBy', $event)">
-              </mat-form-field>
-            </div>
-          }
-          <button mat-flat-button color="primary" [disabled]="creating()" (click)="createJustifications()">
-            <mat-icon>task_alt</mat-icon> Crear {{groups().length}} justificación(es)
+          <div style="font-size:13px;color:var(--muted-strong);margin-bottom:12px">
+            {{groups().length}} semana(s) con faltas seleccionadas. El motivo y los adjuntos se completan en el siguiente paso.
+          </div>
+          <button mat-flat-button color="primary" (click)="openCreateWizard()">
+            <mat-icon>arrow_forward</mat-icon> Continuar ({{groups().length}} semana(s))
           </button>
         }
       }
@@ -150,6 +182,33 @@ interface GroupInput { reason: string; notifiedBy: string; }
                       </button>
                     </div>
                   </div>
+
+                  <div class="evidence-row" style="margin-top:10px">
+                    @for (a of j.attachments; track a.id) {
+                      @if (a.mimeType.startsWith('image/')) {
+                        <a class="evidence-tile" [href]="a.url" target="_blank" [style.--r.deg]="rotationFor(a.fileName)">
+                          <img [src]="a.url">
+                          <button class="evidence-remove" (click)="removeAttachment(j.id, a.id); $event.preventDefault()">
+                            <mat-icon>close</mat-icon>
+                          </button>
+                        </a>
+                      } @else {
+                        <a class="evidence-tile evidence-tile-doc" [href]="a.url" target="_blank" [style.--r.deg]="rotationFor(a.fileName)">
+                          <mat-icon>description</mat-icon>
+                          <span>{{a.originalName}}</span>
+                          <button class="evidence-remove" (click)="removeAttachment(j.id, a.id); $event.preventDefault()">
+                            <mat-icon>close</mat-icon>
+                          </button>
+                        </a>
+                      }
+                    }
+                    <input type="file" #attInput hidden multiple
+                           accept="image/png,image/jpeg,image/webp,application/pdf,.doc,.docx"
+                           (change)="onAddAttachments(j.id, $event)">
+                    <button class="evidence-add-pill" (click)="attInput.click()">
+                      <mat-icon>add</mat-icon> Adjuntar
+                    </button>
+                  </div>
                 </div>
               </div>
             }
@@ -173,8 +232,6 @@ export class JustificationsComponent implements OnInit {
   readonly studentEnrollments = signal<Enrollment[]>([]);
   readonly unjustified = signal<Absence[]>([]);
   readonly selectedIds = signal<Set<number>>(new Set());
-  readonly groupInputs = signal<Record<string, GroupInput>>({});
-  readonly creating = signal(false);
 
   selYear: number | null = null;
   selCourse: number | null = null;
@@ -205,7 +262,6 @@ export class JustificationsComponent implements OnInit {
     this.selStudent = null;
     this.unjustified.set([]);
     this.selectedIds.set(new Set());
-    this.groupInputs.set({});
     if (this.selYear && this.selCourse) {
       const [enrollments, pending] = await Promise.all([
         firstValueFrom(this.http.get<Enrollment[]>(`/api/enrollments?course_id=${this.selCourse}&academic_year_id=${this.selYear}`)),
@@ -220,7 +276,6 @@ export class JustificationsComponent implements OnInit {
 
   async onStudentChange(): Promise<void> {
     this.selectedIds.set(new Set());
-    this.groupInputs.set({});
     if (!this.selStudent) { this.unjustified.set([]); return; }
     const data = await firstValueFrom(
       this.http.get<Absence[]>(`/api/absences?enrollment_id=${this.selStudent}&is_justified=false`)
@@ -260,54 +315,55 @@ export class JustificationsComponent implements OnInit {
       .map(([weekKey, absences]) => ({ weekKey, absences }));
   }
 
-  datesLabel(absences: Absence[]): string {
-    return absences.map(a => a.date).join(', ');
-  }
-
-  groupInput(weekKey: string): GroupInput {
-    return this.groupInputs()[weekKey] ?? { reason: '', notifiedBy: '' };
-  }
-
-  updateGroupInput(weekKey: string, field: 'reason' | 'notifiedBy', value: string): void {
-    this.groupInputs.update(g => ({ ...g, [weekKey]: { ...this.groupInput(weekKey), [field]: value } }));
-  }
-
-  async createJustifications(): Promise<void> {
+  async openCreateWizard(): Promise<void> {
     const gs = this.groups();
     if (!gs.length) return;
-    for (const g of gs) {
-      if (!this.groupInput(g.weekKey).reason) {
-        this.snack.open(`Falta el motivo para la semana del ${g.weekKey}`, '', { duration: 3000 });
-        return;
-      }
+    const ref = this.dialog.open(JustificationCreateDialogComponent, {
+      width: '560px',
+      data: { groups: gs },
+    });
+    const saved = await firstValueFrom(ref.afterClosed());
+    if (saved) {
+      this.selectedIds.set(new Set());
+      await this.onStudentChange();
+      await this.load();
     }
+  }
 
-    this.creating.set(true);
-    let okCount = 0;
-    const errors: string[] = [];
-    for (const g of gs) {
-      const input = this.groupInput(g.weekKey);
-      try {
-        await firstValueFrom(this.http.post('/api/justifications', {
-          enrollmentId: g.absences[0].enrollmentId,
-          reason: input.reason,
-          notifiedBy: input.notifiedBy || null,
-          absenceIds: g.absences.map(a => a.id),
-        }));
-        okCount++;
-      } catch (err: any) {
-        errors.push(`Semana del ${g.weekKey}: ${err?.error?.error ?? 'error'}`);
-      }
+  // Same deterministic tilt as the wizard's evidence tiles — stable across
+  // re-renders, just enough to read as loosely pinned rather than aligned.
+  rotationFor(name: string): number {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+    return (Math.abs(hash) % 9) - 4;
+  }
+
+  async onAddAttachments(justificationId: number, ev: Event): Promise<void> {
+    const input = ev.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    if (!files.length) return;
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f);
+    try {
+      await firstValueFrom(this.http.post(`/api/justifications/${justificationId}/attachments`, fd));
+      this.snack.open('Adjunto(s) agregado(s)', '', { duration: 2000 });
+      await this.load();
+    } catch (err: any) {
+      this.snack.open(err?.error?.error ?? 'Error al subir archivo', '', { duration: 4000 });
     }
-    this.creating.set(false);
-    this.snack.open(
-      errors.length ? `${okCount} creada(s), ${errors.length} con error` : `${okCount} justificación(es) creada(s)`,
-      '', { duration: 4000 }
-    );
-    this.selectedIds.set(new Set());
-    this.groupInputs.set({});
-    await this.onStudentChange();
-    await this.load();
+  }
+
+  removeAttachment(justificationId: number, attachmentId: number): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: { title: 'Eliminar adjunto', message: 'Esta evidencia se eliminará permanentemente. Esta acción no se puede deshacer.' },
+    }).afterClosed().subscribe(async ok => {
+      if (!ok) return;
+      await firstValueFrom(this.http.delete(`/api/justifications/${justificationId}/attachments/${attachmentId}`));
+      this.snack.open('Adjunto eliminado', '', { duration: 2000 });
+      await this.load();
+    });
   }
 
   startEdit(j: Justification): void {

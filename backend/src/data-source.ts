@@ -13,6 +13,7 @@ import { RolePermission } from './entities/RolePermission';
 import { User } from './entities/User';
 import { Justification } from './entities/Justification';
 import { JustificationAbsence } from './entities/JustificationAbsence';
+import { JustificationAttachment } from './entities/JustificationAttachment';
 import { Institution } from './entities/Institution';
 import { UserCourse } from './entities/UserCourse';
 import { UserModule } from './entities/UserModule';
@@ -48,6 +49,7 @@ export const AppDataSource = new DataSource({
     User,
     Justification,
     JustificationAbsence,
+    JustificationAttachment,
     Institution,
     UserCourse,
     UserModule,

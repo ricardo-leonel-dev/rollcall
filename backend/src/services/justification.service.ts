@@ -1,13 +1,20 @@
 import { IsNull } from 'typeorm';
+import fs from 'fs';
+import path from 'path';
 import { AppDataSource } from '../data-source';
 import { Justification } from '../entities/Justification';
 import { JustificationAbsence } from '../entities/JustificationAbsence';
+import { JustificationAttachment } from '../entities/JustificationAttachment';
 import { Absence } from '../entities/Absence';
 import { Enrollment } from '../entities/Enrollment';
 
 const repo = () => AppDataSource.getRepository(Justification);
 const jaRepo = () => AppDataSource.getRepository(JustificationAbsence);
+const attRepo = () => AppDataSource.getRepository(JustificationAttachment);
 const absRepo = () => AppDataSource.getRepository(Absence);
+
+const ATTACHMENTS_DIR = path.join(process.cwd(), 'uploads', 'justifications');
+const attachmentUrl = (fileName: string) => `/api/uploads/justifications/${fileName}`;
 
 async function assertEnrollmentInScope(institutionId: number, courseIds: number[] | null, enrollmentId: number): Promise<Enrollment> {
   const enrollment = await AppDataSource.getRepository(Enrollment).findOne({ where: { id: enrollmentId, institutionId } });
@@ -30,6 +37,10 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
     enrollmentFilter = `AND j.enrollment_id = $${params.length}`;
   }
 
+  // Subqueries correlacionadas (una por array) en vez de LEFT JOIN + GROUP BY:
+  // con dos relaciones N:1 (faltas y adjuntos) un JOIN normal produciría un
+  // producto cruzado entre ambas antes de agrupar — cada subquery corre
+  // aislada por fila de j, sin cruces entre absenceIds y attachments.
   const sql = `
     SELECT
       j.id,
@@ -41,17 +52,34 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
       j.deleted_at AS "deletedAt",
       j.created_at AS "createdAt",
       j.updated_at AS "updatedAt",
-      COALESCE(json_agg(ja.absence_id) FILTER (WHERE ja.absence_id IS NOT NULL), '[]') AS "absenceIds"
+      COALESCE((
+        SELECT json_agg(ja.absence_id)
+        FROM justification_absences ja
+        WHERE ja.justification_id = j.id
+      ), '[]') AS "absenceIds",
+      COALESCE((
+        SELECT json_agg(json_build_object(
+          'id', att.id,
+          'fileName', att.file_name,
+          'originalName', att.original_name,
+          'mimeType', att.mime_type,
+          'createdAt', att.created_at
+        ) ORDER BY att.created_at ASC)
+        FROM justification_attachments att
+        WHERE att.justification_id = j.id
+      ), '[]') AS "attachments"
     FROM justifications j
     JOIN enrollments e ON e.id = j.enrollment_id
-    LEFT JOIN justification_absences ja ON ja.justification_id = j.id
     WHERE j.institution_id = $1 AND j.deleted_at IS NULL
     ${courseFilter}
     ${enrollmentFilter}
-    GROUP BY j.id
     ORDER BY j.created_at DESC
   `;
-  return AppDataSource.query(sql, params);
+  const rows = await AppDataSource.query(sql, params);
+  return rows.map((r: any) => ({
+    ...r,
+    attachments: r.attachments.map((a: any) => ({ ...a, url: attachmentUrl(a.fileName) })),
+  }));
 }
 
 export async function findById(institutionId: number, courseIds: number[] | null, id: number) {
@@ -131,10 +159,45 @@ export async function update(institutionId: number, courseIds: number[] | null, 
 export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
   const j = await findById(institutionId, courseIds, id);
 
+  // Los adjuntos (justification_attachments) se preservan intactos a propósito:
+  // borrar una justificación nunca debe destruir la evidencia que la respaldaba.
   return AppDataSource.transaction(async (em) => {
     await em.delete(JustificationAbsence, { justificationId: id });
     j.deletedAt = new Date();
     j.isActive = false;
     await em.save(j);
   });
+}
+
+export async function addAttachments(
+  institutionId: number,
+  courseIds: number[] | null,
+  justificationId: number,
+  files: Express.Multer.File[],
+) {
+  await findById(institutionId, courseIds, justificationId);
+
+  const rows = files.map(f => attRepo().create({
+    justificationId,
+    fileName: f.filename,
+    originalName: f.originalname,
+    mimeType: f.mimetype,
+  }));
+  const saved = await attRepo().save(rows);
+  return saved.map(a => ({ ...a, url: attachmentUrl(a.fileName) }));
+}
+
+export async function removeAttachment(
+  institutionId: number,
+  courseIds: number[] | null,
+  justificationId: number,
+  attachmentId: number,
+) {
+  await findById(institutionId, courseIds, justificationId);
+
+  const att = await attRepo().findOne({ where: { id: attachmentId, justificationId } });
+  if (!att) throw Object.assign(new Error('Attachment not found'), { status: 404 });
+
+  await attRepo().remove(att);
+  fs.unlink(path.join(ATTACHMENTS_DIR, att.fileName), () => {});
 }

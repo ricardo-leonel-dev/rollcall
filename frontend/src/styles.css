@@ -198,6 +198,40 @@ body {
 
 .mat-mdc-snack-bar-container { border-radius: 12px !important; }
 
+/* Stepper (mat-stepper) — Material 22's stepper reads its colors from these
+   M3 tokens rather than fixed classes, so recasting it into the ledger's
+   stamped language is a token swap, not a CSS fight. "Done"/"edit" states
+   reuse the same green as .stamp-j (a step you've filled in already reads
+   as "justified" in this app's own vocabulary). The dashed border on the
+   icon itself isn't tokenized — that's the one structural rule below. */
+:root {
+  --mat-stepper-container-color: transparent;
+  --mat-stepper-line-color: var(--border);
+  --mat-stepper-header-icon-background-color: transparent;
+  --mat-stepper-header-icon-foreground-color: var(--muted-strong);
+  --mat-stepper-header-selected-state-icon-background-color: var(--accent);
+  --mat-stepper-header-selected-state-icon-foreground-color: white;
+  --mat-stepper-header-done-state-icon-background-color: #15803d;
+  --mat-stepper-header-done-state-icon-foreground-color: white;
+  --mat-stepper-header-edit-state-icon-background-color: #15803d;
+  --mat-stepper-header-edit-state-icon-foreground-color: white;
+  --mat-stepper-header-label-text-color: var(--muted-strong);
+  --mat-stepper-header-label-text-font: 'Nunito', sans-serif;
+  --mat-stepper-header-label-text-weight: 600;
+  --mat-stepper-header-selected-state-label-text-color: var(--ink);
+  --mat-stepper-header-selected-state-label-text-weight: 700;
+  --mat-stepper-header-hover-state-layer-color: rgba(0, 0, 0, .035);
+}
+.mat-step-icon {
+  border: 1.5px dashed currentColor !important;
+  font-weight: 700 !important;
+}
+.mat-step-icon-selected, .mat-step-icon-state-done, .mat-step-icon-state-edit {
+  border-style: solid !important;
+}
+.mat-stepper-vertical-line::before { border-left-style: dashed !important; }
+.mat-vertical-content-container { margin-left: 12px !important; }
+
 /* ─── Layout tokens ─────────────────────────────────────────────────────── */
 @layer components {
 

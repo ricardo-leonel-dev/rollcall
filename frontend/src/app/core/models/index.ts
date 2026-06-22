@@ -83,6 +83,15 @@ export interface Absence {
   whatsappLink: string | null;
 }
 
+export interface JustificationAttachment {
+  id: number;
+  fileName: string;
+  originalName: string;
+  mimeType: string;
+  url: string;
+  createdAt: string;
+}
+
 export interface Justification {
   id: number;
   enrollmentId: number;
@@ -90,6 +99,7 @@ export interface Justification {
   notifiedBy: string | null;
   isActive: boolean;
   absenceIds: number[];
+  attachments: JustificationAttachment[];
   createdAt: string;
 }
 
