@@ -12,10 +12,15 @@ function normalizeStr(s: string | null | undefined): string {
   return (s ?? '').toString().trim().toUpperCase();
 }
 
-function padIdNumber(raw: string): string {
+// Excel guarda cédula y teléfono como número, no texto — el formato de celda les
+// pone el cero inicial solo para mostrarlos (ej. "0991606679"), pero el valor real
+// que se lee llega sin él. No se puede asumir un largo fijo (cédula son 10 dígitos,
+// pero teléfono varía entre celular de 10 y fijo de 9) — siempre se pierde exactamente
+// un solo cero inicial, nunca más, así que basta con reponerlo si falta.
+function padDigits(raw: string): string {
   const trimmed = raw.trim();
-  if (/^\d+$/.test(trimmed) && trimmed.length < 10) {
-    return trimmed.padStart(10, '0');
+  if (/^\d+$/.test(trimmed) && !trimmed.startsWith('0')) {
+    return '0' + trimmed;
   }
   return trimmed;
 }
@@ -84,7 +89,7 @@ export async function importRoster(institutionId: number, buffer: Buffer): Promi
 
       try {
         const rawCed = colCed >= 0 ? String(row[colCed] ?? '').trim() : '';
-        const idNumber = rawCed ? padIdNumber(rawCed) : undefined;
+        const idNumber = rawCed ? padDigits(rawCed) : undefined;
         const gender = colSex >= 0 ? String(row[colSex] ?? '').trim().toUpperCase().charAt(0) : undefined;
 
         let birthDate: string | undefined;
@@ -98,10 +103,12 @@ export async function importRoster(institutionId: number, buffer: Buffer): Promi
           }
         }
 
-        const studentPhone = colStudPhone  >= 0 ? String(row[colStudPhone]  ?? '').trim() || null : null;
-        const studentEmail = colStudEmail  >= 0 ? String(row[colStudEmail]  ?? '').trim() || null : null;
-        const guardPhone    = colGuardPhone >= 0 ? String(row[colGuardPhone] ?? '').trim() || null : null;
-        const guardEmail    = colGuardEmail >= 0 ? String(row[colGuardEmail] ?? '').trim() || null : null;
+        const studentPhoneRaw = colStudPhone  >= 0 ? String(row[colStudPhone]  ?? '').trim() : '';
+        const studentEmail    = colStudEmail  >= 0 ? String(row[colStudEmail]  ?? '').trim() || null : null;
+        const guardPhoneRaw    = colGuardPhone >= 0 ? String(row[colGuardPhone] ?? '').trim() : '';
+        const guardEmail       = colGuardEmail >= 0 ? String(row[colGuardEmail] ?? '').trim() || null : null;
+        const studentPhone = studentPhoneRaw ? padDigits(studentPhoneRaw) : null;
+        const guardPhone    = guardPhoneRaw ? padDigits(guardPhoneRaw) : null;
 
         let student: Student | null = null;
         if (idNumber) student = await studentRepo.findOne({ where: { institutionId, idNumber, deletedAt: IsNull() } });
