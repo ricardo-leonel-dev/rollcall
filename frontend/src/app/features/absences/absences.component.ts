@@ -10,8 +10,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { firstValueFrom } from 'rxjs';
 import { Course, Enrollment, Absence, OcrResult } from '../../core/models/index';
+import { dateToDateString } from '../../shared/utils/date.util';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { DEFAULT_NOTIFICATION_TEMPLATE } from '../../shared/components/profile-dialog/profile-dialog.component';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
@@ -23,7 +25,7 @@ import { AbsenceSavedSnackbarComponent } from '../../shared/components/absence-s
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule,
-            MatButtonModule, MatIconModule, MatSnackBarModule, MatTooltipModule, WhatsappIconComponent],
+            MatButtonModule, MatIconModule, MatSnackBarModule, MatTooltipModule, MatDatepickerModule, WhatsappIconComponent],
   styles: [`
     .tab-content { padding: 20px 0; }
     .enroll-row {
@@ -62,7 +64,9 @@ import { AbsenceSavedSnackbarComponent } from '../../shared/components/absence-s
 
           <mat-form-field appearance="outline" style="width:200px;margin-bottom:16px">
             <mat-label>Fecha (opcional)</mat-label>
-            <input matInput type="date" [(ngModel)]="photoDate">
+            <input matInput [matDatepicker]="pickerPhoto" [(ngModel)]="photoDate">
+            <mat-datepicker-toggle matIconSuffix [for]="pickerPhoto"></mat-datepicker-toggle>
+            <mat-datepicker #pickerPhoto></mat-datepicker>
           </mat-form-field>
 
           <div class="upload-zone" (dragover)="$event.preventDefault()" (drop)="onDrop($event)">
@@ -177,11 +181,15 @@ import { AbsenceSavedSnackbarComponent } from '../../shared/components/absence-s
           <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;align-items:center">
             <mat-form-field appearance="outline" style="width:150px">
               <mat-label>Desde</mat-label>
-              <input matInput type="date" [(ngModel)]="dateFrom" (change)="loadAbsences()">
+              <input matInput [matDatepicker]="pickerFrom" [(ngModel)]="dateFrom" (dateChange)="loadAbsences()">
+              <mat-datepicker-toggle matIconSuffix [for]="pickerFrom"></mat-datepicker-toggle>
+              <mat-datepicker #pickerFrom></mat-datepicker>
             </mat-form-field>
             <mat-form-field appearance="outline" style="width:150px">
               <mat-label>Hasta</mat-label>
-              <input matInput type="date" [(ngModel)]="dateTo" (change)="loadAbsences()">
+              <input matInput [matDatepicker]="pickerTo" [(ngModel)]="dateTo" (dateChange)="loadAbsences()">
+              <mat-datepicker-toggle matIconSuffix [for]="pickerTo"></mat-datepicker-toggle>
+              <mat-datepicker #pickerTo></mat-datepicker>
             </mat-form-field>
             <mat-form-field appearance="outline" style="width:130px">
               <mat-label>Tipo</mat-label>
@@ -269,9 +277,9 @@ export class AbsencesComponent implements OnInit {
 
   selYear: number | null = null;
   selCourse: number | null = null;
-  photoDate = '';
-  dateFrom = '';
-  dateTo = '';
+  photoDate: Date | null = null;
+  dateFrom: Date | null = null;
+  dateTo: Date | null = null;
   filterType = '';
   private notificationTemplate = DEFAULT_NOTIFICATION_TEMPLATE;
 
@@ -317,8 +325,8 @@ export class AbsencesComponent implements OnInit {
     const params: string[] = [];
     if (this.selCourse)  params.push(`course_id=${this.selCourse}`);
     if (this.selYear)    params.push(`academic_year_id=${this.selYear}`);
-    if (this.dateFrom)   params.push(`date_from=${this.dateFrom}`);
-    if (this.dateTo)     params.push(`date_to=${this.dateTo}`);
+    if (this.dateFrom)   params.push(`date_from=${dateToDateString(this.dateFrom)}`);
+    if (this.dateTo)     params.push(`date_to=${dateToDateString(this.dateTo)}`);
     if (this.filterType) params.push(`type=${this.filterType}`);
     this.absLoading.set(true);
     try {
@@ -350,7 +358,7 @@ export class AbsencesComponent implements OnInit {
       fd.append('foto', file);
       fd.append('course_id', String(this.selCourse));
       fd.append('academic_year_id', String(this.selYear));
-      if (this.photoDate) fd.append('date', this.photoDate);
+      if (this.photoDate) fd.append('date', dateToDateString(this.photoDate));
       const result = await firstValueFrom(this.http.post<OcrResult>('/api/ocr/process-photo', fd));
       this.ocrResult.set(result);
       await this.loadAbsences();

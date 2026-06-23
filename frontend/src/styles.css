@@ -232,6 +232,34 @@ body {
 .mat-stepper-vertical-line::before { border-left-style: dashed !important; }
 .mat-vertical-content-container { margin-left: 12px !important; }
 
+/* Datepicker (mat-datepicker) — mismo trato que el stepper arriba: Material 22
+   lee estos tokens M3 en vez de clases fijas, así que es un swap de tokens, no
+   una pelea de especificidad. Importante además de estético: el día
+   seleccionado y el ícono del toggle por defecto NO siguen --accent, así que
+   sin esto el calendario ignora el color de marca de la institución activa
+   (ver theme.service.ts applyInstitutionColors) y queda indigo de fábrica. */
+:root {
+  --mat-datepicker-calendar-container-background-color: var(--paper);
+  --mat-datepicker-calendar-container-text-color: var(--ink-soft);
+  --mat-datepicker-calendar-container-shape: 14px;
+  --mat-datepicker-calendar-container-elevation-shadow: 0 2px 6px rgba(30, 27, 22, .06), 0 16px 40px -16px rgba(30, 27, 22, .18);
+  --mat-datepicker-calendar-text-font: 'Nunito', sans-serif;
+  --mat-datepicker-calendar-header-text-color: var(--muted-strong);
+  --mat-datepicker-calendar-header-divider-color: var(--border-soft);
+  --mat-datepicker-calendar-body-label-text-color: var(--muted-strong);
+  --mat-datepicker-calendar-period-button-text-color: var(--ink);
+  --mat-datepicker-calendar-navigation-button-icon-color: var(--muted-strong);
+  --mat-datepicker-calendar-date-text-color: var(--ink-soft);
+  --mat-datepicker-calendar-date-outline-color: var(--border);
+  --mat-datepicker-calendar-date-today-outline-color: var(--accent);
+  --mat-datepicker-calendar-date-hover-state-background-color: var(--paper-deep);
+  --mat-datepicker-calendar-date-focus-state-background-color: var(--accent-soft);
+  --mat-datepicker-calendar-date-selected-state-background-color: var(--accent);
+  --mat-datepicker-calendar-date-selected-state-text-color: white;
+  --mat-datepicker-toggle-icon-color: var(--muted-strong);
+  --mat-datepicker-toggle-active-state-icon-color: var(--accent);
+}
+
 /* ─── Layout tokens ─────────────────────────────────────────────────────── */
 @layer components {
 

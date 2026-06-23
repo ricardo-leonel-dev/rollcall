@@ -5,6 +5,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { dateToDateString } from '../../shared/utils/date.util';
 
 export interface AbsenceRangeDialogData {
   fullName: string;
@@ -20,18 +22,22 @@ export interface AbsenceRangeDialogResult {
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule],
+  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule, MatDatepickerModule],
   template: `
     <h2 mat-dialog-title>{{data.type === 'F' ? 'Agregar falta' : 'Agregar atraso'}}</h2>
     <div mat-dialog-content>
       <div style="font-size:13px;color:var(--muted-strong);margin-bottom:16px">{{data.fullName}}</div>
       <mat-form-field appearance="outline" style="width:100%;margin-bottom:8px">
         <mat-label>Desde</mat-label>
-        <input matInput type="date" [(ngModel)]="dateFrom">
+        <input matInput [matDatepicker]="pickerFrom" [(ngModel)]="dateFrom">
+        <mat-datepicker-toggle matIconSuffix [for]="pickerFrom"></mat-datepicker-toggle>
+        <mat-datepicker #pickerFrom></mat-datepicker>
       </mat-form-field>
       <mat-form-field appearance="outline" style="width:100%;margin-bottom:8px">
         <mat-label>Hasta</mat-label>
-        <input matInput type="date" [(ngModel)]="dateTo">
+        <input matInput [matDatepicker]="pickerTo" [(ngModel)]="dateTo">
+        <mat-datepicker-toggle matIconSuffix [for]="pickerTo"></mat-datepicker-toggle>
+        <mat-datepicker #pickerTo></mat-datepicker>
       </mat-form-field>
       <mat-form-field appearance="outline" style="width:100%">
         <mat-label>Motivo (opcional)</mat-label>
@@ -47,20 +53,24 @@ export interface AbsenceRangeDialogResult {
   `,
 })
 export class AbsenceRangeDialogComponent {
-  dateFrom: string;
-  dateTo: string;
+  dateFrom: Date | null;
+  dateTo: Date | null;
   notes = '';
 
   constructor(
     public dialogRef: MatDialogRef<AbsenceRangeDialogComponent, AbsenceRangeDialogResult>,
     @Inject(MAT_DIALOG_DATA) public data: AbsenceRangeDialogData,
   ) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
     this.dateFrom = today;
     this.dateTo = today;
   }
 
   confirm(): void {
-    this.dialogRef.close({ dateFrom: this.dateFrom, dateTo: this.dateTo, notes: this.notes });
+    this.dialogRef.close({
+      dateFrom: dateToDateString(this.dateFrom),
+      dateTo: dateToDateString(this.dateTo),
+      notes: this.notes,
+    });
   }
 }

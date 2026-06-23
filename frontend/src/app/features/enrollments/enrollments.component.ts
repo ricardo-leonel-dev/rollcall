@@ -7,15 +7,17 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { firstValueFrom } from 'rxjs';
 import { Enrollment, AcademicYear, Course } from '../../core/models/index';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
+import { dateToDateString } from '../../shared/utils/date.util';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule, MatSnackBarModule, WhatsappIconComponent],
+  imports: [FormsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule, MatSnackBarModule, MatDatepickerModule, WhatsappIconComponent],
   template: `
     <div class="page-header">
       <h1 class="page-title">Matrículas</h1>
@@ -34,11 +36,15 @@ import { AcademicYearContextService } from '../../core/services/academic-year-co
       </mat-form-field>
       <mat-form-field appearance="outline" style="width:150px">
         <mat-label>Desde</mat-label>
-        <input matInput type="date" [(ngModel)]="dateFrom">
+        <input matInput [matDatepicker]="pickerFrom" [(ngModel)]="dateFrom">
+        <mat-datepicker-toggle matIconSuffix [for]="pickerFrom"></mat-datepicker-toggle>
+        <mat-datepicker #pickerFrom></mat-datepicker>
       </mat-form-field>
       <mat-form-field appearance="outline" style="width:150px">
         <mat-label>Hasta</mat-label>
-        <input matInput type="date" [(ngModel)]="dateTo">
+        <input matInput [matDatepicker]="pickerTo" [(ngModel)]="dateTo">
+        <mat-datepicker-toggle matIconSuffix [for]="pickerTo"></mat-datepicker-toggle>
+        <mat-datepicker #pickerTo></mat-datepicker>
       </mat-form-field>
       @if (enrollments().length) {
         <div style="align-self:center;background:var(--accent-soft);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--accent)">
@@ -148,8 +154,8 @@ export class EnrollmentsComponent implements OnInit {
 
   selYear: number | null = null;
   selCourse: number | null = null;
-  dateFrom = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
-  dateTo = new Date().toISOString().split('T')[0];
+  dateFrom: Date | null = new Date(new Date().getFullYear(), 0, 1);
+  dateTo: Date | null = new Date();
 
   async ngOnInit(): Promise<void> {
     this.courses.set(await firstValueFrom(this.http.get<Course[]>('/api/courses')));
@@ -164,7 +170,6 @@ export class EnrollmentsComponent implements OnInit {
    * tercios iguales desde su fecha de inicio. */
   private setDefaultTrimester(year: AcademicYear): void {
     if (!year.startDate || !year.endDate) return;
-    const fmt = (d: Date) => d.toISOString().split('T')[0];
     const start = new Date(year.startDate);
     const end = new Date(year.endDate);
     const third = (end.getTime() - start.getTime()) / 3;
@@ -174,8 +179,8 @@ export class EnrollmentsComponent implements OnInit {
     const clamped = today < start ? start : today > end ? end : today;
     const idx = bounds.slice(1).findIndex(b => clamped.getTime() <= b.getTime());
     const i = idx === -1 ? 2 : idx;
-    this.dateFrom = fmt(bounds[i]);
-    this.dateTo = fmt(bounds[i + 1]);
+    this.dateFrom = bounds[i];
+    this.dateTo = bounds[i + 1];
   }
 
   async load(): Promise<void> {
@@ -191,7 +196,7 @@ export class EnrollmentsComponent implements OnInit {
 
   async downloadExcel(): Promise<void> {
     if (!this.selCourse || !this.selYear) return;
-    const url = `/api/export/excel?course_id=${this.selCourse}&academic_year_id=${this.selYear}&date_from=${this.dateFrom}&date_to=${this.dateTo}`;
+    const url = `/api/export/excel?course_id=${this.selCourse}&academic_year_id=${this.selYear}&date_from=${dateToDateString(this.dateFrom)}&date_to=${dateToDateString(this.dateTo)}`;
     try {
       const blob = await firstValueFrom(this.http.get(url, { responseType: 'blob' }));
       const blobUrl = URL.createObjectURL(blob);

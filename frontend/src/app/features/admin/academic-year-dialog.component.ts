@@ -6,8 +6,10 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { firstValueFrom } from 'rxjs';
 import { AcademicYear } from '../../core/models/index';
+import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
 
 export interface AcademicYearDialogData {
   mode: 'create' | 'edit';
@@ -17,7 +19,7 @@ export interface AcademicYearDialogData {
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatSnackBarModule],
+  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatSnackBarModule, MatDatepickerModule],
   template: `
     <h2 mat-dialog-title style="font-family:'Nunito',sans-serif">{{data.mode === 'edit' ? 'Editar año lectivo' : 'Nuevo año lectivo'}}</h2>
     <mat-dialog-content>
@@ -27,11 +29,15 @@ export interface AcademicYearDialogData {
       </mat-form-field>
       <mat-form-field appearance="outline" style="width:100%">
         <mat-label>Fecha inicio</mat-label>
-        <input matInput type="date" [(ngModel)]="startDate">
+        <input matInput [matDatepicker]="pickerStart" [(ngModel)]="startDate">
+        <mat-datepicker-toggle matIconSuffix [for]="pickerStart"></mat-datepicker-toggle>
+        <mat-datepicker #pickerStart></mat-datepicker>
       </mat-form-field>
       <mat-form-field appearance="outline" style="width:100%">
         <mat-label>Fecha fin</mat-label>
-        <input matInput type="date" [(ngModel)]="endDate">
+        <input matInput [matDatepicker]="pickerEnd" [(ngModel)]="endDate">
+        <mat-datepicker-toggle matIconSuffix [for]="pickerEnd"></mat-datepicker-toggle>
+        <mat-datepicker #pickerEnd></mat-datepicker>
       </mat-form-field>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
@@ -49,14 +55,18 @@ export class AcademicYearDialogComponent {
   private readonly snack = inject(MatSnackBar);
 
   name = this.data.year?.name ?? '';
-  startDate = this.data.year?.startDate ?? '';
-  endDate = this.data.year?.endDate ?? '';
+  startDate: Date | null = this.data.year?.startDate ? dateStringToDate(this.data.year.startDate) : null;
+  endDate: Date | null = this.data.year?.endDate ? dateStringToDate(this.data.year.endDate) : null;
   readonly saving = signal(false);
 
   async save(): Promise<void> {
     if (!this.name) return;
     this.saving.set(true);
-    const body = { name: this.name, startDate: this.startDate || null, endDate: this.endDate || null };
+    const body = {
+      name: this.name,
+      startDate: this.startDate ? dateToDateString(this.startDate) : null,
+      endDate: this.endDate ? dateToDateString(this.endDate) : null,
+    };
     try {
       if (this.data.mode === 'edit') {
         await firstValueFrom(this.http.put(`/api/academic-years/${this.data.year!.id}`, body));

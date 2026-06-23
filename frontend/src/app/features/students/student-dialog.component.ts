@@ -7,8 +7,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { firstValueFrom } from 'rxjs';
 import { Student, AcademicYear, Course, Enrollment, Guardian } from '../../core/models/index';
+import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
 
 export interface StudentDialogData {
   mode: 'create' | 'edit';
@@ -21,7 +23,7 @@ export interface StudentDialogData {
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatSnackBarModule],
+  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatSnackBarModule, MatDatepickerModule],
   styles: [`
     .section-title {
       font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
@@ -37,7 +39,12 @@ export interface StudentDialogData {
       <mat-form-field appearance="outline"><mat-label>Nombre completo *</mat-label><input matInput [(ngModel)]="name"></mat-form-field>
       <mat-form-field appearance="outline"><mat-label>Cédula</mat-label><input matInput [(ngModel)]="idNumber"></mat-form-field>
       <mat-form-field appearance="outline"><mat-label>Sexo (H/M)</mat-label><input matInput [(ngModel)]="gender"></mat-form-field>
-      <mat-form-field appearance="outline"><mat-label>F. Nacimiento</mat-label><input matInput type="date" [(ngModel)]="birthDate"></mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>F. Nacimiento</mat-label>
+        <input matInput [matDatepicker]="pickerBirth" [(ngModel)]="birthDate">
+        <mat-datepicker-toggle matIconSuffix [for]="pickerBirth"></mat-datepicker-toggle>
+        <mat-datepicker #pickerBirth></mat-datepicker>
+      </mat-form-field>
 
       @if (data.mode === 'create') {
         <div class="section-title">Matrícula (opcional)</div>
@@ -86,7 +93,7 @@ export class StudentDialogComponent {
   name = this.data.student?.name ?? '';
   idNumber = this.data.student?.idNumber ?? '';
   gender = this.data.student?.gender ?? '';
-  birthDate = this.data.student?.birthDate ?? '';
+  birthDate: Date | null = this.data.student?.birthDate ? dateStringToDate(this.data.student.birthDate) : null;
 
   selYear: number | null = null;
   selCourse: number | null = null;
@@ -106,7 +113,7 @@ export class StudentDialogComponent {
   async save(): Promise<void> {
     if (!this.name) { this.snack.open('El nombre es requerido', '', { duration: 3000 }); return; }
     this.saving.set(true);
-    const studentBody = { name: this.name, idNumber: this.idNumber || null, gender: this.gender || null, birthDate: this.birthDate || null };
+    const studentBody = { name: this.name, idNumber: this.idNumber || null, gender: this.gender || null, birthDate: this.birthDate ? dateToDateString(this.birthDate) : null };
     const guardianBody = { name: this.guardianName, idNumber: this.guardianIdNumber, phone: this.guardianPhone, email: this.guardianEmail };
     try {
       if (this.data.mode === 'edit') {
