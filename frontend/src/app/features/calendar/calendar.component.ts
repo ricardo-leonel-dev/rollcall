@@ -144,8 +144,8 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
       .weekday { text-align: center; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding-bottom: 8px; }
       .grid-wrap { padding: 4px 18px 8px; }
       .week-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 6px; margin-bottom: 6px; }
-      .month-slide-next .week-grid { animation: slideIn .32s ease both; }
-      .month-slide-prev .week-grid { animation: slideIn .32s ease both reverse; }
+      .month-slide-next .week-grid { animation: slideInRight .32s ease both; }
+      .month-slide-prev .week-grid { animation: slideInLeft .32s ease both; }
       .day-cell { position: relative; min-height: 90px; border-radius: 13px; padding: 8px; border: 1px solid transparent; display: flex; flex-direction: column; transition: transform .15s ease, box-shadow .15s ease; animation: cellIn .35s ease both; animation-delay: calc(var(--i,0) * 12ms); }
       .day-cell.out { opacity: .35; }
       .day-cell.has-records { cursor: pointer; background: var(--paper); border-color: #eee5d3; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
@@ -164,7 +164,8 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
       .detail-name { font-weight: 600; color: #292524; }
       .detail-meta { color: var(--muted); font-size: 12px; }
       @keyframes cellIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-      @keyframes slideIn { from { opacity: 0; transform: translateX(16px); } }
+      @keyframes slideInRight { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+      @keyframes slideInLeft { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }
       @media (max-width: 640px) {
         .month-header { padding: 16px 14px 12px; }
         .month-title { font-size: 21px; }
