@@ -439,6 +439,24 @@ body {
   .action-pill-at { color: #92400e; }
   .action-pill-at:hover { background: #f59e0b; color: #fff; border-color: #f59e0b; }
 
+  /* Period pill — preset de rango de fechas, mismo lenguaje visual que .action-pill
+     (sello de borde punteado) pero sin rotación: son controles clicables en línea,
+     no sellos decorativos sobre datos. */
+  .period-pill {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px dashed var(--border);
+    cursor: pointer;
+    background: var(--paper);
+    color: var(--muted-strong);
+    transition: all .15s ease;
+    @apply inline-flex items-center gap-1;
+  }
+  .period-pill:hover { border-color: var(--accent); color: var(--accent); }
+  .period-pill.active { background: var(--accent); color: #fff; border-color: var(--accent); border-style: solid; }
+
   /* Inline modal — fixed-overlay dialogs that don't need full MatDialog */
   .modal-overlay {
     position: fixed;

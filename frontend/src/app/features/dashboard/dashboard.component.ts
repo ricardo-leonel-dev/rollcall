@@ -4,18 +4,23 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { MatInputModule } from '@angular/material/input';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { FormsModule } from '@angular/forms';
 import { DashboardSummary, Course } from '../../core/models/index';
 import { firstValueFrom } from 'rxjs';
 import { Chart, registerables } from 'chart.js';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
+import { dateToDateString } from '../../shared/utils/date.util';
 
 Chart.register(...registerables);
+
+type PeriodPreset = 'today' | 'yesterday' | '7d' | '15d' | '30d' | 'full' | 'custom';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatSelectModule, MatFormFieldModule, MatIconModule, MatButtonModule, FormsModule],
+  imports: [MatSelectModule, MatFormFieldModule, MatIconModule, MatButtonModule, MatInputModule, MatDatepickerModule, FormsModule],
   styles: [`
     .stat-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
     .stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px -8px rgba(15,23,42,.15) !important; }
@@ -49,6 +54,35 @@ Chart.register(...registerables);
           }
         </mat-select>
       </mat-form-field>
+    </div>
+
+    <!-- Selector de período -->
+    <div class="filter-bar" style="align-items:center">
+      @for (opt of periodOptions; track opt.value) {
+        <button type="button" class="period-pill" [class.active]="selectedPeriod === opt.value" (click)="selectPeriod(opt.value)">
+          {{opt.label}}
+        </button>
+      }
+      <button type="button" class="period-pill" [class.active]="selectedPeriod === 'custom'" (click)="selectPeriod('custom')">
+        <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:text-bottom">calendar_today</mat-icon> Personalizado
+      </button>
+
+      @if (showCustomPanel) {
+        <div class="flex gap-3 min-w-0">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" style="flex:1;min-width:0;max-width:130px">
+            <mat-label>Desde</mat-label>
+            <input matInput [matDatepicker]="pickerCustomFrom" [(ngModel)]="customFrom">
+            <mat-datepicker-toggle matIconSuffix [for]="pickerCustomFrom"></mat-datepicker-toggle>
+            <mat-datepicker #pickerCustomFrom></mat-datepicker>
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" style="flex:1;min-width:0;max-width:130px">
+            <mat-label>Hasta</mat-label>
+            <input matInput [matDatepicker]="pickerCustomTo" [(ngModel)]="customTo" (dateChange)="onCustomDateChange()">
+            <mat-datepicker-toggle matIconSuffix [for]="pickerCustomTo"></mat-datepicker-toggle>
+            <mat-datepicker #pickerCustomTo></mat-datepicker>
+          </mat-form-field>
+        </div>
+      }
     </div>
 
     @if (loading()) {
@@ -116,7 +150,7 @@ Chart.register(...registerables);
         <!-- Bar chart -->
         <div class="card">
           <div class="card-header">
-            <span class="card-title">Inasistencias últimos 30 días</span>
+            <span class="card-title">Inasistencias — {{periodLabel()}}</span>
           </div>
           <div class="chart-wrap">
             <canvas #barChart></canvas>
@@ -148,6 +182,20 @@ Chart.register(...registerables);
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Faltas por curso -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-header">
+          <span class="card-title">Faltas por curso</span>
+        </div>
+        @if (summary()!.byCourse?.length) {
+          <div class="chart-wrap" style="height:240px">
+            <canvas #courseChart></canvas>
+          </div>
+        } @else {
+          <div class="empty-state" style="padding:24px">Sin datos para este período</div>
+        }
       </div>
 
       <!-- Top 10 -->
@@ -194,11 +242,13 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly http = inject(HttpClient);
   readonly academicYearContext = inject(AcademicYearContextService);
 
-  @ViewChild('barChart')   barChartEl!: ElementRef<HTMLCanvasElement>;
-  @ViewChild('donutChart') donutChartEl!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('barChart')    barChartEl!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('donutChart')  donutChartEl!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('courseChart') courseChartEl!: ElementRef<HTMLCanvasElement>;
 
   private barChart: Chart | null = null;
   private donutChart: Chart | null = null;
+  private courseChart: Chart | null = null;
 
   readonly courses = signal<Course[]>([]);
   readonly summary = signal<DashboardSummary | null>(null);
@@ -206,6 +256,19 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   selectedYear: number | null = null;
   selectedCourse: number | null = null;
+
+  readonly periodOptions: { value: PeriodPreset; label: string }[] = [
+    { value: 'full',      label: 'Año completo' },
+    { value: 'today',     label: 'Hoy' },
+    { value: 'yesterday', label: 'Ayer' },
+    { value: '7d',        label: 'Últimos 7 días' },
+    { value: '15d',       label: 'Últimos 15 días' },
+    { value: '30d',       label: 'Últimos 30 días' },
+  ];
+  selectedPeriod: PeriodPreset = 'full';
+  customFrom: Date | null = null;
+  customTo: Date | null = null;
+  showCustomPanel = false;
 
   readonly alertStudents = computed(() =>
     (this.summary()?.topStudents ?? []).filter(s => s.totalAbsences >= 5)
@@ -224,14 +287,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this.barChart?.destroy();
     this.donutChart?.destroy();
+    this.courseChart?.destroy();
   }
 
   async loadSummary(): Promise<void> {
     this.loading.set(true);
     try {
+      const { from, to } = this.computeDateRange();
       const params: string[] = [];
       if (this.selectedYear)   params.push(`academic_year_id=${this.selectedYear}`);
       if (this.selectedCourse) params.push(`course_id=${this.selectedCourse}`);
+      if (from) params.push(`date_from=${from}`);
+      if (to)   params.push(`date_to=${to}`);
       const qs = params.length ? '?' + params.join('&') : '';
       const data = await firstValueFrom(this.http.get<DashboardSummary>(`/api/dashboard/summary${qs}`));
       this.summary.set(data);
@@ -241,9 +308,44 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  private computeDateRange(): { from: string | null; to: string | null } {
+    const today = new Date();
+    const fmt = (d: Date) => dateToDateString(d);
+    switch (this.selectedPeriod) {
+      case 'today': return { from: fmt(today), to: fmt(today) };
+      case 'yesterday': { const y = new Date(today); y.setDate(y.getDate() - 1); return { from: fmt(y), to: fmt(y) }; }
+      case '7d':  { const f = new Date(today); f.setDate(f.getDate() - 6);  return { from: fmt(f), to: fmt(today) }; }
+      case '15d': { const f = new Date(today); f.setDate(f.getDate() - 14); return { from: fmt(f), to: fmt(today) }; }
+      case '30d': { const f = new Date(today); f.setDate(f.getDate() - 29); return { from: fmt(f), to: fmt(today) }; }
+      case 'custom': return { from: this.customFrom ? fmt(this.customFrom) : null, to: this.customTo ? fmt(this.customTo) : null };
+      case 'full':
+      default: return { from: null, to: null };
+    }
+  }
+
+  selectPeriod(p: PeriodPreset): void {
+    this.selectedPeriod = p;
+    this.showCustomPanel = p === 'custom';
+    if (p !== 'custom') this.loadSummary();
+  }
+
+  onCustomDateChange(): void {
+    if (this.customFrom && this.customTo) this.loadSummary();
+  }
+
+  periodLabel(): string {
+    if (this.selectedPeriod === 'custom') {
+      return this.customFrom && this.customTo
+        ? `${dateToDateString(this.customFrom)} – ${dateToDateString(this.customTo)}`
+        : 'Personalizado';
+    }
+    return this.periodOptions.find(p => p.value === this.selectedPeriod)?.label ?? '';
+  }
+
   private renderCharts(data: DashboardSummary): void {
     this.barChart?.destroy();
     this.donutChart?.destroy();
+    this.courseChart?.destroy();
 
     const days = data.absencesByDay ?? [];
     const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#6366f1';
@@ -290,6 +392,29 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           maintainAspectRatio: false,
           cutout: '72%',
           plugins: { legend: { display: false } },
+        },
+      });
+    }
+
+    const byCourse = data.byCourse ?? [];
+    if (this.courseChartEl?.nativeElement && byCourse.length) {
+      this.courseChart = new Chart(this.courseChartEl.nativeElement, {
+        type: 'bar',
+        data: {
+          labels: byCourse.map(c => c.course),
+          datasets: [
+            { label: 'Faltas',  data: byCourse.map(c => c.totalAbsences), backgroundColor: '#ef4444', borderRadius: 6, borderSkipped: false },
+            { label: 'Atrasos', data: byCourse.map(c => c.totalTardies),  backgroundColor: '#f59e0b', borderRadius: 6, borderSkipped: false },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+            y: { grid: { color: '#f1ece0' }, ticks: { font: { size: 11 } }, beginAtZero: true },
+          },
         },
       });
     }

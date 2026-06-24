@@ -116,6 +116,7 @@ export interface DashboardSummary {
     totalAbsences: number;
     totalTardies: number;
   }[];
+  byCourse: { course: string; totalAbsences: number; totalTardies: number }[];
   absencesByDay: { date: string; count: number }[];
 }
 

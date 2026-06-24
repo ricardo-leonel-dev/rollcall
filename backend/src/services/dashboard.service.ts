@@ -1,12 +1,14 @@
 import { AppDataSource } from '../data-source';
 
-export async function getSummary(institutionId: number, courseIds: number[] | null, courseId?: number, academicYearId?: number) {
+export async function getSummary(institutionId: number, courseIds: number[] | null, courseId?: number, academicYearId?: number, dateFrom?: string, dateTo?: string) {
   const filters: string[] = ['a.deleted_at IS NULL', 'm.deleted_at IS NULL', 'a.institution_id = $1'];
   const params: any[] = [institutionId];
   let i = 2;
   if (courseIds !== null) { filters.push(`m.course_id = ANY($${i++})`); params.push(courseIds); }
   if (courseId)       { filters.push(`m.course_id = $${i++}`);        params.push(courseId); }
   if (academicYearId) { filters.push(`m.academic_year_id = $${i++}`); params.push(academicYearId); }
+  if (dateFrom)        { filters.push(`a.date >= $${i++}`);            params.push(dateFrom); }
+  if (dateTo)          { filters.push(`a.date <= $${i++}`);            params.push(dateTo); }
 
   const where = filters.join(' AND ');
 
@@ -37,12 +39,23 @@ export async function getSummary(institutionId: number, courseIds: number[] | nu
     LIMIT 10
   `, params);
 
-  const lastThirtyDays = await AppDataSource.query(`
+  const byCourse = await AppDataSource.query(`
+    SELECT c.name AS course,
+           COUNT(*) FILTER (WHERE a.type = 'F')  AS "totalAbsences",
+           COUNT(*) FILTER (WHERE a.type = 'AT') AS "totalTardies"
+    FROM absences a
+    JOIN enrollments m ON m.id = a.enrollment_id
+    JOIN courses c     ON c.id = m.course_id
+    WHERE ${where}
+    GROUP BY c.id, c.name
+    ORDER BY c.name
+  `, params);
+
+  const absencesByDay = await AppDataSource.query(`
     SELECT a.date::text AS date, COUNT(*) AS count
     FROM absences a
     JOIN enrollments m ON m.id = a.enrollment_id
     WHERE ${where}
-      AND a.date >= CURRENT_DATE - INTERVAL '30 days'
     GROUP BY a.date
     ORDER BY a.date
   `, params);
@@ -60,6 +73,7 @@ export async function getSummary(institutionId: number, courseIds: number[] | nu
     unjustifiedCount: unjustified,
     justifiedPercent: total > 0 ? Math.round((justified / total) * 100) : 0,
     topStudents,
-    absencesByDay: lastThirtyDays.map((r: any) => ({ date: r.date, count: parseInt(r.count) })),
+    byCourse: byCourse.map((r: any) => ({ course: r.course, totalAbsences: parseInt(r.totalAbsences), totalTardies: parseInt(r.totalTardies) })),
+    absencesByDay: absencesByDay.map((r: any) => ({ date: r.date, count: parseInt(r.count) })),
   };
 }

@@ -10,7 +10,9 @@ router.use(requireInstitution);
 router.get('/summary', requirePermission('dashboard','read'), async (req, res) => {
   const courseId = req.query.course_id ? +req.query.course_id : undefined;
   const yearId   = req.query.academic_year_id ? +req.query.academic_year_id : undefined;
-  res.json(await svc.getSummary(req.institutionId!, req.courseIds ?? null, courseId, yearId));
+  const dateFrom = req.query.date_from as string | undefined;
+  const dateTo   = req.query.date_to as string | undefined;
+  res.json(await svc.getSummary(req.institutionId!, req.courseIds ?? null, courseId, yearId, dateFrom, dateTo));
 });
 
 export default router;

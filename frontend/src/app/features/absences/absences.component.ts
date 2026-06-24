@@ -178,27 +178,47 @@ import { AbsenceSavedSnackbarComponent } from '../../shared/components/absence-s
         </ng-template>
         <div class="tab-content" style="padding:16px">
           <!-- Sub-filtros — vacíos/"Todos" por defecto, que ya equivale a ver todo -->
-          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;align-items:center">
-            <mat-form-field appearance="outline" style="width:150px">
-              <mat-label>Desde</mat-label>
-              <input matInput [matDatepicker]="pickerFrom" [(ngModel)]="dateFrom" (dateChange)="loadAbsences()">
-              <mat-datepicker-toggle matIconSuffix [for]="pickerFrom"></mat-datepicker-toggle>
-              <mat-datepicker #pickerFrom></mat-datepicker>
-            </mat-form-field>
-            <mat-form-field appearance="outline" style="width:150px">
-              <mat-label>Hasta</mat-label>
-              <input matInput [matDatepicker]="pickerTo" [(ngModel)]="dateTo" (dateChange)="loadAbsences()">
-              <mat-datepicker-toggle matIconSuffix [for]="pickerTo"></mat-datepicker-toggle>
-              <mat-datepicker #pickerTo></mat-datepicker>
-            </mat-form-field>
-            <mat-form-field appearance="outline" style="width:130px">
-              <mat-label>Tipo</mat-label>
-              <mat-select [(ngModel)]="filterType" (ngModelChange)="loadAbsences()">
-                <mat-option value="">Todos</mat-option>
-                <mat-option value="F">Falta</mat-option>
-                <mat-option value="AT">Atrasado</mat-option>
-              </mat-select>
-            </mat-form-field>
+          <div class="filter-bar" style="flex-direction:column;align-items:stretch">
+            <div class="flex flex-col items-stretch md:flex-row md:flex-wrap md:items-center gap-3">
+              <div class="flex gap-3 min-w-0">
+                <mat-form-field appearance="outline" subscriptSizing="dynamic" style="flex:1;min-width:0;max-width:130px">
+                  <mat-label>Desde</mat-label>
+                  <input matInput [matDatepicker]="pickerFrom" [(ngModel)]="dateFrom">
+                  <mat-datepicker-toggle matIconSuffix [for]="pickerFrom"></mat-datepicker-toggle>
+                  <mat-datepicker #pickerFrom></mat-datepicker>
+                </mat-form-field>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic" style="flex:1;min-width:0;max-width:130px">
+                  <mat-label>Hasta</mat-label>
+                  <input matInput [matDatepicker]="pickerTo" [(ngModel)]="dateTo">
+                  <mat-datepicker-toggle matIconSuffix [for]="pickerTo"></mat-datepicker-toggle>
+                  <mat-datepicker #pickerTo></mat-datepicker>
+                </mat-form-field>
+              </div>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:130px">
+                <mat-label>Tipo</mat-label>
+                <mat-select [(ngModel)]="filterType">
+                  <mat-option value="">Todos</mat-option>
+                  <mat-option value="F">Falta</mat-option>
+                  <mat-option value="AT">Atrasado</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="md:flex-1" style="min-width:160px">
+                <mat-label>Buscar estudiante</mat-label>
+                <mat-icon matPrefix style="color:var(--muted)">search</mat-icon>
+                <input matInput [(ngModel)]="studentSearch" placeholder="Ej: ANDRADE">
+              </mat-form-field>
+              <div class="flex gap-2 shrink-0">
+                <button mat-flat-button color="primary" (click)="loadAbsences()" style="white-space:nowrap">
+                  <mat-icon>filter_alt</mat-icon> Aplicar filtros
+                </button>
+                <button mat-stroked-button (click)="clearFilters()" style="white-space:nowrap">
+                  Limpiar
+                </button>
+              </div>
+            </div>
+            @if (studentSearch) {
+              <span style="color:var(--muted);font-size:12px;margin-top:8px">{{filteredAbsences().length}} de {{absences().length}}</span>
+            }
           </div>
 
           @if (absLoading()) {
@@ -209,6 +229,11 @@ import { AbsenceSavedSnackbarComponent } from '../../shared/components/absence-s
             <div class="empty-state">
               <mat-icon style="font-size:40px;width:40px;height:40px;color:var(--border)">event_available</mat-icon>
               <div style="margin-top:8px;color:var(--ink-soft)">Sin inasistencias con estos filtros</div>
+            </div>
+          } @else if (!filteredAbsences().length) {
+            <div class="empty-state">
+              <mat-icon style="font-size:40px;width:40px;height:40px;color:var(--border)">search_off</mat-icon>
+              <div style="margin-top:8px;color:var(--ink-soft)">Ningún estudiante coincide con "{{studentSearch}}"</div>
             </div>
           } @else {
             <div class="data-table-wrap">
@@ -224,7 +249,7 @@ import { AbsenceSavedSnackbarComponent } from '../../shared/components/absence-s
                   </tr>
                 </thead>
                 <tbody>
-                  @for (a of absences(); track a.id) {
+                  @for (a of filteredAbsences(); track a.id) {
                     <tr>
                       <td style="font-weight:500">{{a.studentName}}</td>
                       <td style="color:var(--muted-strong);white-space:nowrap">{{a.date}}</td>
@@ -281,6 +306,7 @@ export class AbsencesComponent implements OnInit {
   dateFrom: Date | null = null;
   dateTo: Date | null = null;
   filterType = '';
+  studentSearch = '';
   private notificationTemplate = DEFAULT_NOTIFICATION_TEMPLATE;
 
   async ngOnInit(): Promise<void> {
@@ -333,6 +359,20 @@ export class AbsencesComponent implements OnInit {
       const data = await firstValueFrom(this.http.get<Absence[]>(`/api/absences?${params.join('&')}`));
       this.absences.set(data);
     } finally { this.absLoading.set(false); }
+  }
+
+  filteredAbsences(): Absence[] {
+    const q = this.studentSearch.trim().toLowerCase();
+    if (!q) return this.absences();
+    return this.absences().filter(a => a.studentName.toLowerCase().includes(q));
+  }
+
+  clearFilters(): void {
+    this.dateFrom = null;
+    this.dateTo = null;
+    this.filterType = '';
+    this.studentSearch = '';
+    this.loadAbsences();
   }
 
   onDrop(e: DragEvent): void {
