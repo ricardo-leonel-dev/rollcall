@@ -1,6 +1,7 @@
 {
   "name": "asistencia-frontend",
   "version": "1.0.0",
+  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
