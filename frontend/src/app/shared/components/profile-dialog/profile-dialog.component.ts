@@ -6,9 +6,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
+import { NotificationService } from '../../../core/services/notification.service';
 
 export const DEFAULT_NOTIFICATION_TEMPLATE =
   'Estimado representante, le informamos que {{nombre}} registró {{tipo}} el día {{fecha}} en el curso {{curso}}. Por favor comuníquese con la institución para más información.';
@@ -46,7 +46,7 @@ interface Me {
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatIconModule, MatSnackBarModule],
+  imports: [FormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatIconModule],
   styles: [`
     .section { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border-soft); }
     .section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
@@ -161,7 +161,7 @@ interface Me {
 export class ProfileDialogComponent implements OnInit {
   readonly dialogRef = inject(MatDialogRef<ProfileDialogComponent>);
   private readonly http = inject(HttpClient);
-  private readonly snack = inject(MatSnackBar);
+  private readonly notify = inject(NotificationService);
   private readonly auth = inject(AuthService);
 
   readonly presets = AVATAR_PRESETS;
@@ -205,17 +205,17 @@ export class ProfileDialogComponent implements OnInit {
     try {
       await firstValueFrom(this.http.put('/api/auth/me', { fullName: this.fullName, email: this.email }));
       this.auth.updateLocalUser({ fullName: this.fullName, email: this.email });
-      this.snack.open('Perfil actualizado', '', { duration: 2000 });
+      this.notify.success('Perfil actualizado');
     } finally { this.savingProfile.set(false); }
   }
 
   async savePassword(): Promise<void> {
     if (!this.currentPassword || !this.newPassword) {
-      this.snack.open('Completa la contraseña actual y la nueva', '', { duration: 3000 });
+      this.notify.warning('Completa la contraseña actual y la nueva');
       return;
     }
     if (this.newPassword !== this.confirmPassword) {
-      this.snack.open('Las contraseñas nuevas no coinciden', '', { duration: 3000 });
+      this.notify.warning('Las contraseñas nuevas no coinciden');
       return;
     }
     this.savingPassword.set(true);
@@ -224,9 +224,9 @@ export class ProfileDialogComponent implements OnInit {
         currentPassword: this.currentPassword, newPassword: this.newPassword,
       }));
       this.currentPassword = ''; this.newPassword = ''; this.confirmPassword = '';
-      this.snack.open('Contraseña actualizada', '', { duration: 2000 });
+      this.notify.success('Contraseña actualizada');
     } catch (err: any) {
-      this.snack.open('Error: ' + (err?.error?.error ?? 'No se pudo cambiar la contraseña'), '', { duration: 4000 });
+      this.notify.error(err?.error?.error ?? 'No se pudo cambiar la contraseña');
     } finally { this.savingPassword.set(false); }
   }
 
@@ -237,7 +237,7 @@ export class ProfileDialogComponent implements OnInit {
       this.avatarUrl.set(me.avatarUrl);
       this.selectedPreset.set(id);
       this.auth.updateLocalUser({ avatarUrl: me.avatarUrl });
-      this.snack.open('Avatar actualizado', '', { duration: 2000 });
+      this.notify.success('Avatar actualizado');
     } finally { this.savingAvatar.set(false); }
   }
 
@@ -252,9 +252,9 @@ export class ProfileDialogComponent implements OnInit {
       this.avatarUrl.set(me.avatarUrl);
       this.selectedPreset.set(null);
       this.auth.updateLocalUser({ avatarUrl: me.avatarUrl });
-      this.snack.open('Foto actualizada', '', { duration: 2000 });
+      this.notify.success('Foto actualizada');
     } catch (err: any) {
-      this.snack.open('Error: ' + (err?.error?.error ?? 'No se pudo subir la foto'), '', { duration: 4000 });
+      this.notify.error(err?.error?.error ?? 'No se pudo subir la foto');
     } finally { this.savingAvatar.set(false); }
   }
 
@@ -262,7 +262,7 @@ export class ProfileDialogComponent implements OnInit {
     this.savingTemplate.set(true);
     try {
       await firstValueFrom(this.http.put('/api/auth/me', { notificationTemplate: this.template() }));
-      this.snack.open('Mensaje guardado', '', { duration: 2000 });
+      this.notify.success('Mensaje guardado');
     } finally { this.savingTemplate.set(false); }
   }
 }

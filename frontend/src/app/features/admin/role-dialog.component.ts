@@ -5,9 +5,9 @@ import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import { Role } from '../../core/models/index';
+import { NotificationService } from '../../core/services/notification.service';
 
 export interface RoleDialogData {
   mode: 'create' | 'edit';
@@ -17,7 +17,7 @@ export interface RoleDialogData {
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatSnackBarModule],
+  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule],
   template: `
     <h2 mat-dialog-title style="font-family:'Nunito',sans-serif">{{data.mode === 'edit' ? 'Editar rol' : 'Nuevo rol'}}</h2>
     <mat-dialog-content>
@@ -42,7 +42,7 @@ export class RoleDialogComponent {
   readonly dialogRef = inject(MatDialogRef<RoleDialogComponent, Role | false>);
   readonly data: RoleDialogData = inject(MAT_DIALOG_DATA);
   private readonly http = inject(HttpClient);
-  private readonly snack = inject(MatSnackBar);
+  private readonly notify = inject(NotificationService);
 
   name = this.data.role?.name ?? '';
   description = this.data.role?.description ?? '';
@@ -55,14 +55,14 @@ export class RoleDialogComponent {
       let saved: Role;
       if (this.data.mode === 'edit') {
         saved = await firstValueFrom(this.http.put<Role>(`/api/roles/${this.data.role!.id}`, { name: this.name, description: this.description || null }));
-        this.snack.open('Rol actualizado', '', { duration: 2000 });
+        this.notify.success('Rol actualizado');
       } else {
         saved = await firstValueFrom(this.http.post<Role>('/api/roles', { name: this.name, description: this.description || null }));
-        this.snack.open('Rol creado', '', { duration: 2000 });
+        this.notify.success('Rol creado');
       }
       this.dialogRef.close(saved);
     } catch (err: any) {
-      this.snack.open(err?.error?.error ?? 'Error al guardar', '', { duration: 4000 });
+      this.notify.error(err?.error?.error ?? 'Error al guardar');
     } finally {
       this.saving.set(false);
     }

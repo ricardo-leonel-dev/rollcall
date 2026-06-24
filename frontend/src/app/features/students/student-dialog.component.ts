@@ -6,11 +6,11 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { firstValueFrom } from 'rxjs';
 import { Student, AcademicYear, Course, Enrollment, Guardian } from '../../core/models/index';
 import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
+import { NotificationService } from '../../core/services/notification.service';
 
 export interface StudentDialogData {
   mode: 'create' | 'edit';
@@ -23,7 +23,7 @@ export interface StudentDialogData {
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatSnackBarModule, MatDatepickerModule],
+  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatDatepickerModule],
   styles: [`
     .section-title {
       font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
@@ -88,7 +88,7 @@ export class StudentDialogComponent {
   readonly dialogRef = inject(MatDialogRef<StudentDialogComponent, boolean>);
   readonly data: StudentDialogData = inject(MAT_DIALOG_DATA);
   private readonly http = inject(HttpClient);
-  private readonly snack = inject(MatSnackBar);
+  private readonly notify = inject(NotificationService);
 
   name = this.data.student?.name ?? '';
   idNumber = this.data.student?.idNumber ?? '';
@@ -111,7 +111,7 @@ export class StudentDialogComponent {
   }
 
   async save(): Promise<void> {
-    if (!this.name) { this.snack.open('El nombre es requerido', '', { duration: 3000 }); return; }
+    if (!this.name) { this.notify.warning('El nombre es requerido'); return; }
     this.saving.set(true);
     const studentBody = { name: this.name, idNumber: this.idNumber || null, gender: this.gender || null, birthDate: this.birthDate ? dateToDateString(this.birthDate) : null };
     const guardianBody = { name: this.guardianName, idNumber: this.guardianIdNumber, phone: this.guardianPhone, email: this.guardianEmail };
@@ -127,7 +127,7 @@ export class StudentDialogComponent {
             await firstValueFrom(this.http.put(`/api/enrollments/${e.enrollmentId}`, { guardianId: guardian.id }));
           }
         }
-        this.snack.open('Guardado', '', { duration: 2000 });
+        this.notify.success('Guardado');
       } else {
         const student = await firstValueFrom(this.http.post<Student>('/api/students', studentBody));
         if (this.selYear && this.selCourse) {
@@ -140,11 +140,11 @@ export class StudentDialogComponent {
             studentId: student.id, courseId: this.selCourse, academicYearId: this.selYear, guardianId,
           }));
         }
-        this.snack.open('Estudiante creado', '', { duration: 2000 });
+        this.notify.success('Estudiante creado');
       }
       this.dialogRef.close(true);
     } catch (err: any) {
-      this.snack.open(err?.error?.error ?? 'Error al guardar', '', { duration: 4000 });
+      this.notify.error(err?.error?.error ?? 'Error al guardar');
     } finally {
       this.saving.set(false);
     }

@@ -8,13 +8,13 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { AcademicYear, Course, User, Role, RolePermission, Institution } from '../../core/models/index';
 import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { InstitutionDialogComponent } from './institution-dialog.component';
 import { AcademicYearDialogComponent } from './academic-year-dialog.component';
@@ -27,7 +27,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule,
-            MatInputModule, MatButtonModule, MatIconModule, MatCheckboxModule, MatSnackBarModule],
+            MatInputModule, MatButtonModule, MatIconModule, MatCheckboxModule],
   styles: [`
     .tab-content { padding: 20px; }
     .admin-row {
@@ -356,7 +356,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
 })
 export class AdminComponent implements OnInit {
   private readonly http = inject(HttpClient);
-  private readonly snack = inject(MatSnackBar);
+  private readonly notify = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
   readonly auth = inject(AuthService);
   readonly institutionContext = inject(InstitutionContextService);
@@ -411,7 +411,7 @@ export class AdminComponent implements OnInit {
 
   async activateYear(id: number): Promise<void> {
     await firstValueFrom(this.http.put(`/api/academic-years/${id}`, { isActive: true }));
-    this.snack.open('Año lectivo activado', '', { duration: 2000 });
+    this.notify.success('Año lectivo activado');
     await this.loadAll();
   }
 
@@ -487,7 +487,7 @@ export class AdminComponent implements OnInit {
     formData.append('logo', file);
     await firstValueFrom(this.http.post(`/api/institutions/${id}/logo/upload`, formData));
     await this.institutionContext.loadInstitutions();
-    this.snack.open('Logo actualizado', '', { duration: 2000 });
+    this.notify.success('Logo actualizado');
   }
 
   deleteUser(id: number): void {
@@ -505,7 +505,7 @@ export class AdminComponent implements OnInit {
     const academicYearId = this.academicYearContext.selectedId();
     if (!academicYearId) return;
     await firstValueFrom(this.http.put(`/api/users/${userId}/courses`, { academicYearId, courseIds }));
-    this.snack.open('Cursos actualizados', '', { duration: 2000 });
+    this.notify.success('Cursos actualizados');
     await this.loadAll();
   }
 
@@ -513,7 +513,7 @@ export class AdminComponent implements OnInit {
 
   async updateUserModules(userId: number, moduleKeys: string[]): Promise<void> {
     await firstValueFrom(this.http.put(`/api/users/${userId}/modules`, { moduleKeys }));
-    this.snack.open('Módulos actualizados', '', { duration: 2000 });
+    this.notify.success('Módulos actualizados');
     await this.loadAll();
   }
 
@@ -540,7 +540,7 @@ export class AdminComponent implements OnInit {
   async savePermissions(): Promise<void> {
     if (!this.selRole) return;
     await firstValueFrom(this.http.put(`/api/roles/permissions/${this.selRole}`, this.permissions()));
-    this.snack.open('Permisos guardados', '', { duration: 2000 });
+    this.notify.success('Permisos guardados');
   }
 
   async onRosterFile(e: Event): Promise<void> {
@@ -553,9 +553,9 @@ export class AdminComponent implements OnInit {
       fd.append('file', file);
       const result = await firstValueFrom(this.http.post<any>('/api/import/roster', fd));
       this.importResult.set(result);
-      this.snack.open('Nómina importada correctamente', '', { duration: 3000 });
+      this.notify.success('Nómina importada correctamente', { duration: 3000 });
     } catch (err: any) {
-      this.snack.open('Error: ' + (err?.error?.error ?? 'Error al importar'), '', { duration: 5000 });
+      this.notify.error(err?.error?.error ?? 'Error al importar', { duration: 5000 });
     } finally { this.importLoading.set(false); }
   }
 }

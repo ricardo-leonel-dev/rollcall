@@ -6,10 +6,10 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import { User, Role, Institution } from '../../core/models/index';
 import { AuthService } from '../../core/services/auth.service';
+import { NotificationService } from '../../core/services/notification.service';
 
 export interface UserDialogData {
   mode: 'create' | 'edit';
@@ -21,7 +21,7 @@ export interface UserDialogData {
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatSnackBarModule],
+  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule],
   template: `
     <h2 mat-dialog-title style="font-family:'Nunito',sans-serif">{{data.mode === 'edit' ? 'Editar usuario' : 'Nuevo usuario'}}</h2>
     <mat-dialog-content>
@@ -68,7 +68,7 @@ export class UserDialogComponent {
   readonly dialogRef = inject(MatDialogRef<UserDialogComponent, boolean>);
   readonly data: UserDialogData = inject(MAT_DIALOG_DATA);
   private readonly http = inject(HttpClient);
-  private readonly snack = inject(MatSnackBar);
+  private readonly notify = inject(NotificationService);
   readonly auth = inject(AuthService);
 
   username = this.data.user?.username ?? '';
@@ -92,17 +92,17 @@ export class UserDialogComponent {
         const body: Record<string, unknown> = { fullName: this.fullName, email: this.email, roleId: this.roleId };
         if (this.password) body['password'] = this.password;
         await firstValueFrom(this.http.put(`/api/users/${this.data.user!.id}`, body));
-        this.snack.open('Usuario actualizado', '', { duration: 2000 });
+        this.notify.success('Usuario actualizado');
       } else {
         await firstValueFrom(this.http.post('/api/users', {
           username: this.username, password: this.password, fullName: this.fullName,
           email: this.email, roleId: this.roleId, institutionId: this.institutionId,
         }));
-        this.snack.open('Usuario creado', '', { duration: 2000 });
+        this.notify.success('Usuario creado');
       }
       this.dialogRef.close(true);
     } catch (err: any) {
-      this.snack.open(err?.error?.error ?? 'Error al guardar', '', { duration: 4000 });
+      this.notify.error(err?.error?.error ?? 'Error al guardar');
     } finally {
       this.saving.set(false);
     }

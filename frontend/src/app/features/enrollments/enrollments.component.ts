@@ -6,18 +6,18 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { firstValueFrom } from 'rxjs';
 import { Enrollment, AcademicYear, Course } from '../../core/models/index';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { dateToDateString } from '../../shared/utils/date.util';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule, MatSnackBarModule, MatDatepickerModule, WhatsappIconComponent],
+  imports: [FormsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule, MatDatepickerModule, WhatsappIconComponent],
   template: `
     <div class="page-header">
       <h1 class="page-title">Matrículas</h1>
@@ -145,7 +145,7 @@ import { dateToDateString } from '../../shared/utils/date.util';
 })
 export class EnrollmentsComponent implements OnInit {
   private readonly http = inject(HttpClient);
-  private readonly snack = inject(MatSnackBar);
+  private readonly notify = inject(NotificationService);
   readonly academicYearContext = inject(AcademicYearContextService);
 
   readonly courses = signal<Course[]>([]);
@@ -206,7 +206,7 @@ export class EnrollmentsComponent implements OnInit {
       a.click();
       URL.revokeObjectURL(blobUrl);
     } catch {
-      this.snack.open('Error al exportar', '', { duration: 3000 });
+      this.notify.error('Error al exportar');
     }
   }
 }

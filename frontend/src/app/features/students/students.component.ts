@@ -5,11 +5,11 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom, debounceTime, distinctUntilChanged, Subject } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Student, AcademicYear, Course, Enrollment } from '../../core/models/index';
+import { NotificationService } from '../../core/services/notification.service';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { StudentDialogComponent } from './student-dialog.component';
 import { StudentDetailDialogComponent } from './student-detail-dialog.component';
@@ -17,7 +17,7 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule, MatSnackBarModule],
+  imports: [FormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule],
   template: `
     <div class="page-header">
       <h1 class="page-title">Estudiantes</h1>
@@ -106,7 +106,7 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
 })
 export class StudentsComponent implements OnInit {
   private readonly http = inject(HttpClient);
-  private readonly snack = inject(MatSnackBar);
+  private readonly notify = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
 
   readonly students = signal<Student[]>([]);
@@ -176,7 +176,7 @@ export class StudentsComponent implements OnInit {
     }).afterClosed().subscribe(async ok => {
       if (!ok) return;
       await firstValueFrom(this.http.delete(`/api/students/${id}`));
-      this.snack.open('Eliminado', '', { duration: 2000 });
+      this.notify.success('Eliminado');
       await this.loadStudents(this.searchTerm);
     });
   }

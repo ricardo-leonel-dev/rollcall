@@ -54,8 +54,7 @@ html.dark {
 html.dark .mat-mdc-dialog-surface,
 html.dark .mat-mdc-select-panel,
 html.dark .mat-mdc-autocomplete-panel,
-html.dark .mat-mdc-menu-panel,
-html.dark .mat-mdc-snack-bar-container .mdc-snackbar__surface {
+html.dark .mat-mdc-menu-panel {
   background: var(--paper) !important;
   color: var(--ink-soft) !important;
 }
@@ -196,7 +195,15 @@ body {
 .mdc-tab--active .mdc-tab__text-label { color: var(--accent) !important; font-weight: 600 !important; }
 .mdc-tab-indicator__content--underline { border-color: var(--accent) !important; }
 
-.mat-mdc-snack-bar-container { border-radius: 12px !important; }
+/* Toasts custom (app-toast-panel, ver NotificationService/ToastComponent) traen su
+   propia tarjeta "paper" — hay que anular la superficie MDC default (fondo, padding,
+   shadow, radius del tema indigo-pink) para que no quede una caja dentro de otra. */
+.app-toast-panel .mdc-snackbar__surface {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
 
 /* Stepper (mat-stepper) — Material 22's stepper reads its colors from these
    M3 tokens rather than fixed classes, so recasting it into the ledger's

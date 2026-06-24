@@ -1,10 +1,10 @@
 import { Component, ChangeDetectionStrategy, effect, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { filter, interval } from 'rxjs';
 import { AuthService } from './core/services/auth.service';
 import { ThemeService } from './core/services/theme.service';
+import { NotificationService } from './core/services/notification.service';
 
 const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 
@@ -19,7 +19,7 @@ export class AppComponent {
   private readonly auth = inject(AuthService);
   private readonly theme = inject(ThemeService);
   private readonly swUpdate = inject(SwUpdate);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly notify = inject(NotificationService);
 
   constructor() {
     effect(() => {
@@ -46,9 +46,10 @@ export class AppComponent {
   }
 
   private promptUpdate(): void {
-    const ref = this.snackBar.open('Hay una nueva versión disponible', 'Actualizar', { duration: 0 });
-    ref.onAction().subscribe(() => {
-      this.swUpdate.activateUpdate().then(() => document.location.reload());
+    this.notify.info('Hay una nueva versión disponible', {
+      actionLabel: 'Actualizar',
+      duration: 0,
+      onAction: () => this.swUpdate.activateUpdate().then(() => document.location.reload()),
     });
   }
 }

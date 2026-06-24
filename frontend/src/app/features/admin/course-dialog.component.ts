@@ -5,9 +5,9 @@ import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import { Course } from '../../core/models/index';
+import { NotificationService } from '../../core/services/notification.service';
 
 export interface CourseDialogData {
   mode: 'create' | 'edit';
@@ -17,7 +17,7 @@ export interface CourseDialogData {
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatSnackBarModule],
+  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule],
   template: `
     <h2 mat-dialog-title style="font-family:'Nunito',sans-serif">{{data.mode === 'edit' ? 'Editar curso' : 'Nuevo curso'}}</h2>
     <mat-dialog-content>
@@ -38,7 +38,7 @@ export class CourseDialogComponent {
   readonly dialogRef = inject(MatDialogRef<CourseDialogComponent, boolean>);
   readonly data: CourseDialogData = inject(MAT_DIALOG_DATA);
   private readonly http = inject(HttpClient);
-  private readonly snack = inject(MatSnackBar);
+  private readonly notify = inject(NotificationService);
 
   name = this.data.course?.name ?? '';
   readonly saving = signal(false);
@@ -49,14 +49,14 @@ export class CourseDialogComponent {
     try {
       if (this.data.mode === 'edit') {
         await firstValueFrom(this.http.put(`/api/courses/${this.data.course!.id}`, { name: this.name }));
-        this.snack.open('Curso actualizado', '', { duration: 2000 });
+        this.notify.success('Curso actualizado');
       } else {
         await firstValueFrom(this.http.post('/api/courses', { name: this.name }));
-        this.snack.open('Curso creado', '', { duration: 2000 });
+        this.notify.success('Curso creado');
       }
       this.dialogRef.close(true);
     } catch (err: any) {
-      this.snack.open(err?.error?.error ?? 'Error al guardar', '', { duration: 4000 });
+      this.notify.error(err?.error?.error ?? 'Error al guardar');
     } finally {
       this.saving.set(false);
     }

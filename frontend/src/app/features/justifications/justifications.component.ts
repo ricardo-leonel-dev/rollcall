@@ -6,18 +6,18 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { Justification, Course, Enrollment, Absence } from '../../core/models/index';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { JustificationCreateDialogComponent, JustifyGroup } from './justification-create-dialog.component';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule, MatSnackBarModule],
+  imports: [FormsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule],
   styles: [`
     /* Same pinned-evidence language as the "Nueva justificación" wizard, so a
        photo looks like the same object whether it's mid-upload there or
@@ -220,7 +220,7 @@ import { JustificationCreateDialogComponent, JustifyGroup } from './justificatio
 })
 export class JustificationsComponent implements OnInit {
   private readonly http = inject(HttpClient);
-  private readonly snack = inject(MatSnackBar);
+  private readonly notify = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
   readonly academicYearContext = inject(AcademicYearContextService);
 
@@ -347,10 +347,10 @@ export class JustificationsComponent implements OnInit {
     for (const f of files) fd.append('files', f);
     try {
       await firstValueFrom(this.http.post(`/api/justifications/${justificationId}/attachments`, fd));
-      this.snack.open('Adjunto(s) agregado(s)', '', { duration: 2000 });
+      this.notify.success('Adjunto(s) agregado(s)');
       await this.load();
     } catch (err: any) {
-      this.snack.open(err?.error?.error ?? 'Error al subir archivo', '', { duration: 4000 });
+      this.notify.error(err?.error?.error ?? 'Error al subir archivo');
     }
   }
 
@@ -361,7 +361,7 @@ export class JustificationsComponent implements OnInit {
     }).afterClosed().subscribe(async ok => {
       if (!ok) return;
       await firstValueFrom(this.http.delete(`/api/justifications/${justificationId}/attachments/${attachmentId}`));
-      this.snack.open('Adjunto eliminado', '', { duration: 2000 });
+      this.notify.success('Adjunto eliminado');
       await this.load();
     });
   }
@@ -375,7 +375,7 @@ export class JustificationsComponent implements OnInit {
   async saveEdit(id: number): Promise<void> {
     await firstValueFrom(this.http.put(`/api/justifications/${id}`, { reason: this.editReason, notifiedBy: this.editNotifiedBy }));
     this.editingId.set(null);
-    this.snack.open('Justificación actualizada', '', { duration: 2000 });
+    this.notify.success('Justificación actualizada');
     await this.load();
   }
 
@@ -386,7 +386,7 @@ export class JustificationsComponent implements OnInit {
     }).afterClosed().subscribe(async ok => {
       if (!ok) return;
       await firstValueFrom(this.http.delete(`/api/justifications/${id}`));
-      this.snack.open('Eliminada', '', { duration: 2000 });
+      this.notify.success('Eliminada');
       await this.load();
     });
   }

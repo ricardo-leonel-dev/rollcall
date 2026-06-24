@@ -7,9 +7,9 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import { Absence } from '../../core/models/index';
+import { NotificationService } from '../../core/services/notification.service';
 
 export interface JustifyGroup { weekKey: string; absences: Absence[]; }
 
@@ -37,7 +37,7 @@ const MAX_FILES_PER_GROUP = 5;
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatDialogModule, MatStepperModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule, MatSnackBarModule],
+  imports: [FormsModule, MatDialogModule, MatStepperModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule],
   styles: [`
     mat-form-field { width: 100%; }
     .step-hint { font-size: 12px; color: var(--muted-strong); margin-bottom: 12px; }
@@ -204,7 +204,7 @@ export class JustificationCreateDialogComponent {
   readonly dialogRef = inject(MatDialogRef<JustificationCreateDialogComponent, boolean>);
   readonly data: JustificationCreateDialogData = inject(MAT_DIALOG_DATA);
   private readonly http = inject(HttpClient);
-  private readonly snack = inject(MatSnackBar);
+  private readonly notify = inject(NotificationService);
 
   readonly MAX_FILES_PER_GROUP = MAX_FILES_PER_GROUP;
   readonly steps = signal<WizardStep[]>(
@@ -240,11 +240,11 @@ export class JustificationCreateDialogComponent {
     const valid: File[] = [];
     for (const f of files) {
       if (!ALLOWED_TYPES.includes(f.type)) {
-        this.snack.open(`${f.name}: tipo no permitido`, '', { duration: 3000 });
+        this.notify.warning(`${f.name}: tipo no permitido`);
         continue;
       }
       if (f.size > MAX_FILE_MB * 1024 * 1024) {
-        this.snack.open(`${f.name}: supera ${MAX_FILE_MB}MB`, '', { duration: 3000 });
+        this.notify.warning(`${f.name}: supera ${MAX_FILE_MB}MB`);
         continue;
       }
       valid.push(f);
@@ -284,9 +284,9 @@ export class JustificationCreateDialogComponent {
     if (errors.length === 0 && okCount > 0) {
       this.justSaved.set(true);
       await new Promise(r => setTimeout(r, 650));
-      this.snack.open(`${okCount} justificación(es) creada(s)`, '', { duration: 4000 });
+      this.notify.success(`${okCount} justificación(es) creada(s)`, { duration: 4000 });
     } else {
-      this.snack.open(`${okCount} creada(s), ${errors.length} con error`, '', { duration: 4000 });
+      this.notify.warning(`${okCount} creada(s), ${errors.length} con error`, { duration: 4000 });
     }
     this.saving.set(false);
     this.dialogRef.close(okCount > 0);

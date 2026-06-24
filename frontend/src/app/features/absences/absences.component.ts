@@ -7,7 +7,6 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
 import { MatDatepickerModule } from '@angular/material/datepicker';
@@ -15,17 +14,17 @@ import { firstValueFrom } from 'rxjs';
 import { Course, Enrollment, Absence, OcrResult } from '../../core/models/index';
 import { dateToDateString } from '../../shared/utils/date.util';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { DEFAULT_NOTIFICATION_TEMPLATE } from '../../shared/components/profile-dialog/profile-dialog.component';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AbsenceRangeDialogComponent, AbsenceRangeDialogResult } from './absence-range-dialog.component';
-import { AbsenceSavedSnackbarComponent } from '../../shared/components/absence-saved-snackbar/absence-saved-snackbar.component';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule,
-            MatButtonModule, MatIconModule, MatSnackBarModule, MatTooltipModule, MatDatepickerModule, WhatsappIconComponent],
+            MatButtonModule, MatIconModule, MatTooltipModule, MatDatepickerModule, WhatsappIconComponent],
   styles: [`
     .tab-content { padding: 20px 0; }
     .enroll-row {
@@ -287,7 +286,7 @@ import { AbsenceSavedSnackbarComponent } from '../../shared/components/absence-s
 })
 export class AbsencesComponent implements OnInit {
   private readonly http = inject(HttpClient);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly notify = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
   readonly academicYearContext = inject(AcademicYearContextService);
 
@@ -388,7 +387,7 @@ export class AbsencesComponent implements OnInit {
 
   async processPhoto(file: File): Promise<void> {
     if (!this.selCourse || !this.selYear) {
-      this.snackBar.open('Selecciona un curso y año lectivo primero', '', { duration: 3000 });
+      this.notify.warning('Selecciona un curso y año lectivo primero');
       return;
     }
     this.ocrLoading.set(true);
@@ -403,7 +402,7 @@ export class AbsencesComponent implements OnInit {
       this.ocrResult.set(result);
       await this.loadAbsences();
     } catch (err: any) {
-      this.snackBar.open('Error: ' + (err?.error?.detail ?? err.message), '', { duration: 5000 });
+      this.notify.error(err?.error?.detail ?? err.message, { duration: 5000 });
     } finally { this.ocrLoading.set(false); }
   }
 
@@ -431,16 +430,15 @@ export class AbsencesComponent implements OnInit {
         : `${result.created} registro(s) creado(s)`;
       const link = enrollment.whatsappLink;
       const dateLabel = f.dateFrom === f.dateTo ? f.dateFrom : `${f.dateFrom} al ${f.dateTo}`;
-      this.snackBar.openFromComponent(AbsenceSavedSnackbarComponent, {
+      this.notify.success(msg, {
         duration: 10000,
-        data: {
-          message: msg,
-          onNotify: link ? () => this.notifyGuardian(link, enrollment.fullName, dateLabel, type, enrollment.course) : undefined,
-        },
+        actionLabel: link ? 'Enviar WhatsApp' : undefined,
+        actionIcon: 'whatsapp',
+        onAction: link ? () => this.notifyGuardian(link, enrollment.fullName, dateLabel, type, enrollment.course) : undefined,
       });
       await Promise.all([this.loadTodayAbsences(), this.loadAbsences()]);
     } catch (err: any) {
-      this.snackBar.open('Error: ' + (err?.error?.error ?? 'No se pudo guardar'), '', { duration: 4000 });
+      this.notify.error(err?.error?.error ?? 'No se pudo guardar');
     }
   }
 
@@ -461,7 +459,7 @@ export class AbsencesComponent implements OnInit {
   }
 
   openManualAdd(name: string): void {
-    this.snackBar.open(`Busca "${name}" en la pestaña Manual`, '', { duration: 2000 });
+    this.notify.info(`Busca "${name}" en la pestaña Manual`);
   }
 
   deleteAbsence(a: Absence): void {
