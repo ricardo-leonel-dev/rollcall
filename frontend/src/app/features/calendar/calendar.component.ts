@@ -136,7 +136,7 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
       .month-tally { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
       .month-nav { display: flex; align-items: center; gap: 4px; }
       .nav-btn, .today-btn { cursor: pointer; transition: all .15s ease; background: transparent; }
-      .nav-btn { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: var(--muted-strong); border: 1px solid transparent; }
+      .nav-btn { width: 34px; height: 34px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; color: var(--muted-strong); border: 1px solid transparent; }
       .nav-btn:hover { background: var(--paper-deep); color: var(--ink-soft); }
       .today-btn { font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 999px; border: 1px dashed #c4b5a0; color: var(--muted-strong); margin: 0 4px; }
       .today-btn:hover { background: #fef3e2; color: #92400e; }
@@ -146,7 +146,7 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
       .week-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 6px; margin-bottom: 6px; }
       .month-slide-next .week-grid { animation: slideInRight .32s ease both; }
       .month-slide-prev .week-grid { animation: slideInLeft .32s ease both; }
-      .day-cell { position: relative; min-height: 90px; border-radius: 13px; padding: 8px; border: 1px solid transparent; display: flex; flex-direction: column; transition: transform .15s ease, box-shadow .15s ease; animation: cellIn .35s ease both; animation-delay: calc(var(--i,0) * 12ms); }
+      .day-cell { position: relative; min-height: 90px; border-radius: var(--radius-md); padding: 8px; border: 1px solid transparent; display: flex; flex-direction: column; transition: transform .15s ease, box-shadow .15s ease; animation: cellIn .35s ease both; animation-delay: calc(var(--i,0) * 12ms); }
       .day-cell.out { opacity: .35; }
       .day-cell.has-records { cursor: pointer; background: var(--paper); border-color: #eee5d3; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
       .day-cell.has-records:hover { transform: translateY(-3px); box-shadow: 0 12px 20px -12px rgba(15,23,42,.22); }
@@ -160,7 +160,7 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
       .detail-date { font-family: 'Nunito', sans-serif; font-size: 16px; font-weight: 600; color: var(--ink); }
       .detail-count { font-size: 12px; color: var(--muted); }
       .detail-list { display: flex; flex-direction: column; gap: 6px; }
-      .detail-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border-radius: 10px; background: var(--paper-deep); border: 1px solid var(--border-soft); font-size: 13px; }
+      .detail-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border-radius: var(--radius-sm); background: var(--paper-deep); border: 1px solid var(--border-soft); font-size: 13px; }
       .detail-name { font-weight: 600; color: #292524; }
       .detail-meta { color: var(--muted); font-size: 12px; }
       @keyframes cellIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
@@ -171,7 +171,7 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
         .month-title { font-size: 21px; }
         .weekday-row, .grid-wrap { padding-left: 8px; padding-right: 8px; }
         .week-grid { gap: 4px; }
-        .day-cell { min-height: 60px; padding: 5px; border-radius: 9px; }
+        .day-cell { min-height: 60px; padding: 5px; border-radius: var(--radius-md); }
         .day-num { font-size: 14px; }
         .stamp { font-size: 8.5px; padding: 1px 4px; }
         .detail-panel { margin: 4px 8px 18px; }

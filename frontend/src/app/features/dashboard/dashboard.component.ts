@@ -1,11 +1,13 @@
 import { Component, ChangeDetectionStrategy, signal, computed, inject, OnInit, AfterViewInit, ViewChild, ElementRef, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatTooltipModule, MatTooltip } from '@angular/material/tooltip';
 import { FormsModule } from '@angular/forms';
 import { DashboardSummary, Course } from '../../core/models/index';
 import { firstValueFrom } from 'rxjs';
@@ -20,12 +22,14 @@ type PeriodPreset = 'today' | 'yesterday' | '7d' | '15d' | '30d' | 'full' | 'cus
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatSelectModule, MatFormFieldModule, MatIconModule, MatButtonModule, MatInputModule, MatDatepickerModule, FormsModule],
+  imports: [MatSelectModule, MatFormFieldModule, MatIconModule, MatButtonModule, MatInputModule, MatDatepickerModule, MatTooltipModule, FormsModule],
   styles: [`
     .stat-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
     .stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px -8px rgba(15,23,42,.15) !important; }
     .chart-wrap { position: relative; height: 200px; }
     .top-table tr td:first-child { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .detail-stamps { display: inline-flex; gap: 4px; cursor: pointer; padding: 2px; border-radius: 8px; transition: background .12s ease; }
+    .detail-stamps:hover { background: var(--paper-deep); }
     .alert-bar {
       background: linear-gradient(135deg, #fef2f2, #fff7ed);
       border: 1px dashed #fca5a5;
@@ -212,6 +216,8 @@ type PeriodPreset = 'today' | 'yesterday' | '7d' | '15d' | '30d' | 'full' | 'cus
                 <th>Curso</th>
                 <th style="text-align:center">Faltas</th>
                 <th style="text-align:center">Atrasos</th>
+                <th style="text-align:center">Justificadas</th>
+                <th style="text-align:center">Detalle</th>
               </tr>
             </thead>
             <tbody>
@@ -222,10 +228,23 @@ type PeriodPreset = 'today' | 'yesterday' | '7d' | '15d' | '30d' | 'full' | 'cus
                   <td style="font-size:12px;color:var(--muted-strong)">{{s.course}}</td>
                   <td style="text-align:center"><span class="badge-F">{{s.totalAbsences}}</span></td>
                   <td style="text-align:center"><span class="badge-AT">{{s.totalTardies}}</span></td>
+                  <td style="text-align:center">
+                    @if (s.totalJustified > 0) { <span class="badge-J">{{s.totalJustified}}</span> } @else { <span style="color:var(--border)">—</span> }
+                  </td>
+                  <td style="text-align:center">
+                    <span class="detail-stamps"
+                          #tip="matTooltip"
+                          [matTooltip]="breakdownTooltip(s.breakdown)"
+                          matTooltipClass="detail-tooltip"
+                          (click)="onDetailClick(s, tip)">
+                      @if (s.totalAbsences) { <span class="stamp stamp-f">{{s.totalAbsences}} F</span> }
+                      @if (s.totalTardies)  { <span class="stamp stamp-at">{{s.totalTardies}} AT</span> }
+                    </span>
+                  </td>
                 </tr>
               }
               @if (!summary()!.topStudents?.length) {
-                <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:32px">Sin datos</td></tr>
+                <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px">Sin datos</td></tr>
               }
             </tbody>
           </table>
@@ -240,6 +259,7 @@ type PeriodPreset = 'today' | 'yesterday' | '7d' | '15d' | '30d' | 'full' | 'cus
 })
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
   readonly academicYearContext = inject(AcademicYearContextService);
 
   @ViewChild('barChart')    barChartEl!: ElementRef<HTMLCanvasElement>;
@@ -340,6 +360,30 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         : 'Personalizado';
     }
     return this.periodOptions.find(p => p.value === this.selectedPeriod)?.label ?? '';
+  }
+
+  breakdownTooltip(breakdown: { date: string; type: 'F' | 'AT'; isJustified: boolean }[]): string {
+    if (!breakdown?.length) return 'Sin registros';
+    return breakdown.map(b => {
+      const [, m, d] = b.date.split('-');
+      const label = b.type === 'F' ? 'Falta' : 'Atraso';
+      return `${d}/${m} ${label}${b.isJustified ? ' (justificada)' : ''}`;
+    }).join('\n');
+  }
+
+  onDetailClick(s: { courseId: number; studentName: string }, tip: MatTooltip): void {
+    // En mobile no hay hover — el primer tap debe mostrar el desglose, no
+    // navegar de una. En desktop el hover ya muestra el tooltip, así que el
+    // click navega directo (mismo comportamiento que ya había).
+    if (window.innerWidth < 768) {
+      tip.toggle();
+      return;
+    }
+    this.goToAbsences(s);
+  }
+
+  goToAbsences(s: { courseId: number; studentName: string }): void {
+    this.router.navigate(['/absences'], { queryParams: { course: s.courseId, student: s.studentName } });
   }
 
   private renderCharts(data: DashboardSummary): void {

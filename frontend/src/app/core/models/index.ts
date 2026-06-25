@@ -112,9 +112,12 @@ export interface DashboardSummary {
   topStudents: {
     studentName: string;
     rosterNumber: number | null;
+    courseId: number;
     course: string;
     totalAbsences: number;
     totalTardies: number;
+    totalJustified: number;
+    breakdown: { date: string; type: 'F' | 'AT'; isJustified: boolean }[];
   }[];
   byCourse: { course: string; totalAbsences: number; totalTardies: number }[];
   absencesByDay: { date: string; count: number }[];

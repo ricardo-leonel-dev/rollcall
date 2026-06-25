@@ -29,6 +29,21 @@
   --accent: #6366f1;
   --accent-2: #8b5cf6;
   --accent-soft: #eef2ff;
+
+  /* Escala de radios — 3 niveles para que el chrome estructural (inputs,
+     botones, pills, paneles flotantes, cards, diálogos) comparta la misma
+     "redondez" en vez de valores ad-hoc por componente. Elementos puramente
+     decorativos (stamps, avatares, spinner, badges píldora) quedan afuera
+     de la escala a propósito. */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 16px;
+
+  /* Hook de theming oficial de Material 22 para el radio del notched-outline
+     (inputs/selects outline) — sin esto, Material cae a una CSS var de M3
+     que este theme M2 nunca define, y el lado "trailing" del outline queda
+     sin redondear (ver override explícito más abajo como refuerzo). */
+  --mat-form-field-outlined-container-shape: var(--radius-sm);
 }
 
 html.dark {
@@ -85,7 +100,7 @@ body {
 
 /* ─── Material overrides ────────────────────────────────────────────────── */
 .mat-mdc-card {
-  border-radius: 16px !important;
+  border-radius: var(--radius-lg) !important;
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07) !important;
   border: 1px solid #e2e8f0;
 }
@@ -97,9 +112,22 @@ body {
 }
 /* Each of the 3 notched-outline pieces only owns its own outer corners —
    forcing the same radius on all three breaks the curve where they meet
-   (visible as a kink right at the label notch). */
-.mat-mdc-form-field .mdc-notched-outline__leading  { border-radius: 10px 0 0 10px !important; }
-.mat-mdc-form-field .mdc-notched-outline__trailing { border-radius: 0 10px 10px 0 !important; }
+   (visible as a kink right at the label notch). Longhand explícito (no
+   shorthand border-radius) porque Material 22 ya usa longhand internamente
+   para estas mismas esquinas — mezclar shorthand/longhand contra el mismo
+   selector es lo que dejaba el lado "trailing" sin redondear en producción. */
+.mat-mdc-form-field .mdc-notched-outline__leading {
+  border-top-left-radius: var(--radius-sm) !important;
+  border-bottom-left-radius: var(--radius-sm) !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+.mat-mdc-form-field .mdc-notched-outline__trailing {
+  border-top-right-radius: var(--radius-sm) !important;
+  border-bottom-right-radius: var(--radius-sm) !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
 .mat-mdc-form-field .mdc-notched-outline__notch    { border-radius: 0 !important; }
 
 /* Tighter field height — default MDC outlined fields run tall/empty-looking
@@ -127,14 +155,44 @@ body {
    into the warm paper palette + Nunito so they don't look like a foreign
    widget bolted onto the page. Shadow is tinted from --ink (warm near-black)
    instead of a generic cool slate, to match the rest of the paper palette. */
-.mat-mdc-select-panel, .mat-mdc-autocomplete-panel {
+.mat-mdc-select-panel, .mat-mdc-autocomplete-panel, .mat-mdc-menu-panel {
   background: var(--paper) !important;
   border: 1px solid var(--border-soft) !important;
-  border-radius: 14px !important;
+  border-radius: var(--radius-md) !important;
   box-shadow: 0 2px 6px rgba(30, 27, 22, .06), 0 16px 40px -16px rgba(30, 27, 22, .18) !important;
-  min-width: 280px !important;
   padding: 8px !important;
 }
+.mat-mdc-select-panel, .mat-mdc-autocomplete-panel { min-width: 280px !important; }
+.mat-mdc-menu-item {
+  font-family: 'Nunito', 'Helvetica Neue', sans-serif !important;
+  font-weight: 300 !important;
+  color: var(--ink-soft) !important;
+  border-radius: var(--radius-sm) !important;
+  min-height: 44px !important;
+}
+.mat-mdc-menu-item .mat-icon { color: var(--muted-strong); margin-right: 4px; }
+.mat-mdc-menu-item:hover:not([disabled]) { background: var(--paper-deep) !important; }
+/* El tooltip de Material 22 depende 100% de variables CSS que el theme
+   prebuilt indigo-pink no resuelve de forma confiable (mismo problema ya
+   documentado arriba para diálogos/selects/menús) — sin esto, el tooltip
+   se renderiza sin fondo/color/tipografía, como texto suelto flotando
+   sobre lo que esté debajo. */
+.mat-mdc-tooltip-surface {
+  background: var(--ink) !important;
+  color: var(--paper) !important;
+  font-family: 'Nunito', 'Helvetica Neue', sans-serif !important;
+  font-size: 12px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(30, 27, 22, .25) !important;
+}
+/* Tooltip del desglose de faltas en el Top 10 del Dashboard — por default
+   Material colapsa los saltos de línea, pero acá cada falta va en su
+   propia línea para que el listado sea legible. */
+.detail-tooltip {
+  white-space: pre-line !important;
+  text-align: left !important;
+}
+
 .mat-mdc-option {
   font-family: 'Nunito', 'Helvetica Neue', sans-serif !important;
   /* Nunito reads noticeably heavier than Inter at the same 400 weight —
@@ -142,7 +200,7 @@ body {
      genuinely-bold 600 used for the selected option below. */
   font-weight: 300 !important;
   color: var(--ink-soft) !important;
-  border-radius: 10px !important;
+  border-radius: var(--radius-sm) !important;
   min-height: 44px !important;
   padding: 0 14px !important;
 }
@@ -166,7 +224,7 @@ body {
 /* Dialogs */
 .mat-mdc-dialog-container .mdc-dialog__surface {
   background: var(--paper) !important;
-  border-radius: 16px !important;
+  border-radius: var(--radius-lg) !important;
 }
 .mat-mdc-dialog-title { color: var(--ink) !important; }
 .mat-mdc-dialog-content { color: var(--ink-soft) !important; }
@@ -174,13 +232,13 @@ body {
 .mat-mdc-unelevated-button.mat-primary,
 .mat-mdc-raised-button.mat-primary {
   background-color: var(--accent) !important;
-  border-radius: 10px !important;
+  border-radius: var(--radius-sm) !important;
   font-weight: 600 !important;
   letter-spacing: 0 !important;
 }
 
 .mat-mdc-outlined-button {
-  border-radius: 10px !important;
+  border-radius: var(--radius-sm) !important;
   border-color: #cbd5e1 !important;
   font-weight: 500 !important;
   letter-spacing: 0 !important;
@@ -416,7 +474,7 @@ body {
   /* Ghost icon button — table row actions (edit/delete/etc) */
   .icon-btn {
     width: 34px; height: 34px;
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
     color: var(--muted-strong);
     background: transparent;
     border: 1px solid transparent;
@@ -432,7 +490,7 @@ body {
   /* Action pill — compact colored quick-action (e.g. A / AT roll-call buttons) */
   .action-pill {
     padding: 4px 12px;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     font-size: 12px;
     font-weight: 700;
     border: 1px dashed currentColor;
@@ -451,7 +509,7 @@ body {
      no sellos decorativos sobre datos. */
   .period-pill {
     padding: 6px 14px;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     font-size: 12px;
     font-weight: 700;
     border: 1px dashed var(--border);
@@ -476,7 +534,7 @@ body {
   .modal-panel {
     background: var(--paper);
     border: 1px solid var(--border);
-    border-radius: 18px;
+    border-radius: var(--radius-lg);
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, .35);
     width: 100%;
     max-width: 460px;
@@ -493,7 +551,7 @@ body {
     background: var(--paper);
     border: 1px solid var(--border);
     border-left: 9px solid var(--stripe);
-    border-radius: 18px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 16px 32px -20px rgba(15, 23, 42, 0.18);
   }
