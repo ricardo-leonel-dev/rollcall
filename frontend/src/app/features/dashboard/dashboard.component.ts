@@ -368,7 +368,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       const label = b.type === 'F' ? 'Falta' : 'Atraso';
       return `${d}/${m} ${label}${b.isJustified ? ' (justificada)' : ''}`;
     });
-    if (window.innerWidth < 768) lines.push('', 'Tocá de nuevo para ir a Inasistencias');
+    if (window.innerWidth < 768) lines.push('', 'Toca de nuevo para ir a Inasistencias');
     return lines.join('\n');
   }
 
