@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, signal, inject, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -8,6 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { firstValueFrom } from 'rxjs';
@@ -19,12 +21,13 @@ import { DEFAULT_NOTIFICATION_TEMPLATE } from '../../shared/components/profile-d
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AbsenceRangeDialogComponent, AbsenceRangeDialogResult } from './absence-range-dialog.component';
+import { AbsenceDialogComponent } from './absence-dialog.component';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule,
-            MatButtonModule, MatIconModule, MatTooltipModule, MatDatepickerModule, WhatsappIconComponent],
+            MatButtonModule, MatIconModule, MatTooltipModule, MatMenuModule, MatDatepickerModule, WhatsappIconComponent],
   styles: [`
     .tab-content { padding: 20px 0; }
     .enroll-row {
@@ -51,7 +54,7 @@ import { AbsenceRangeDialogComponent, AbsenceRangeDialogResult } from './absence
       </mat-form-field>
     </div>
 
-    <mat-tab-group style="background:var(--paper);border-radius:16px;border:1px solid var(--border);overflow:hidden">
+    <mat-tab-group [(selectedIndex)]="selectedTabIndex" style="background:var(--paper);border-radius:16px;border:1px solid var(--border);overflow:hidden">
 
       <!-- TAB FOTO -->
       <mat-tab>
@@ -244,7 +247,7 @@ import { AbsenceRangeDialogComponent, AbsenceRangeDialogResult } from './absence
                     <th>Tipo</th>
                     <th>Estado</th>
                     <th>Notas</th>
-                    <th></th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -269,9 +272,20 @@ import { AbsenceRangeDialogComponent, AbsenceRangeDialogResult } from './absence
                             <app-whatsapp-icon [size]="20" />
                           </button>
                         }
-                        <button mat-icon-button style="color:#b91c1c" (click)="deleteAbsence(a)">
+                        <button mat-icon-button style="color:#b91c1c" (click)="deleteAbsence(a)" matTooltip="Eliminar">
                           <mat-icon>delete_outline</mat-icon>
                         </button>
+                        <button mat-icon-button [matMenuTriggerFor]="rowMenu" matTooltip="Más acciones">
+                          <mat-icon>more_vert</mat-icon>
+                        </button>
+                        <mat-menu #rowMenu="matMenu">
+                          <button mat-menu-item (click)="openAbsenceDialog(a, 'view')">
+                            <mat-icon>visibility</mat-icon> Ver
+                          </button>
+                          <button mat-menu-item [disabled]="a.isJustified" (click)="openAbsenceDialog(a, 'edit')">
+                            <mat-icon>edit</mat-icon> Editar
+                          </button>
+                        </mat-menu>
                       </td>
                     </tr>
                   }
@@ -288,6 +302,8 @@ export class AbsencesComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly notify = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   readonly academicYearContext = inject(AcademicYearContextService);
 
   readonly courses = signal<Course[]>([]);
@@ -299,6 +315,7 @@ export class AbsencesComponent implements OnInit {
   readonly absLoading = signal(false);
   readonly todayAbsences = signal<Absence[]>([]);
 
+  selectedTabIndex = 0;
   selYear: number | null = null;
   selCourse: number | null = null;
   photoDate: Date | null = null;
@@ -316,6 +333,16 @@ export class AbsencesComponent implements OnInit {
     this.courses.set(courses);
     this.selYear = this.academicYearContext.selected()?.id ?? null;
     if (me.notificationTemplate) this.notificationTemplate = me.notificationTemplate;
+
+    const params = this.route.snapshot.queryParamMap;
+    const courseParam = params.get('course');
+    if (courseParam) {
+      this.selCourse = Number(courseParam);
+      this.studentSearch = params.get('student') ?? '';
+      this.selectedTabIndex = 2;
+      await this.onFiltersChange();
+      this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+    }
   }
 
   private todayStr(): string { return new Date().toISOString().split('T')[0]; }
@@ -460,6 +487,15 @@ export class AbsencesComponent implements OnInit {
 
   openManualAdd(name: string): void {
     this.notify.info(`Busca "${name}" en la pestaña Manual`);
+  }
+
+  openAbsenceDialog(a: Absence, mode: 'view' | 'edit'): void {
+    this.dialog.open(AbsenceDialogComponent, {
+      width: '420px',
+      data: { absence: a, mode },
+    }).afterClosed().subscribe(async saved => {
+      if (saved) await this.loadAbsences();
+    });
   }
 
   deleteAbsence(a: Absence): void {

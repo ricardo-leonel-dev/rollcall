@@ -5,6 +5,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom, debounceTime, distinctUntilChanged, Subject } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -17,7 +18,7 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule],
+  imports: [FormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule, MatMenuModule],
   template: `
     <div class="page-header">
       <h1 class="page-title">Estudiantes</h1>
@@ -26,7 +27,7 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
       </button>
     </div>
 
-    <div class="filter-bar" style="margin-bottom:0;border-bottom:none;border-radius:16px 16px 0 0">
+    <div class="filter-bar" style="margin-bottom:0;border-bottom:none;border-radius:var(--radius-lg) var(--radius-lg) 0 0">
       <mat-form-field appearance="outline" style="flex:1;max-width:380px">
         <mat-label>Buscar por nombre o cédula</mat-label>
         <mat-icon matPrefix style="color:var(--muted)">search</mat-icon>
@@ -44,7 +45,7 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
       </div>
     } @else {
       <!-- Desktop -->
-      <div class="data-table-wrap hidden md:block" style="border-radius:0 0 16px 16px">
+      <div class="data-table-wrap hidden md:block" style="border-radius:0 0 var(--radius-lg) var(--radius-lg)">
         <table class="data-table">
           <thead>
             <tr>
@@ -52,7 +53,7 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
               <th>Cédula</th>
               <th>Sexo</th>
               <th>F. Nacimiento</th>
-              <th></th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -74,9 +75,14 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
                 </td>
                 <td style="color:var(--muted-strong)">{{s.birthDate ?? '—'}}</td>
                 <td>
-                  <button mat-icon-button style="color:var(--muted)" (click)="openDetail(s);$event.stopPropagation()">
-                    <mat-icon>chevron_right</mat-icon>
+                  <button mat-icon-button style="color:var(--muted)" [matMenuTriggerFor]="rowMenu" (click)="$event.stopPropagation()">
+                    <mat-icon>more_vert</mat-icon>
                   </button>
+                  <mat-menu #rowMenu="matMenu">
+                    <button mat-menu-item (click)="openDetail(s, 'view')"><mat-icon>visibility</mat-icon> Ver</button>
+                    <button mat-menu-item (click)="openDetail(s, 'edit')"><mat-icon>edit</mat-icon> Editar</button>
+                    <button mat-menu-item (click)="deleteStudent(s.id)"><mat-icon>delete</mat-icon> Eliminar</button>
+                  </mat-menu>
                 </td>
               </tr>
             }
@@ -96,7 +102,14 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
                 <div style="font-weight:600;font-size:14px">{{s.name}}</div>
                 <div style="font-size:12px;color:var(--muted);margin-top:2px">{{s.idNumber ?? 'Sin cédula'}} · {{s.gender ?? ''}} · {{s.birthDate ?? ''}}</div>
               </div>
-              <mat-icon style="color:var(--border);margin-left:auto">chevron_right</mat-icon>
+              <button mat-icon-button style="color:var(--muted);margin-left:auto" [matMenuTriggerFor]="rowMenuMobile" (click)="$event.stopPropagation()">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #rowMenuMobile="matMenu">
+                <button mat-menu-item (click)="openDetail(s, 'view')"><mat-icon>visibility</mat-icon> Ver</button>
+                <button mat-menu-item (click)="openDetail(s, 'edit')"><mat-icon>edit</mat-icon> Editar</button>
+                <button mat-menu-item (click)="deleteStudent(s.id)"><mat-icon>delete</mat-icon> Eliminar</button>
+              </mat-menu>
             </div>
           </div>
         }
@@ -140,14 +153,13 @@ export class StudentsComponent implements OnInit {
     } finally { this.loading.set(false); }
   }
 
-  openDetail(s: Student): void {
+  openDetail(s: Student, mode: 'view' | 'edit' = 'view'): void {
     this.dialog.open(StudentDetailDialogComponent, {
       width: '480px',
-      data: { student: s },
+      data: { student: s, mode },
     }).afterClosed().subscribe(result => {
       if (!result) return;
       if (result.action === 'edit') this.openEdit(s, result.enrollment);
-      else if (result.action === 'delete') this.deleteStudent(s.id);
     });
   }
 

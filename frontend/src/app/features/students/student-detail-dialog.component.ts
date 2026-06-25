@@ -8,9 +8,10 @@ import { Student, Enrollment } from '../../core/models/index';
 
 export interface StudentDetailDialogData {
   student: Student;
+  mode: 'view' | 'edit';
 }
 
-export type StudentDetailResult = { action: 'edit'; enrollment: Enrollment | null } | { action: 'delete' } | undefined;
+export type StudentDetailResult = { action: 'edit'; enrollment: Enrollment | null } | undefined;
 
 @Component({
   standalone: true,
@@ -72,8 +73,12 @@ export type StudentDetailResult = { action: 'edit'; enrollment: Enrollment | nul
       }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-stroked-button color="warn" [mat-dialog-close]="{action: 'delete'}"><mat-icon>delete</mat-icon> Eliminar</button>
-      <button mat-flat-button color="primary" [mat-dialog-close]="{action: 'edit', enrollment: enrollment()}"><mat-icon>edit</mat-icon> Editar</button>
+      @if (data.mode === 'edit') {
+        <button mat-stroked-button [mat-dialog-close]="undefined">Cancelar</button>
+        <button mat-flat-button color="primary" [mat-dialog-close]="{action: 'edit', enrollment: enrollment()}"><mat-icon>save</mat-icon> Guardar</button>
+      } @else {
+        <button mat-stroked-button [mat-dialog-close]="undefined">Cerrar</button>
+      }
     </mat-dialog-actions>
   `,
 })
