@@ -191,6 +191,7 @@ body {
 .detail-tooltip {
   white-space: pre-line !important;
   text-align: left !important;
+  max-width: 260px !important;
 }
 
 .mat-mdc-option {

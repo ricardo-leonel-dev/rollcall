@@ -363,20 +363,31 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   breakdownTooltip(breakdown: { date: string; type: 'F' | 'AT'; isJustified: boolean }[]): string {
-    if (!breakdown?.length) return 'Sin registros';
-    return breakdown.map(b => {
+    const lines = !breakdown?.length ? ['Sin registros'] : breakdown.map(b => {
       const [, m, d] = b.date.split('-');
       const label = b.type === 'F' ? 'Falta' : 'Atraso';
       return `${d}/${m} ${label}${b.isJustified ? ' (justificada)' : ''}`;
-    }).join('\n');
+    });
+    if (window.innerWidth < 768) lines.push('', 'Tocá de nuevo para ir a Inasistencias');
+    return lines.join('\n');
   }
 
+  private lastTappedDetail: string | null = null;
+
   onDetailClick(s: { courseId: number; studentName: string }, tip: MatTooltip): void {
-    // En mobile no hay hover — el primer tap debe mostrar el desglose, no
-    // navegar de una. En desktop el hover ya muestra el tooltip, así que el
-    // click navega directo (mismo comportamiento que ya había).
+    // En mobile no hay hover — el primer tap muestra el desglose (no navega
+    // de una, para poder leerlo); un segundo tap sobre ese mismo estudiante
+    // ya confirma la intención de revisarlo a fondo, así que navega. En
+    // desktop el hover ya muestra el tooltip, así que el click navega
+    // directo (mismo comportamiento que ya había).
     if (window.innerWidth < 768) {
-      tip.toggle();
+      if (this.lastTappedDetail === s.studentName) {
+        this.lastTappedDetail = null;
+        this.goToAbsences(s);
+      } else {
+        this.lastTappedDetail = s.studentName;
+        tip.show();
+      }
       return;
     }
     this.goToAbsences(s);
