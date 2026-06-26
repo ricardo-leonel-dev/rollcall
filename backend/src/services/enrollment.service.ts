@@ -76,7 +76,7 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
        is_active       AS "isActive"
      FROM v_enrollments_detail
      WHERE ${conditions.join(' AND ')}
-     ORDER BY academic_year_id DESC, roster_number NULLS LAST, full_name`,
+     ORDER BY academic_year_id DESC, full_name`,
     params
   );
 }
@@ -95,6 +95,15 @@ export async function create(institutionId: number, courseIds: number[] | null, 
   studentPhone?: string; studentEmail?: string;
 }) {
   await assertOwnership(institutionId, courseIds, data);
+  if (!data.rosterNumber) {
+    const [row] = await AppDataSource.query(
+      `SELECT COALESCE(MAX(roster_number), 0) + 1 AS next
+         FROM enrollments
+        WHERE course_id = $1 AND academic_year_id = $2 AND deleted_at IS NULL`,
+      [data.courseId, data.academicYearId]
+    );
+    data.rosterNumber = Number(row.next);
+  }
   const e = repo().create({ ...data, institutionId });
   return repo().save(e);
 }
