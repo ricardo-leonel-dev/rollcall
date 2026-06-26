@@ -80,7 +80,7 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
                   </button>
                   <mat-menu #rowMenu="matMenu">
                     <button mat-menu-item (click)="openDetail(s, 'view')"><mat-icon>visibility</mat-icon> Ver</button>
-                    <button mat-menu-item (click)="openDetail(s, 'edit')"><mat-icon>edit</mat-icon> Editar</button>
+                    <button mat-menu-item (click)="openEditDirect(s)"><mat-icon>edit</mat-icon> Editar</button>
                     <button mat-menu-item (click)="deleteStudent(s.id)"><mat-icon>delete</mat-icon> Eliminar</button>
                   </mat-menu>
                 </td>
@@ -107,7 +107,7 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
               </button>
               <mat-menu #rowMenuMobile="matMenu">
                 <button mat-menu-item (click)="openDetail(s, 'view')"><mat-icon>visibility</mat-icon> Ver</button>
-                <button mat-menu-item (click)="openDetail(s, 'edit')"><mat-icon>edit</mat-icon> Editar</button>
+                <button mat-menu-item (click)="openEditDirect(s)"><mat-icon>edit</mat-icon> Editar</button>
                 <button mat-menu-item (click)="deleteStudent(s.id)"><mat-icon>delete</mat-icon> Eliminar</button>
               </mat-menu>
             </div>
@@ -170,6 +170,11 @@ export class StudentsComponent implements OnInit {
     }).afterClosed().subscribe(async ok => {
       if (ok) await this.loadStudents(this.searchTerm);
     });
+  }
+
+  async openEditDirect(s: Student): Promise<void> {
+    const enrollments = await firstValueFrom(this.http.get<Enrollment[]>(`/api/enrollments?student_id=${s.id}`));
+    this.openEdit(s, enrollments[0] ?? null);
   }
 
   openEdit(s: Student, enrollment: Enrollment | null): void {

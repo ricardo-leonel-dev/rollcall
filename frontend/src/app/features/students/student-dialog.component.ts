@@ -41,7 +41,7 @@ export interface StudentDialogData {
       <mat-form-field appearance="outline"><mat-label>Sexo (H/M)</mat-label><input matInput [(ngModel)]="gender"></mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>F. Nacimiento</mat-label>
-        <input matInput [matDatepicker]="pickerBirth" [(ngModel)]="birthDate">
+        <input matInput [matDatepicker]="pickerBirth" [(ngModel)]="birthDate" (dateChange)="birthDate = $event.value">
         <mat-datepicker-toggle matIconSuffix [for]="pickerBirth"></mat-datepicker-toggle>
         <mat-datepicker #pickerBirth></mat-datepicker>
       </mat-form-field>
