@@ -45,7 +45,7 @@ export class AuthService {
   // rememberMe=true persists across browser restarts (localStorage);
   // false only lasts for the current browser session (sessionStorage).
   // The JWT itself always expires after JWT_EXPIRES_IN regardless.
-  async login(username: string, password: string, rememberMe = true): Promise<void> {
+  async loginSetup(username: string, password: string, rememberMe = true): Promise<void> {
     const resp = await firstValueFrom(
       this.http.post<AuthResponse>('/api/auth/login', { username, password })
     );
@@ -54,6 +54,10 @@ export class AuthService {
     storage.setItem('user', JSON.stringify(resp.user));
     this._token.set(resp.token);
     this._user.set(resp.user);
+  }
+
+  async login(username: string, password: string, rememberMe = true): Promise<void> {
+    await this.loginSetup(username, password, rememberMe);
     await this.router.navigate(['/inicio']);
   }
 
