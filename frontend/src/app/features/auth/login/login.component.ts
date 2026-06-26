@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, signal, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -83,6 +84,70 @@ import { AuthService } from '../../../core/services/auth.service';
       border-radius: 12px !important;
       background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
     }
+
+    /* Overlay pizarrón — posición absoluta (alta especificidad para ganar a .login-card > *) */
+    .login-card .chalk-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      border-radius: inherit;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    /* Éxito: abrir cuaderno — pivota desde el lomo (borde rojo = borde izquierdo) */
+    .login-card.anim-open {
+      transform-origin: left center;
+      animation: notebook-open 650ms cubic-bezier(0.4, 0, 0.6, 1) forwards;
+      pointer-events: none;
+    }
+    @keyframes notebook-open {
+      0%   { transform: perspective(1200px) rotateY(0deg); opacity: 1;
+             box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.45); }
+      20%  { transform: perspective(1200px) rotateY(-12deg) translateZ(10px);
+             box-shadow: 0 35px 60px -8px rgb(0 0 0 / 0.55); }
+      70%  { transform: perspective(1200px) rotateY(-80deg); opacity: 0.7;
+             box-shadow: 0 8px 16px -8px rgb(0 0 0 / 0.2); }
+      100% { transform: perspective(1200px) rotateY(-90deg); opacity: 0;
+             box-shadow: none; }
+    }
+
+    /* Error: sacudida + barrido de borrador */
+    .login-card.anim-erase {
+      animation: card-shake 600ms ease-in-out;
+    }
+    @keyframes card-shake {
+      0%, 100% { transform: translateX(0) rotate(0deg); }
+      12%  { transform: translateX(-7px) rotate(-0.5deg); }
+      28%  { transform: translateX(5px) rotate(0.4deg); }
+      45%  { transform: translateX(-4px) rotate(-0.3deg); }
+      62%  { transform: translateX(3px) rotate(0.2deg); }
+      78%  { transform: translateX(-1px); }
+    }
+    .login-card.anim-erase .chalk-overlay {
+      background: linear-gradient(
+        104deg,
+        rgba(33, 52, 40, 0)    0%,
+        rgba(33, 52, 40, 0.92) 10%,
+        rgba(42, 65, 50, 0.96) 40%,
+        rgba(42, 65, 50, 0.96) 60%,
+        rgba(33, 52, 40, 0.92) 90%,
+        rgba(33, 52, 40, 0)    100%
+      );
+      animation: chalk-sweep 750ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+    }
+    @keyframes chalk-sweep {
+      0%   { opacity: 0.95; transform: translateX(-105%); }
+      40%  { transform: translateX(0%); opacity: 0.95; }
+      60%  { transform: translateX(0%); opacity: 0.90; }
+      100% { transform: translateX(105%); opacity: 0; }
+    }
+
+    /* Accesibilidad: sin movimiento */
+    @media (prefers-reduced-motion: reduce) {
+      .login-card.anim-open { animation: none; opacity: 0; transition: opacity 150ms ease; }
+      .login-card.anim-erase, .login-card.anim-erase .chalk-overlay { animation: none !important; }
+    }
   `],
   template: `
     <div class="left-panel">
@@ -102,7 +167,10 @@ import { AuthService } from '../../../core/services/auth.service';
     </div>
 
     <div class="right-panel">
-      <div class="login-card">
+      <div class="login-card"
+           [class.anim-open]="loginSuccess()"
+           [class.anim-erase]="showEraseAnim()">
+        <div class="chalk-overlay" aria-hidden="true"></div>
         <div class="logo-circle"><mat-icon style="font-size:28px;width:28px;height:28px">school</mat-icon></div>
         <h2>Bienvenido</h2>
         <p class="subtitle">Ingresa tus credenciales para continuar</p>
@@ -145,12 +213,15 @@ import { AuthService } from '../../../core/services/auth.service';
 })
 export class LoginComponent {
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   username = '';
   password = '';
   rememberMe = true;
   readonly loading = signal(false);
   readonly error = signal('');
   readonly showPass = signal(false);
+  readonly loginSuccess = signal(false);
+  readonly showEraseAnim = signal(false);
 
   readonly features = [
     { icon: 'photo_camera', label: 'Registro por foto', desc: 'IA detecta inasistencias desde fotos de lista' },
@@ -163,12 +234,21 @@ export class LoginComponent {
     if (!this.username || !this.password) return;
     this.loading.set(true);
     this.error.set('');
+    let success = false;
     try {
-      await this.auth.login(this.username, this.password, this.rememberMe);
+      await this.auth.loginSetup(this.username, this.password, this.rememberMe);
+      success = true;
     } catch (err: any) {
       this.error.set(err?.error?.error ?? 'Usuario o contraseña incorrectos');
+      this.showEraseAnim.set(true);
+      setTimeout(() => this.showEraseAnim.set(false), 950);
     } finally {
       this.loading.set(false);
+    }
+    if (success) {
+      this.loginSuccess.set(true);
+      await new Promise<void>(r => setTimeout(r, 650));
+      this.router.navigate(['/inicio']);
     }
   }
 }
