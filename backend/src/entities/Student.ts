@@ -17,7 +17,7 @@ export class Student {
   @Column({ name: 'gender', type: 'char', length: 1, nullable: true })
   gender!: string | null;
 
-  @Column({ name: 'birth_date', type: 'date', nullable: true })
+  @Column({ name: 'birth_date', type: 'date', nullable: true, transformer: { from: (v: string | null) => v, to: (v: string | null) => v } })
   birthDate!: string | null;
 
   @Column({ name: 'is_active', default: true })
