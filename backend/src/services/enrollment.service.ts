@@ -58,11 +58,7 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
        course,
        teacher,
        student_id      AS "studentId",
-       COALESCE(
-         roster_number,
-         COALESCE(MAX(roster_number) OVER (PARTITION BY course_id, academic_year_id), 0) +
-         ROW_NUMBER() OVER (PARTITION BY course_id, academic_year_id, (roster_number IS NULL) ORDER BY full_name)
-       ) AS "rosterNumber",
+       ROW_NUMBER() OVER (PARTITION BY course_id, academic_year_id ORDER BY full_name) AS "rosterNumber",
        id_number       AS "idNumber",
        full_name       AS "fullName",
        gender,
