@@ -562,7 +562,7 @@ export class AbsencesComponent implements OnInit {
     }).afterClosed().subscribe(async ok => {
       if (!ok) return;
       await firstValueFrom(this.http.delete(`/api/absences/${a.id}`));
-      await this.loadAbsences();
+      await Promise.all([this.loadAbsences(), this.loadTodayAbsences()]);
     });
   }
 }

@@ -128,9 +128,34 @@ export async function createRange(institutionId: number, courseIds: number[] | n
   const existingDates = new Set(existingRows.map((r: { date: string }) => r.date));
   const toCreate = days.filter(d => !existingDates.has(d));
 
-  if (toCreate.length) {
+  // Separate toCreate into: rows that were soft-deleted (restore them) vs truly new (insert).
+  // Without this, the unconditional UNIQUE(enrollment_id, date) constraint would reject the
+  // INSERT even though the prior row was logically deleted.
+  const softDeletedRows = toCreate.length
+    ? await AppDataSource.query(
+        `SELECT id, date::text AS date FROM absences
+         WHERE enrollment_id = $1 AND date = ANY($2) AND deleted_at IS NOT NULL`,
+        [data.enrollmentId, toCreate]
+      )
+    : [];
+  const softDeletedByDate = new Map<string, number>(
+    softDeletedRows.map((r: { id: number; date: string }) => [r.date, r.id])
+  );
+  const toRestore = toCreate.filter(d => softDeletedByDate.has(d));
+  const toInsert  = toCreate.filter(d => !softDeletedByDate.has(d));
+
+  if (toRestore.length || toInsert.length) {
     await AppDataSource.transaction(async (em) => {
-      for (const date of toCreate) {
+      for (const date of toRestore) {
+        await em.update(Absence, { id: softDeletedByDate.get(date) }, {
+          type: data.type,
+          notes: data.notes ?? null,
+          deletedAt: null as unknown as Date,
+          isActive: true,
+          updatedAt: new Date(),
+        });
+      }
+      for (const date of toInsert) {
         const a = em.create(Absence, {
           institutionId,
           enrollmentId: data.enrollmentId,
