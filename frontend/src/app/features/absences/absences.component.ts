@@ -37,6 +37,27 @@ import { AbsenceDialogComponent } from './absence-dialog.component';
     }
     .enroll-row:hover { background: var(--paper-deep); }
     .marked-today { font-size: 11px; color: #15803d; display: flex; align-items: center; gap: 2px; margin-right: 6px; }
+    .manual-search {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 10px 5px 8px;
+      background: var(--paper); border: 1px solid var(--border-soft); border-radius: 10px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .manual-search:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+    .manual-search input {
+      border: none; outline: none; background: transparent;
+      font-family: Nunito, sans-serif; font-size: 13px; color: var(--ink-soft);
+      width: 150px;
+    }
+    .manual-search input::placeholder { color: var(--muted); }
+    .manual-search .ms-clear {
+      display: flex; align-items: center; cursor: pointer;
+      padding: 0; background: none; border: none; color: var(--muted); line-height: 1;
+    }
+    .manual-search .ms-clear:hover { color: var(--ink-soft); }
   `],
   template: `
     <div class="page-header">
@@ -145,10 +166,25 @@ import { AbsenceDialogComponent } from './absence-dialog.component';
               <div class="spinner"></div>
             </div>
           } @else {
-            <div style="padding:12px 16px;background:var(--paper-deep);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted-strong)">
-              {{enrollments().length}} estudiantes — haz clic en Falta o Atrasado (puedes elegir un rango de días)
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px;background:var(--paper-deep);border-bottom:1px solid var(--border)">
+              <span style="font-size:12px;color:var(--muted-strong);white-space:nowrap">
+                @if (manualSearch) {
+                  <strong style="color:var(--ink-soft)">{{filteredEnrollments().length}}</strong> de {{enrollments().length}}
+                } @else {
+                  {{enrollments().length}} estudiantes
+                }
+              </span>
+              <div class="manual-search">
+                <mat-icon style="font-size:16px;width:16px;height:16px;color:var(--muted);flex-shrink:0">search</mat-icon>
+                <input [(ngModel)]="manualSearch" placeholder="Buscar por nombre...">
+                @if (manualSearch) {
+                  <button class="ms-clear" (click)="manualSearch = ''" tabindex="-1">
+                    <mat-icon style="font-size:16px;width:16px;height:16px">close</mat-icon>
+                  </button>
+                }
+              </div>
             </div>
-            @for (e of enrollments(); track e.enrollmentId) {
+            @for (e of filteredEnrollments(); track e.enrollmentId) {
               <div class="enroll-row">
                 <div style="display:flex;align-items:center;gap:10px">
                   <div style="width:28px;height:28px;border-radius:7px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);flex-shrink:0">
@@ -167,6 +203,13 @@ import { AbsenceDialogComponent } from './absence-dialog.component';
                   </button>
                 </div>
               </div>
+            } @empty {
+              @if (manualSearch) {
+                <div class="empty-state" style="padding:32px">
+                  <mat-icon style="font-size:36px;width:36px;height:36px;color:var(--border)">search_off</mat-icon>
+                  <div style="margin-top:8px;color:var(--ink-soft)">Ningún estudiante coincide con "<strong>{{manualSearch}}</strong>"</div>
+                </div>
+              }
             }
           }
         </div>
@@ -323,6 +366,7 @@ export class AbsencesComponent implements OnInit {
   dateTo: Date | null = null;
   filterType = '';
   studentSearch = '';
+  manualSearch = '';
   private notificationTemplate = DEFAULT_NOTIFICATION_TEMPLATE;
 
   async ngOnInit(): Promise<void> {
@@ -348,6 +392,7 @@ export class AbsencesComponent implements OnInit {
   private todayStr(): string { return new Date().toISOString().split('T')[0]; }
 
   async onFiltersChange(): Promise<void> {
+    this.manualSearch = '';
     if (this.selCourse && this.selYear) {
       this.enrollLoading.set(true);
       try {
@@ -385,6 +430,15 @@ export class AbsencesComponent implements OnInit {
       const data = await firstValueFrom(this.http.get<Absence[]>(`/api/absences?${params.join('&')}`));
       this.absences.set(data);
     } finally { this.absLoading.set(false); }
+  }
+
+  filteredEnrollments(): Enrollment[] {
+    const q = this.manualSearch.trim().toLowerCase();
+    if (!q) return this.enrollments();
+    return this.enrollments().filter(e =>
+      e.fullName.toLowerCase().includes(q) ||
+      String(e.rosterNumber ?? '').includes(q)
+    );
   }
 
   filteredAbsences(): Absence[] {
