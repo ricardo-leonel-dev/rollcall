@@ -24,12 +24,28 @@ async function assertEnrollmentInScope(institutionId: number, courseIds: number[
   return enrollment;
 }
 
-export async function findAll(institutionId: number, courseIds: number[] | null, enrollmentId?: number) {
+export async function findAll(
+  institutionId: number,
+  courseIds: number[] | null,
+  enrollmentId?: number,
+  courseId?: number,
+  academicYearId?: number,
+) {
   const params: any[] = [institutionId];
   let courseFilter = '';
   if (courseIds !== null) {
     params.push(courseIds);
     courseFilter = `AND e.course_id = ANY($${params.length})`;
+  }
+  let specificCourseFilter = '';
+  if (courseId) {
+    params.push(courseId);
+    specificCourseFilter = `AND e.course_id = $${params.length}`;
+  }
+  let academicYearFilter = '';
+  if (academicYearId) {
+    params.push(academicYearId);
+    academicYearFilter = `AND e.academic_year_id = $${params.length}`;
   }
   let enrollmentFilter = '';
   if (enrollmentId) {
@@ -52,6 +68,10 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
       j.deleted_at AS "deletedAt",
       j.created_at AS "createdAt",
       j.updated_at AS "updatedAt",
+      s.name AS "studentName",
+      c.name AS "courseName",
+      e.course_id AS "courseId",
+      e.academic_year_id AS "academicYearId",
       COALESCE((
         SELECT json_agg(ja.absence_id)
         FROM justification_absences ja
@@ -70,8 +90,12 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
       ), '[]') AS "attachments"
     FROM justifications j
     JOIN enrollments e ON e.id = j.enrollment_id
+    JOIN students s ON s.id = e.student_id
+    JOIN courses c ON c.id = e.course_id
     WHERE j.institution_id = $1 AND j.deleted_at IS NULL
     ${courseFilter}
+    ${specificCourseFilter}
+    ${academicYearFilter}
     ${enrollmentFilter}
     ORDER BY j.created_at DESC
   `;
