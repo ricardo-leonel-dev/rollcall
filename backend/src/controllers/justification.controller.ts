@@ -37,8 +37,10 @@ const uploadAttachments = multer({
 router.use(requireInstitution);
 
 router.get('/', requirePermission(R,'read'), async (req, res) => {
-  const enrollmentId = req.query.enrollment_id ? +req.query.enrollment_id : undefined;
-  res.json(await svc.findAll(req.institutionId!, req.courseIds ?? null, enrollmentId));
+  const enrollmentId   = req.query.enrollment_id   ? +req.query.enrollment_id   : undefined;
+  const courseId       = req.query.course_id        ? +req.query.course_id        : undefined;
+  const academicYearId = req.query.academic_year_id ? +req.query.academic_year_id : undefined;
+  res.json(await svc.findAll(req.institutionId!, req.courseIds ?? null, enrollmentId, courseId, academicYearId));
 });
 
 router.post('/',   requirePermission(R,'create'), async (req, res) => res.status(201).json(await svc.create(req.institutionId!, req.courseIds ?? null, req.body)));

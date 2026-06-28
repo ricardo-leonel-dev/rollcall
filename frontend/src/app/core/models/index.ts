@@ -101,6 +101,10 @@ export interface Justification {
   absenceIds: number[];
   attachments: JustificationAttachment[];
   createdAt: string;
+  studentName?: string;
+  courseName?: string;
+  courseId?: number;
+  academicYearId?: number;
 }
 
 export interface DashboardSummary {

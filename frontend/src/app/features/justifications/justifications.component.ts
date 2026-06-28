@@ -1,6 +1,7 @@
-import { Component, ChangeDetectionStrategy, signal, inject, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, computed, inject, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { MatTabsModule } from '@angular/material/tabs';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
@@ -8,7 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
-import { Justification, Course, Enrollment, Absence } from '../../core/models/index';
+import { Justification, Course, Absence } from '../../core/models/index';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -17,11 +18,10 @@ import { JustificationCreateDialogComponent, JustifyGroup } from './justificatio
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule],
+  imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule],
   styles: [`
-    /* Same pinned-evidence language as the "Nueva justificación" wizard, so a
-       photo looks like the same object whether it's mid-upload there or
-       already filed here. */
+    .tab-content { padding: 20px 0; }
+    /* Evidencias — mismo lenguaje visual que el wizard de creación */
     .evidence-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 4px; }
     .evidence-tile {
       position: relative; display: block;
@@ -69,153 +69,241 @@ import { JustificationCreateDialogComponent, JustifyGroup } from './justificatio
       <h1 class="page-title">Justificaciones</h1>
     </div>
 
-    <div class="filter-bar">
+    <!-- Filtro de curso compartido entre tabs -->
+    <div class="filter-bar" style="margin-bottom:0;border-radius:var(--radius-lg) var(--radius-lg) 0 0;border-bottom:none">
       <mat-form-field appearance="outline" style="width:220px">
         <mat-label>Curso</mat-label>
-        <mat-select [(ngModel)]="selCourse" (ngModelChange)="onFiltersChange()">
+        <mat-select [(ngModel)]="selCourse" (ngModelChange)="onCourseChange()">
           <mat-option [value]="null">Todos los cursos</mat-option>
           @for (c of courses(); track c.id) { <mat-option [value]="c.id">{{c.name}}</mat-option> }
         </mat-select>
       </mat-form-field>
     </div>
 
-    <div class="card" style="margin-bottom:20px">
-      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-strong);margin-bottom:12px">Nueva justificación</div>
-      @if (!selYear || !selCourse) {
-        <div style="font-size:13px;color:var(--muted)">Selecciona año lectivo y un curso específico arriba para elegir un estudiante.</div>
-      } @else if (!studentEnrollments().length) {
-        <div style="font-size:13px;color:var(--muted)">Nadie en este curso tiene faltas pendientes de justificar.</div>
-      } @else {
-        <mat-form-field appearance="outline" style="width:280px;margin-bottom:12px">
-          <mat-label>Estudiante</mat-label>
-          <mat-select [(ngModel)]="selStudent" (ngModelChange)="onStudentChange()">
-            @for (e of studentEnrollments(); track e.enrollmentId) { <mat-option [value]="e.enrollmentId">{{e.fullName}}</mat-option> }
-          </mat-select>
-        </mat-form-field>
+    <mat-tab-group [(selectedIndex)]="selectedTabIndex"
+                   style="background:var(--paper);border-radius:0 0 var(--radius-lg) var(--radius-lg);border:1px solid var(--border);border-top:none;overflow:hidden;margin-bottom:20px">
 
-        @if (selStudent && !unjustified().length) {
-          <div style="font-size:13px;color:var(--muted)">Este estudiante no tiene faltas pendientes de justificar.</div>
-        }
+      <!-- ═══ TAB 1: NUEVA JUSTIFICACIÓN ═══ -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">add_task</mat-icon>
+          Nueva justificación
+        </ng-template>
 
-        @if (unjustified().length) {
-          <div style="font-size:12px;color:var(--muted-strong);margin-bottom:8px">Marca las faltas a justificar:</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
-            @for (a of unjustified(); track a.id) {
-              <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px">
-                <input type="checkbox" [checked]="selectedIds().has(a.id)" (change)="toggleSelect(a.id)">
-                {{a.date}} <span [class]="'badge-' + a.type">{{a.type}}</span>
-              </label>
+        <div class="tab-content" style="padding:20px">
+          @if (!selYear || !selCourse) {
+            <div class="empty-state" style="padding:32px">
+              <mat-icon style="font-size:40px;width:40px;height:40px;color:var(--border)">school</mat-icon>
+              <div style="margin-top:8px;color:var(--ink-soft)">Selecciona un curso para ver estudiantes con faltas pendientes</div>
+            </div>
+          } @else if (!pendingStudents().length) {
+            <div class="empty-state" style="padding:32px">
+              <mat-icon style="font-size:40px;width:40px;height:40px;color:var(--border)">check_circle</mat-icon>
+              <div style="margin-top:8px;color:var(--ink-soft)">Nadie en este curso tiene faltas pendientes de justificar</div>
+            </div>
+          } @else {
+            <div style="margin-bottom:16px">
+              <mat-form-field appearance="outline" style="width:320px">
+                <mat-label>Estudiante con faltas pendientes</mat-label>
+                <mat-select [(ngModel)]="selStudentCreate" (ngModelChange)="onStudentCreateChange()">
+                  <mat-option [value]="null">— Seleccionar estudiante —</mat-option>
+                  @for (s of pendingStudents(); track s.enrollmentId) {
+                    <mat-option [value]="s.enrollmentId">{{s.fullName}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            @if (selStudentCreate) {
+              @if (!unjustified().length) {
+                <div style="font-size:13px;color:var(--muted)">Este estudiante no tiene faltas pendientes de justificar.</div>
+              } @else {
+                <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-strong);margin-bottom:10px">
+                  Marca las faltas a justificar
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+                  @for (a of unjustified(); track a.id) {
+                    <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px">
+                      <input type="checkbox" [checked]="selectedIds().has(a.id)" (change)="toggleSelect(a.id)">
+                      {{a.date}} <span [class]="'badge-' + a.type">{{a.type}}</span>
+                    </label>
+                  }
+                </div>
+
+                @if (groups().length) {
+                  <div style="font-size:13px;color:var(--muted-strong);margin-bottom:12px">
+                    {{groups().length}} semana(s) seleccionada(s). El motivo y adjuntos se completan en el siguiente paso.
+                  </div>
+                  <button mat-flat-button color="primary" (click)="openCreateWizard()">
+                    <mat-icon>arrow_forward</mat-icon> Continuar ({{groups().length}} semana(s))
+                  </button>
+                }
+              }
+            }
+          }
+        </div>
+      </mat-tab>
+
+      <!-- ═══ TAB 2: HISTORIAL ═══ -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">history</mat-icon>
+          Historial
+        </ng-template>
+
+        <div class="tab-content" style="padding:20px">
+
+          <!-- Sub-filtro interno del historial -->
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:20px">
+            @if (studentsWithJustifications().length) {
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:300px">
+                <mat-label>Filtrar por estudiante</mat-label>
+                <mat-select [ngModel]="selStudentHistorial()" (ngModelChange)="selStudentHistorial.set($event); currentPage.set(0)">
+                  <mat-option [value]="null">Todos los estudiantes</mat-option>
+                  @for (s of studentsWithJustifications(); track s.enrollmentId) {
+                    <mat-option [value]="s.enrollmentId">{{s.fullName}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
+            @if (filteredJustifications().length) {
+              <div style="align-self:center;background:var(--accent-soft);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--accent)">
+                {{filteredJustifications().length}} justificación(es)
+              </div>
             }
           </div>
-        }
 
-        @if (groups().length) {
-          <div style="font-size:13px;color:var(--muted-strong);margin-bottom:12px">
-            {{groups().length}} semana(s) con faltas seleccionadas. El motivo y los adjuntos se completan en el siguiente paso.
-          </div>
-          <button mat-flat-button color="primary" (click)="openCreateWizard()">
-            <mat-icon>arrow_forward</mat-icon> Continuar ({{groups().length}} semana(s))
-          </button>
-        }
-      }
-    </div>
-
-    @if (loading()) {
-      <div class="spinner-center" style="height:200px">
-        <div class="spinner"></div>
-      </div>
-    } @else if (!justifications().length) {
-      <div class="empty-state card">
-        <mat-icon style="font-size:48px;width:48px;height:48px;color:var(--border);margin-bottom:12px">task_alt</mat-icon>
-        <div style="font-weight:600;color:var(--ink-soft)">Sin justificaciones</div>
-        <div style="font-size:13px;color:var(--muted);margin-top:4px;max-width:340px;text-align:center">
-          No hay justificaciones con los filtros seleccionados. Usa "Nueva justificación" arriba para crear una.
-        </div>
-      </div>
-    } @else {
-      <div style="display:flex;flex-direction:column;gap:12px">
-        @for (j of justifications(); track j.id) {
-          <div class="card" style="padding:0;overflow:hidden">
-            @if (editingId() === j.id) {
-              <div style="padding:20px">
-                <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:16px">Editar justificación</div>
-                <mat-form-field appearance="outline" style="width:100%;margin-bottom:12px">
-                  <mat-label>Motivo</mat-label>
-                  <textarea matInput [(ngModel)]="editReason" rows="3"></textarea>
-                </mat-form-field>
-                <mat-form-field appearance="outline" style="width:100%;margin-bottom:12px">
-                  <mat-label>Quién notificó</mat-label>
-                  <input matInput [(ngModel)]="editNotifiedBy">
-                </mat-form-field>
-                <div style="display:flex;gap:8px">
-                  <button mat-flat-button color="primary" (click)="saveEdit(j.id)">Guardar</button>
-                  <button mat-stroked-button (click)="editingId.set(null)">Cancelar</button>
-                </div>
+          <!-- Lista -->
+          @if (loading()) {
+            <div class="spinner-center" style="height:200px">
+              <div class="spinner"></div>
+            </div>
+          } @else if (!filteredJustifications().length) {
+            <div class="empty-state" style="padding:40px">
+              <mat-icon style="font-size:48px;width:48px;height:48px;color:var(--border);margin-bottom:12px">task_alt</mat-icon>
+              <div style="font-weight:600;color:var(--ink-soft)">Sin justificaciones</div>
+              <div style="font-size:13px;color:var(--muted);margin-top:4px;max-width:340px;text-align:center">
+                No hay justificaciones con los filtros seleccionados.
               </div>
-            } @else {
-              <div style="display:flex;align-items:flex-start;gap:0">
-                <div style="width:5px;background:var(--stripe);align-self:stretch;flex-shrink:0;border-radius:4px 0 0 4px"></div>
-                <div style="padding:16px 20px;flex:1">
-                  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
-                    <div style="flex:1;min-width:0">
-                      <div style="font-weight:600;color:var(--ink-soft);margin-bottom:4px">{{j.reason}}</div>
-                      @if (j.notifiedBy) {
-                        <div style="font-size:13px;color:var(--muted-strong);display:flex;align-items:center;gap:4px">
-                          <mat-icon style="font-size:14px;width:14px;height:14px">person</mat-icon>
-                          Notificó: {{j.notifiedBy}}
-                        </div>
-                      }
-                      <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
-                        <span class="stamp stamp-j">
-                          <mat-icon style="font-size:12px;width:12px;height:12px">event</mat-icon>
-                          {{j.absenceIds?.length ?? 0}} falta(s)
-                        </span>
-                        <span style="font-size:12px;color:var(--muted)">{{j.createdAt?.substring(0, 10)}}</span>
+            </div>
+          } @else {
+            <div style="display:flex;flex-direction:column;gap:12px">
+              @for (j of pagedJustifications(); track j.id) {
+                <div class="card" style="padding:0;overflow:hidden">
+                  @if (editingId() === j.id) {
+                    <div style="padding:20px">
+                      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:16px">Editar justificación</div>
+                      <mat-form-field appearance="outline" style="width:100%;margin-bottom:12px">
+                        <mat-label>Motivo</mat-label>
+                        <textarea matInput [(ngModel)]="editReason" rows="3"></textarea>
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" style="width:100%;margin-bottom:12px">
+                        <mat-label>Quién notificó</mat-label>
+                        <input matInput [(ngModel)]="editNotifiedBy">
+                      </mat-form-field>
+                      <div style="display:flex;gap:8px">
+                        <button mat-flat-button color="primary" (click)="saveEdit(j.id)">Guardar</button>
+                        <button mat-stroked-button (click)="editingId.set(null)">Cancelar</button>
                       </div>
                     </div>
-                    <div style="display:flex;gap:4px;flex-shrink:0">
-                      <button mat-icon-button style="color:var(--muted-strong)" (click)="startEdit(j)">
-                        <mat-icon>edit</mat-icon>
-                      </button>
-                      <button mat-icon-button style="color:#b91c1c" (click)="remove(j.id)">
-                        <mat-icon>delete_outline</mat-icon>
-                      </button>
-                    </div>
-                  </div>
+                  } @else {
+                    <div style="display:flex;align-items:flex-start;gap:0">
+                      <div style="width:5px;background:var(--stripe);align-self:stretch;flex-shrink:0;border-radius:4px 0 0 4px"></div>
+                      <div style="padding:16px 20px;flex:1">
+                        @if (j.studentName) {
+                          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+                            <mat-icon style="font-size:14px;width:14px;height:14px;color:var(--accent)">person</mat-icon>
+                            <span style="font-weight:600;font-size:13px;color:var(--ink-soft)">{{j.studentName}}</span>
+                            @if (j.courseName) {
+                              <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted-strong);background:var(--paper-deep);padding:2px 7px;border-radius:4px">{{j.courseName}}</span>
+                            }
+                          </div>
+                        }
+                        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+                          <div style="flex:1;min-width:0">
+                            <div style="font-weight:600;color:var(--ink-soft);margin-bottom:4px">{{j.reason}}</div>
+                            @if (j.notifiedBy) {
+                              <div style="font-size:13px;color:var(--muted-strong);display:flex;align-items:center;gap:4px">
+                                <mat-icon style="font-size:14px;width:14px;height:14px">person</mat-icon>
+                                Notificó: {{j.notifiedBy}}
+                              </div>
+                            }
+                            <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
+                              <span class="stamp stamp-j">
+                                <mat-icon style="font-size:12px;width:12px;height:12px">event</mat-icon>
+                                {{j.absenceIds?.length ?? 0}} falta(s)
+                              </span>
+                              <span style="font-size:12px;color:var(--muted)">{{j.createdAt?.substring(0, 10)}}</span>
+                            </div>
+                          </div>
+                          <div style="display:flex;gap:4px;flex-shrink:0">
+                            <button mat-icon-button style="color:var(--muted-strong)" (click)="startEdit(j)">
+                              <mat-icon>edit</mat-icon>
+                            </button>
+                            <button mat-icon-button style="color:#b91c1c" (click)="remove(j.id)">
+                              <mat-icon>delete_outline</mat-icon>
+                            </button>
+                          </div>
+                        </div>
 
-                  <div class="evidence-row" style="margin-top:10px">
-                    @for (a of j.attachments; track a.id) {
-                      @if (a.mimeType.startsWith('image/')) {
-                        <a class="evidence-tile" [href]="a.url" target="_blank" [style.--r.deg]="rotationFor(a.fileName)">
-                          <img [src]="a.url">
-                          <button class="evidence-remove" (click)="removeAttachment(j.id, a.id); $event.preventDefault()">
-                            <mat-icon>close</mat-icon>
+                        <div class="evidence-row" style="margin-top:10px">
+                          @for (a of j.attachments; track a.id) {
+                            @if (a.mimeType.startsWith('image/')) {
+                              <a class="evidence-tile" [href]="a.url" target="_blank" [style.--r.deg]="rotationFor(a.fileName)">
+                                <img [src]="a.url">
+                                <button class="evidence-remove" (click)="removeAttachment(j.id, a.id); $event.preventDefault()">
+                                  <mat-icon>close</mat-icon>
+                                </button>
+                              </a>
+                            } @else {
+                              <a class="evidence-tile evidence-tile-doc" [href]="a.url" target="_blank" [style.--r.deg]="rotationFor(a.fileName)">
+                                <mat-icon>description</mat-icon>
+                                <span>{{a.originalName}}</span>
+                                <button class="evidence-remove" (click)="removeAttachment(j.id, a.id); $event.preventDefault()">
+                                  <mat-icon>close</mat-icon>
+                                </button>
+                              </a>
+                            }
+                          }
+                          <input type="file" #attInput hidden multiple
+                                 accept="image/png,image/jpeg,image/webp,application/pdf,.doc,.docx"
+                                 (change)="onAddAttachments(j.id, $event)">
+                          <button class="evidence-add-pill" (click)="attInput.click()">
+                            <mat-icon>add</mat-icon> Adjuntar
                           </button>
-                        </a>
-                      } @else {
-                        <a class="evidence-tile evidence-tile-doc" [href]="a.url" target="_blank" [style.--r.deg]="rotationFor(a.fileName)">
-                          <mat-icon>description</mat-icon>
-                          <span>{{a.originalName}}</span>
-                          <button class="evidence-remove" (click)="removeAttachment(j.id, a.id); $event.preventDefault()">
-                            <mat-icon>close</mat-icon>
-                          </button>
-                        </a>
-                      }
-                    }
-                    <input type="file" #attInput hidden multiple
-                           accept="image/png,image/jpeg,image/webp,application/pdf,.doc,.docx"
-                           (change)="onAddAttachments(j.id, $event)">
-                    <button class="evidence-add-pill" (click)="attInput.click()">
-                      <mat-icon>add</mat-icon> Adjuntar
-                    </button>
-                  </div>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            <!-- Paginador -->
+            @if (totalPages() > 1) {
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+                <span style="font-size:13px;color:var(--muted)">
+                  {{currentPage() * PAGE_SIZE + 1}}–{{clamp(filteredJustifications().length, (currentPage() + 1) * PAGE_SIZE)}}
+                  de {{filteredJustifications().length}}
+                </span>
+                <div style="display:flex;align-items:center;gap:4px">
+                  <button mat-icon-button [disabled]="currentPage() === 0" (click)="prevPage()">
+                    <mat-icon>chevron_left</mat-icon>
+                  </button>
+                  <span style="font-size:13px;font-weight:600;color:var(--ink-soft);padding:0 8px">
+                    {{currentPage() + 1}} / {{totalPages()}}
+                  </span>
+                  <button mat-icon-button [disabled]="currentPage() === totalPages() - 1" (click)="nextPage()">
+                    <mat-icon>chevron_right</mat-icon>
+                  </button>
                 </div>
               </div>
             }
-          </div>
-        }
-      </div>
-    }
+          }
+        </div>
+      </mat-tab>
+
+    </mat-tab-group>
   `,
 })
 export class JustificationsComponent implements OnInit {
@@ -225,27 +313,60 @@ export class JustificationsComponent implements OnInit {
   readonly academicYearContext = inject(AcademicYearContextService);
 
   readonly courses = signal<Course[]>([]);
-  readonly justifications = signal<Justification[]>([]);
-  readonly loading = signal(false);
-  readonly editingId = signal<number | null>(null);
 
-  readonly studentEnrollments = signal<Enrollment[]>([]);
+  // ─── Shared ───────────────────────────────────────────────────────────────
+  selectedTabIndex = 0;
+  selYear: number | null = null;
+  selCourse: number | null = null;
+
+  // ─── Tab 1: Nueva justificación ───────────────────────────────────────────
+  readonly pendingStudents = signal<{ enrollmentId: number; fullName: string }[]>([]);
+  selStudentCreate: number | null = null;
   readonly unjustified = signal<Absence[]>([]);
   readonly selectedIds = signal<Set<number>>(new Set());
 
-  selYear: number | null = null;
-  selCourse: number | null = null;
-  selStudent: number | null = null;
+  // ─── Tab 2: Historial ─────────────────────────────────────────────────────
+  readonly allJustifications = signal<Justification[]>([]);
+  readonly loading = signal(false);
+  readonly editingId = signal<number | null>(null);
+  readonly selStudentHistorial = signal<number | null>(null);
+  readonly currentPage = signal(0);
+  readonly PAGE_SIZE = 10;
   editReason = '';
   editNotifiedBy = '';
+
+  readonly studentsWithJustifications = computed(() => {
+    const seen = new Map<number, string>();
+    for (const j of this.allJustifications()) {
+      if (!seen.has(j.enrollmentId)) seen.set(j.enrollmentId, j.studentName ?? '');
+    }
+    return [...seen.entries()]
+      .map(([id, name]) => ({ enrollmentId: id, fullName: name }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName));
+  });
+
+  readonly filteredJustifications = computed(() => {
+    const sel = this.selStudentHistorial();
+    if (!sel) return this.allJustifications();
+    return this.allJustifications().filter(j => j.enrollmentId === sel);
+  });
+
+  readonly pagedJustifications = computed(() => {
+    const start = this.currentPage() * this.PAGE_SIZE;
+    return this.filteredJustifications().slice(start, start + this.PAGE_SIZE);
+  });
+
+  readonly totalPages = computed(() =>
+    Math.ceil(this.filteredJustifications().length / this.PAGE_SIZE)
+  );
 
   async ngOnInit(): Promise<void> {
     this.courses.set(await firstValueFrom(this.http.get<Course[]>('/api/courses')));
     const active = this.academicYearContext.selected();
-    if (active) { this.selYear = active.id; await this.load(); }
+    if (active) { this.selYear = active.id; await this.loadHistorial(); }
   }
 
-  async load(): Promise<void> {
+  async loadHistorial(): Promise<void> {
     this.loading.set(true);
     try {
       const params: string[] = [];
@@ -253,35 +374,53 @@ export class JustificationsComponent implements OnInit {
       if (this.selCourse) params.push(`course_id=${this.selCourse}`);
       const qs = params.length ? '?' + params.join('&') : '';
       const data = await firstValueFrom(this.http.get<Justification[]>(`/api/justifications${qs}`));
-      this.justifications.set(data);
+      this.allJustifications.set(data);
     } finally { this.loading.set(false); }
   }
 
-  async onFiltersChange(): Promise<void> {
-    await this.load();
-    this.selStudent = null;
-    this.unjustified.set([]);
-    this.selectedIds.set(new Set());
-    if (this.selYear && this.selCourse) {
-      const [enrollments, pending] = await Promise.all([
-        firstValueFrom(this.http.get<Enrollment[]>(`/api/enrollments?course_id=${this.selCourse}&academic_year_id=${this.selYear}`)),
-        firstValueFrom(this.http.get<Absence[]>(`/api/absences?course_id=${this.selCourse}&academic_year_id=${this.selYear}&is_justified=false`)),
-      ]);
-      const pendingEnrollmentIds = new Set(pending.map(a => a.enrollmentId));
-      this.studentEnrollments.set(enrollments.filter(e => pendingEnrollmentIds.has(e.enrollmentId)));
-    } else {
-      this.studentEnrollments.set([]);
+  async loadPendingStudents(): Promise<void> {
+    if (!this.selYear || !this.selCourse) { this.pendingStudents.set([]); return; }
+    const pending = await firstValueFrom(
+      this.http.get<Absence[]>(
+        `/api/absences?course_id=${this.selCourse}&academic_year_id=${this.selYear}&is_justified=false`
+      )
+    );
+    const seen = new Map<number, string>();
+    for (const a of pending) {
+      if (!seen.has(a.enrollmentId)) seen.set(a.enrollmentId, a.studentName);
     }
+    this.pendingStudents.set(
+      [...seen.entries()]
+        .map(([id, name]) => ({ enrollmentId: id, fullName: name }))
+        .sort((a, b) => a.fullName.localeCompare(b.fullName))
+    );
   }
 
-  async onStudentChange(): Promise<void> {
+  async onCourseChange(): Promise<void> {
+    this.selStudentCreate = null;
+    this.selStudentHistorial.set(null);
+    this.unjustified.set([]);
     this.selectedIds.set(new Set());
-    if (!this.selStudent) { this.unjustified.set([]); return; }
+    this.currentPage.set(0);
+    await Promise.all([this.loadHistorial(), this.loadPendingStudents()]);
+  }
+
+  async onStudentCreateChange(): Promise<void> {
+    this.selectedIds.set(new Set());
+    this.unjustified.set([]);
+    if (!this.selStudentCreate) return;
     const data = await firstValueFrom(
-      this.http.get<Absence[]>(`/api/absences?enrollment_id=${this.selStudent}&is_justified=false`)
+      this.http.get<Absence[]>(`/api/absences?enrollment_id=${this.selStudentCreate}&is_justified=false`)
     );
     this.unjustified.set(data);
   }
+
+  onStudentHistorialChange(): void { this.currentPage.set(0); }
+
+  prevPage(): void { this.currentPage.update(p => p - 1); }
+  nextPage(): void { this.currentPage.update(p => p + 1); }
+
+  clamp(total: number, end: number): number { return Math.min(total, end); }
 
   toggleSelect(id: number): void {
     this.selectedIds.update(s => {
@@ -325,13 +464,15 @@ export class JustificationsComponent implements OnInit {
     const saved = await firstValueFrom(ref.afterClosed());
     if (saved) {
       this.selectedIds.set(new Set());
-      await this.onStudentChange();
-      await this.load();
+      await Promise.all([
+        this.onStudentCreateChange(),
+        this.loadHistorial(),
+        this.loadPendingStudents(),
+      ]);
     }
   }
 
-  // Same deterministic tilt as the wizard's evidence tiles — stable across
-  // re-renders, just enough to read as loosely pinned rather than aligned.
+  // Misma inclinación determinista que los tiles del wizard — estable entre renders.
   rotationFor(name: string): number {
     let hash = 0;
     for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
@@ -348,7 +489,7 @@ export class JustificationsComponent implements OnInit {
     try {
       await firstValueFrom(this.http.post(`/api/justifications/${justificationId}/attachments`, fd));
       this.notify.success('Adjunto(s) agregado(s)');
-      await this.load();
+      await this.loadHistorial();
     } catch (err: any) {
       this.notify.error(err?.error?.error ?? 'Error al subir archivo');
     }
@@ -362,7 +503,7 @@ export class JustificationsComponent implements OnInit {
       if (!ok) return;
       await firstValueFrom(this.http.delete(`/api/justifications/${justificationId}/attachments/${attachmentId}`));
       this.notify.success('Adjunto eliminado');
-      await this.load();
+      await this.loadHistorial();
     });
   }
 
@@ -376,7 +517,7 @@ export class JustificationsComponent implements OnInit {
     await firstValueFrom(this.http.put(`/api/justifications/${id}`, { reason: this.editReason, notifiedBy: this.editNotifiedBy }));
     this.editingId.set(null);
     this.notify.success('Justificación actualizada');
-    await this.load();
+    await this.loadHistorial();
   }
 
   remove(id: number): void {
@@ -387,7 +528,7 @@ export class JustificationsComponent implements OnInit {
       if (!ok) return;
       await firstValueFrom(this.http.delete(`/api/justifications/${id}`));
       this.notify.success('Eliminada');
-      await this.load();
+      await this.loadHistorial();
     });
   }
 }
