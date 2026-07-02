@@ -41,6 +41,9 @@ services:
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
       - OCR_SERVICE_URL=${OCR_SERVICE_URL}
       - EXCEL_SERVICE_URL=http://excel-service:8002
+      - WHISPER_URL=${WHISPER_URL}
+      - LLM_URL=${LLM_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
       - NODE_ENV=production
     depends_on:
       - excel-service
