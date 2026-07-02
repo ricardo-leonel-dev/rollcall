@@ -27,7 +27,6 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<s
   fd.append('response_format', 'json');
 
   const resp = await fetch(`${WHISPER_URL}/v1/audio/transcriptions`, { method: 'POST', body: fd });
-  console.log(resp);
   if (!resp.ok) throw new Error(`Whisper error ${resp.status}: ${await resp.text()}`);
   const data = await resp.json() as { text: string };
   return data.text.trim();
@@ -111,7 +110,7 @@ export async function parseVoiceAbsence(
   catch { throw new Error(`LLM devolvió JSON inválido: ${raw.slice(0, 200)}`); }
 
   const enrollmentId = typeof parsed.enrollmentId === 'number' ? parsed.enrollmentId : null;
-  if (!enrollmentId) throw new Error('No se pudo identificar al estudiante en el comando de voz');
+  if (!enrollmentId) throw new Error(`No se pudo identificar al estudiante en el comando de voz. ${transcription}`);
 
   const rawType  = String(parsed.type ?? 'F').toUpperCase();
   const dateFrom = String(parsed.dateFrom ?? today);
