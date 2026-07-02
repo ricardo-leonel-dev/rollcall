@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, signal, inject, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, inject, OnInit, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -12,8 +12,9 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { DecimalPipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
-import { Course, Enrollment, Absence, OcrResult } from '../../core/models/index';
+import { Course, Enrollment, Absence, OcrResult, VoiceAbsenceResult } from '../../core/models/index';
 import { dateToDateString } from '../../shared/utils/date.util';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -27,9 +28,32 @@ import { AbsenceDialogComponent } from './absence-dialog.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule,
-            MatButtonModule, MatIconModule, MatTooltipModule, MatMenuModule, MatDatepickerModule, WhatsappIconComponent],
+            MatButtonModule, MatIconModule, MatTooltipModule, MatMenuModule, MatDatepickerModule,
+            WhatsappIconComponent, DecimalPipe],
   styles: [`
     .tab-content { padding: 20px 0; }
+    @keyframes pulse-mic {
+      0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 40%, transparent); }
+      50%       { box-shadow: 0 0 0 16px color-mix(in srgb, var(--accent) 0%, transparent); }
+    }
+    .mic-btn {
+      width: 96px; height: 96px; border-radius: 50%; border: none; cursor: pointer;
+      background: var(--accent); color: white; display: flex; align-items: center;
+      justify-content: center; transition: transform 0.15s, background 0.15s;
+    }
+    .mic-btn:hover { transform: scale(1.05); }
+    .mic-btn.recording { background: #dc2626; animation: pulse-mic 1.2s ease-in-out infinite; }
+    .voice-zone {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; padding: 40px 20px; text-align: center;
+    }
+    .confidence-bar {
+      height: 4px; border-radius: 2px; background: var(--border);
+      overflow: hidden; width: 100%; max-width: 240px;
+    }
+    .confidence-bar-fill {
+      height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.4s;
+    }
     .enroll-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: 10px 16px; border-bottom: 1px solid var(--border-soft);
@@ -215,6 +239,114 @@ import { AbsenceDialogComponent } from './absence-dialog.component';
         </div>
       </mat-tab>
 
+      <!-- TAB VOZ -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">mic</mat-icon>
+          Voz
+        </ng-template>
+        <div class="tab-content" style="padding:20px">
+
+          @if (voiceState() === 'idle' || voiceState() === 'recording') {
+            <div class="voice-zone">
+              <button class="mic-btn" [class.recording]="voiceState() === 'recording'"
+                      (click)="voiceState() === 'idle' ? startRecording() : stopRecording()">
+                <mat-icon style="font-size:40px;width:40px;height:40px">
+                  {{voiceState() === 'recording' ? 'stop' : 'mic'}}
+                </mat-icon>
+              </button>
+              @if (voiceState() === 'idle') {
+                <div style="font-weight:600;color:var(--ink-soft)">Habla para registrar una inasistencia</div>
+                <div style="font-size:13px;color:var(--muted);max-width:320px;line-height:1.5">
+                  Ej: <em>«Agrega una falta a Juan Pérez hoy»</em><br>
+                  o bien: <em>«Atraso de Ana Torres el martes pasado»</em>
+                </div>
+                @if (selCourse) {
+                  <div style="font-size:12px;color:var(--accent);margin-top:4px">
+                    <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">info</mat-icon>
+                    Se buscará en el curso seleccionado
+                  </div>
+                }
+              } @else {
+                <div style="font-weight:600;color:#dc2626">Grabando… pulsa para detener</div>
+                <div style="font-size:22px;font-variant-numeric:tabular-nums;color:var(--ink-soft);font-weight:700">
+                  {{voiceSeconds()}}s
+                </div>
+              }
+            </div>
+          }
+
+          @if (voiceState() === 'processing') {
+            <div style="display:flex;align-items:center;gap:16px;padding:20px;background:var(--paper-deep);border-radius:12px;margin-top:8px">
+              <div class="spinner" style="flex-shrink:0"></div>
+              <div>
+                <div style="font-weight:600;color:var(--ink-soft)">Transcribiendo y analizando…</div>
+                <div style="font-size:13px;color:var(--muted)">Puede tardar unos segundos</div>
+              </div>
+            </div>
+          }
+
+          @if (voiceState() === 'preview' && voiceResult()) {
+            <div style="margin-top:8px">
+              <!-- Transcripción -->
+              <div style="font-size:13px;color:var(--muted-strong);font-style:italic;background:var(--paper-deep);padding:10px 14px;border-radius:8px;margin-bottom:16px;line-height:1.5">
+                "{{voiceResult()!.transcription}}"
+              </div>
+
+              <!-- Resultado -->
+              <div style="border-left:4px solid var(--accent);background:var(--paper-deep);border-radius:0 12px 12px 0;padding:16px 20px;margin-bottom:16px">
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <mat-icon style="color:var(--muted);font-size:18px;width:18px;height:18px">person</mat-icon>
+                    <span style="font-size:15px;font-weight:600">{{voiceResult()!.studentName}}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <mat-icon style="color:var(--muted);font-size:18px;width:18px;height:18px">event_busy</mat-icon>
+                    <span [class]="'badge-' + voiceResult()!.type" style="font-size:13px">
+                      {{voiceResult()!.type === 'F' ? 'Falta' : 'Atrasado'}}
+                    </span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <mat-icon style="color:var(--muted);font-size:18px;width:18px;height:18px">calendar_today</mat-icon>
+                    <span style="font-size:14px;color:var(--ink-soft)">
+                      @if (voiceResult()!.dateFrom === voiceResult()!.dateTo) {
+                        {{voiceResult()!.dateFrom}}
+                      } @else {
+                        {{voiceResult()!.dateFrom}} → {{voiceResult()!.dateTo}}
+                      }
+                    </span>
+                  </div>
+                  <!-- Confianza -->
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <span style="font-size:12px;color:var(--muted)">
+                      Confianza: {{(voiceResult()!.confidence * 100) | number:'1.0-0'}}%
+                      @if (voiceResult()!.confidence < 0.7) {
+                        <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle;color:#b45309" matTooltip="Confianza baja — revisa los datos">warning_amber</mat-icon>
+                      }
+                    </span>
+                    <div class="confidence-bar">
+                      <div class="confidence-bar-fill" [style.width]="(voiceResult()!.confidence * 100) + '%'"
+                           [style.background]="voiceResult()!.confidence < 0.7 ? '#f59e0b' : 'var(--accent)'"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Acciones -->
+              <div style="display:flex;gap:10px">
+                <button mat-flat-button color="primary" (click)="confirmVoiceAbsence()">
+                  <mat-icon>check</mat-icon> Confirmar
+                </button>
+                <button mat-stroked-button (click)="cancelVoice()">
+                  <mat-icon>close</mat-icon> Cancelar
+                </button>
+              </div>
+            </div>
+          }
+
+        </div>
+      </mat-tab>
+
       <!-- TAB LISTADO -->
       <mat-tab>
         <ng-template mat-tab-label>
@@ -341,7 +473,7 @@ import { AbsenceDialogComponent } from './absence-dialog.component';
     </mat-tab-group>
   `,
 })
-export class AbsencesComponent implements OnInit {
+export class AbsencesComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly notify = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
@@ -357,6 +489,9 @@ export class AbsencesComponent implements OnInit {
   readonly enrollLoading = signal(false);
   readonly absLoading = signal(false);
   readonly todayAbsences = signal<Absence[]>([]);
+  readonly voiceState = signal<'idle' | 'recording' | 'processing' | 'preview'>('idle');
+  readonly voiceResult = signal<VoiceAbsenceResult | null>(null);
+  readonly voiceSeconds = signal(0);
 
   selectedTabIndex = 0;
   selYear: number | null = null;
@@ -368,6 +503,9 @@ export class AbsencesComponent implements OnInit {
   studentSearch = '';
   manualSearch = '';
   private notificationTemplate = DEFAULT_NOTIFICATION_TEMPLATE;
+  private mediaRecorder: MediaRecorder | null = null;
+  private audioChunks: Blob[] = [];
+  private voiceTimer: ReturnType<typeof setInterval> | null = null;
 
   async ngOnInit(): Promise<void> {
     const [courses, me] = await Promise.all([
@@ -564,5 +702,84 @@ export class AbsencesComponent implements OnInit {
       await firstValueFrom(this.http.delete(`/api/absences/${a.id}`));
       await Promise.all([this.loadAbsences(), this.loadTodayAbsences()]);
     });
+  }
+
+  async startRecording(): Promise<void> {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.audioChunks = [];
+      this.mediaRecorder = new MediaRecorder(stream);
+      this.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) this.audioChunks.push(e.data); };
+      this.mediaRecorder.start(250);
+      this.voiceSeconds.set(0);
+      this.voiceState.set('recording');
+      this.voiceTimer = setInterval(() => this.voiceSeconds.update(s => s + 1), 1000);
+    } catch {
+      this.notify.error('No se pudo acceder al micrófono');
+    }
+  }
+
+  stopRecording(): void {
+    if (!this.mediaRecorder) return;
+    if (this.voiceTimer) { clearInterval(this.voiceTimer); this.voiceTimer = null; }
+    this.mediaRecorder.onstop = () => {
+      const blob = new Blob(this.audioChunks, { type: this.mediaRecorder!.mimeType || 'audio/webm' });
+      this.mediaRecorder!.stream.getTracks().forEach(t => t.stop());
+      this.mediaRecorder = null;
+      this.sendVoice(blob);
+    };
+    this.mediaRecorder.stop();
+    this.voiceState.set('processing');
+  }
+
+  private async sendVoice(blob: Blob): Promise<void> {
+    try {
+      const fd = new FormData();
+      fd.append('audio', blob, 'audio.webm');
+      if (this.selCourse)  fd.append('course_id',        String(this.selCourse));
+      if (this.selYear)    fd.append('academic_year_id',  String(this.selYear));
+      const result = await firstValueFrom(
+        this.http.post<VoiceAbsenceResult>('/api/ai/voice-absence', fd)
+      );
+      this.voiceResult.set(result);
+      this.voiceState.set('preview');
+    } catch (err: any) {
+      this.notify.error(err?.error?.error ?? 'No se pudo interpretar el audio', { duration: 6000 });
+      this.voiceState.set('idle');
+    }
+  }
+
+  async confirmVoiceAbsence(): Promise<void> {
+    const r = this.voiceResult();
+    if (!r) return;
+    try {
+      const result = await firstValueFrom(
+        this.http.post<{ created: number; skipped: number }>('/api/absences', {
+          enrollmentId: r.enrollmentId,
+          type:         r.type,
+          dateFrom:     r.dateFrom,
+          dateTo:       r.dateTo,
+        })
+      );
+      const msg = result.skipped > 0
+        ? `${result.created} registro(s) creado(s), ${result.skipped} ya existían`
+        : `${result.created} registro(s) creado(s)`;
+      this.notify.success(msg);
+      this.voiceState.set('idle');
+      this.voiceResult.set(null);
+      await Promise.all([this.loadTodayAbsences(), this.loadAbsences()]);
+    } catch (err: any) {
+      this.notify.error(err?.error?.error ?? 'No se pudo guardar');
+    }
+  }
+
+  cancelVoice(): void {
+    this.voiceState.set('idle');
+    this.voiceResult.set(null);
+  }
+
+  ngOnDestroy(): void {
+    if (this.voiceTimer) clearInterval(this.voiceTimer);
+    this.mediaRecorder?.stream.getTracks().forEach(t => t.stop());
   }
 }

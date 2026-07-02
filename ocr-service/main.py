@@ -8,7 +8,8 @@ import io, re
 app = FastAPI(title="OCR Service — School Attendance System")
 
 VLLM_URL     = os.getenv("VLLM_URL", "http://vllm-vision:8000")
-VISION_MODEL = os.getenv("VISION_MODEL", "Qwen/Qwen2.5-VL-7B-Instruct")
+VISION_MODEL = os.getenv("VISION_MODEL", "local")
+AI_API_KEY   = os.getenv("AI_API_KEY", "")
 DB_URL       = os.getenv("DATABASE_URL", "postgresql://attendance:asistencia_local_2026@postgres:5432/attendance")
 DB_SCHEMA    = os.getenv("DB_SCHEMA", "attendance")
 
@@ -74,8 +75,9 @@ async def call_vllm(imagen_b64: str) -> dict:
         "max_tokens": 1024,
         "temperature": 0.1
     }
+    headers = {"Authorization": f"Bearer {AI_API_KEY}"} if AI_API_KEY else {}
     async with httpx.AsyncClient(timeout=1800.0) as client:
-        resp = await client.post(f"{VLLM_URL}/v1/chat/completions", json=payload)
+        resp = await client.post(f"{VLLM_URL}/v1/chat/completions", json=payload, headers=headers)
     if resp.status_code != 200:
         raise HTTPException(status_code=502, detail=f"Error vLLM: {resp.text[:300]}")
     texto = resp.json()["choices"][0]["message"]["content"].strip()

@@ -193,3 +193,13 @@ export interface OcrResult {
   not_found: string[];
   total_in_photo: number;
 }
+
+export interface VoiceAbsenceResult {
+  transcription: string;
+  enrollmentId:  number;
+  studentName:   string;
+  type:          'F' | 'AT';
+  dateFrom:      string;
+  dateTo:        string;
+  confidence:    number;
+}
