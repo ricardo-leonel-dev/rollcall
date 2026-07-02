@@ -67,7 +67,7 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - DB_SCHEMA=${DB_SCHEMA}
-      - VLLM_URL=${VLLM_URL}
+      - VLLM_URL=${LLM_URL}
       - VISION_MODEL=${VISION_MODEL}
       - AI_API_KEY=${LLM_API_KEY}
     depends_on:
@@ -118,7 +118,7 @@ services:
       - OCR_SERVICE_URL=http://ocr-service:8001
       - EXCEL_SERVICE_URL=http://excel-service:8002
       - WHISPER_URL=${WHISPER_URL}
-      - LLM_URL=${VLLM_URL}
+      - LLM_URL=${LLM_URL}
       - LLM_API_KEY=${LLM_API_KEY}
       - NODE_ENV=production
     depends_on:
