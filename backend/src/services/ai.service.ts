@@ -27,6 +27,7 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<s
   fd.append('response_format', 'json');
 
   const resp = await fetch(`${WHISPER_URL}/v1/audio/transcriptions`, { method: 'POST', body: fd });
+  console.log(resp);
   if (!resp.ok) throw new Error(`Whisper error ${resp.status}: ${await resp.text()}`);
   const data = await resp.json() as { text: string };
   return data.text.trim();
