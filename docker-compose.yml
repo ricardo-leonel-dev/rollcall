@@ -53,143 +53,8 @@ services:
       start_period: 10s
 
   # ─────────────────────────────────────────
-  # OLLAMA-CHAT — GPU 0 — chat familiar
-  # ─────────────────────────────────────────
-  ollama-chat:
-    image: ollama/ollama:latest
-    container_name: ollama-chat
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_chat_data:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ["0"]
-              capabilities: [gpu]
-    environment:
-      - OLLAMA_NUM_PARALLEL=1
-      - OLLAMA_MAX_LOADED_MODELS=1
-      - OLLAMA_KEEP_ALIVE=-1
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 15s
-      timeout: 10s
-      retries: 40
-      start_period: 30s
-
-  # ─────────────────────────────────────────
-  # VLLM-VISION — GPU 1 (GPU 0 y 2 libres por ahora)
-  # Qwen2.5-VL-3B-AWQ: checkpoint en disco 3.17 GiB, ~1.7 GiB ya cargado en VRAM.
-  # Probado con tensor-parallel-size=2 (GPU 1+2): NO ayudó. La VRAM nunca fue
-  # el cuello de botella (sobra en 1 sola GPU de 6GB) — el cuello de botella
-  # es la RAM del host (7.2GB) al leer el checkpoint de disco. Con 2 GPUs hay
-  # 2 procesos leyendo el checkpoint completo en paralelo, duplicando la
-  # presión sobre esa misma RAM escasa: el host terminó haciendo swap pesado
-  # (3.6/4GB) y uno de los dos workers nunca terminó de cargar, quedando
-  # colgado en un deadlock de sincronización entre procesos (shm_broadcast).
-  # Con 1 GPU un solo proceso carga el checkpoint (lento por poca RAM
-  # disponible para cachear el archivo, ~107s, pero sin competir consigo
-  # mismo) y termina sin colgarse.
-  # ─────────────────────────────────────────
-  vllm-vision:
-    image: vllm/vllm-openai:latest
-    container_name: vllm-vision
-    restart: unless-stopped
-    ports:
-      - "11435:8000"
-    volumes:
-      - vllm_vision_data:/root/.cache/huggingface
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ["1"]
-              capabilities: [gpu]
-    environment:
-      - CUDA_VISIBLE_DEVICES=0
-      - HF_HUB_OFFLINE=0
-      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-      - OMP_NUM_THREADS=1
-    command: >
-      --model Qwen/Qwen2.5-VL-3B-Instruct-AWQ
-      --max-model-len 2048
-      --gpu-memory-utilization 0.9
-      --dtype float16
-      --quantization awq
-      --trust-remote-code
-      --enforce-eager
-      --limit-mm-per-prompt '{"image":1}'
-      --mm-processor-kwargs '{"max_pixels": 1048576}'
-      --attention-backend TRITON_ATTN
-    shm_size: '2gb'
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 40
-      start_period: 120s
-
-  # ─────────────────────────────────────────
-  # OPEN WEBUI — interfaz chat familiar
-  # Puerto 3001 (3000 es el backend)
-  # ─────────────────────────────────────────
-  open-webui:
-    image: ghcr.io/open-webui/open-webui:main
-    container_name: open-webui
-    restart: unless-stopped
-    ports:
-      - "3001:8080"
-    volumes:
-      - webui_data:/app/backend/data
-    environment:
-      - OLLAMA_BASE_URL=http://ollama-chat:11434
-      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
-      - DEFAULT_MODELS=qwen2.5:7b
-      - ENABLE_IMAGE_GENERATION=false
-      - ENABLE_SIGNUP=true
-      - DEFAULT_USER_ROLE=user
-    depends_on:
-      ollama-chat:
-        condition: service_healthy
-
-  # ─────────────────────────────────────────
-  # MODEL LOADER — precarga modelos ollama
-  # ─────────────────────────────────────────
-  model-loader:
-    image: alpine:latest
-    container_name: model-loader
-    restart: "no"
-    depends_on:
-      ollama-chat:
-        condition: service_started
-    command:
-      - /bin/sh
-      - -c
-      - |
-        apk add --no-cache curl > /dev/null 2>&1
-        echo "=== Esperando ollama-chat ==="
-        until curl -sf http://ollama-chat:11434/api/tags > /dev/null; do
-          echo "  ... esperando ollama-chat"; sleep 5
-        done
-        echo "✓ ollama-chat responde"
-        echo "=== Descargando qwen2.5:7b ==="
-        curl -sf -X POST http://ollama-chat:11434/api/pull \
-          -H "Content-Type: application/json" \
-          -d '{"name":"qwen2.5:7b","stream":false}'
-        echo "✓ qwen2.5:7b listo"
-        curl -sf -X POST http://ollama-chat:11434/api/generate \
-          -H "Content-Type: application/json" \
-          -d '{"model":"qwen2.5:7b","prompt":"hola","stream":false,"keep_alive":-1}' > /dev/null
-        echo "✓ qwen2.5:7b cargado en GPU 0"
-
-  # ─────────────────────────────────────────
   # OCR SERVICE — Python 3.11 + FastAPI
-  # Procesa fotos de listas manuscritas via vLLM
+  # Procesa fotos de listas manuscritas via llama-server (rig remoto)
   # ─────────────────────────────────────────
   ocr-service:
     build:
@@ -204,10 +69,9 @@ services:
       - DB_SCHEMA=${DB_SCHEMA}
       - VLLM_URL=${VLLM_URL}
       - VISION_MODEL=${VISION_MODEL}
+      - AI_API_KEY=${LLM_API_KEY}
     depends_on:
       postgres:
-        condition: service_healthy
-      vllm-vision:
         condition: service_healthy
 
   # ─────────────────────────────────────────
@@ -253,6 +117,9 @@ services:
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
       - OCR_SERVICE_URL=http://ocr-service:8001
       - EXCEL_SERVICE_URL=http://excel-service:8002
+      - WHISPER_URL=${WHISPER_URL}
+      - LLM_URL=${VLLM_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
       - NODE_ENV=production
     depends_on:
       postgres:
@@ -282,9 +149,6 @@ services:
 
 volumes:
   tailscale_data:
-  ollama_chat_data:
-  vllm_vision_data:
-  webui_data:
   postgres_data:
   excel_output:
   avatars_data:
