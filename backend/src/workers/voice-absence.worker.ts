@@ -9,11 +9,12 @@ async function saveLog(params: {
   jobId: string;
   data: VoiceAbsenceJobData;
   result?: VoiceAbsencePreview;
+  transcription?: string;
   processingMs: number;
   status: 'completed' | 'failed';
   errorReason?: string;
 }): Promise<void> {
-  const { jobId, data, result, processingMs, status, errorReason } = params;
+  const { jobId, data, result, transcription, processingMs, status, errorReason } = params;
   try {
     await AppDataSource.query(
       `INSERT INTO voice_absence_logs
@@ -27,7 +28,7 @@ async function saveLog(params: {
         data.courseId,
         data.academicYearId,
         result?.enrollmentId ?? null,
-        result?.transcription ?? null,
+        result?.transcription ?? transcription ?? null,
         result?.studentName ?? null,
         result?.type ?? null,
         result?.dateFrom ?? null,
@@ -50,7 +51,10 @@ export function startVoiceAbsenceWorker(): void {
       const start = Date.now();
       const { audioBase64, mimeType, institutionId, courseId, academicYearId } = job.data;
       const buffer = Buffer.from(audioBase64, 'base64');
-      const result = await parseVoiceAbsence(buffer, mimeType, institutionId, courseId, academicYearId);
+      const result = await parseVoiceAbsence(
+        buffer, mimeType, institutionId, courseId, academicYearId,
+        async (t) => { await job.updateData({ ...job.data, transcription: t }); },
+      );
       await saveLog({ jobId: job.id!, data: job.data, result, processingMs: Date.now() - start, status: 'completed' });
       return result;
     },
@@ -66,6 +70,7 @@ export function startVoiceAbsenceWorker(): void {
       await saveLog({
         jobId: job.id!,
         data: job.data,
+        transcription: job.data.transcription,
         processingMs: Date.now() - (job.processedOn ?? Date.now()),
         status: 'failed',
         errorReason: err.message,

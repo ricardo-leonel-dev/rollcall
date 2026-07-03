@@ -69,12 +69,14 @@ export async function parseVoiceAbsence(
   institutionId: number,
   courseId?: number,
   academicYearId?: number,
+  onTranscribed?: (t: string) => Promise<void>,
 ): Promise<VoiceAbsencePreview> {
   if (!courseId || !academicYearId) {
     throw new Error('Debes seleccionar un curso antes de registrar una inasistencia por voz');
   }
 
   const transcription = await transcribeAudio(audioBuffer, mimeType);
+  if (onTranscribed) await onTranscribed(transcription);
 
   const rows = await fetchEnrollments(courseId, academicYearId, institutionId);
   let studentContext = '';
