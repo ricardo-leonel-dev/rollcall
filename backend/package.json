@@ -9,6 +9,8 @@
     "dev": "ts-node-dev --respawn src/app.ts"
   },
   "dependencies": {
+    "@bull-board/api": "^8.0.2",
+    "@bull-board/express": "^8.0.2",
     "bcrypt": "^5.1.1",
     "bullmq": "^5.79.2",
     "class-transformer": "^0.5.1",
