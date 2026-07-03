@@ -97,6 +97,21 @@ services:
         condition: service_healthy
 
   # ─────────────────────────────────────────
+  # REDIS — cola de jobs para procesamiento de voz
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ─────────────────────────────────────────
   # BACKEND — Node.js 22 + Express 5 + TypeScript
   # API REST principal
   # ─────────────────────────────────────────
@@ -120,9 +135,12 @@ services:
       - WHISPER_URL=${WHISPER_URL}
       - LLM_URL=${LLM_URL}
       - LLM_API_KEY=${LLM_API_KEY}
+      - REDIS_URL=redis://redis:6379
       - NODE_ENV=production
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
@@ -150,6 +168,7 @@ services:
 volumes:
   tailscale_data:
   postgres_data:
+  redis_data:
   excel_output:
   avatars_data:
 

@@ -12,7 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { Course, Enrollment, Absence, OcrResult, VoiceAbsenceResult } from '../../core/models/index';
 import { dateToDateString } from '../../shared/utils/date.util';
@@ -24,12 +24,27 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
 import { AbsenceRangeDialogComponent, AbsenceRangeDialogResult } from './absence-range-dialog.component';
 import { AbsenceDialogComponent } from './absence-dialog.component';
 
+interface VoiceLog {
+  id: number;
+  job_id: string;
+  transcription: string | null;
+  student_name: string | null;
+  absence_type: 'F' | 'AT' | null;
+  date_from: string | null;
+  confidence: number | null;
+  status: 'completed' | 'failed';
+  confirmed: boolean | null;
+  error_reason: string | null;
+  processing_ms: number | null;
+  created_at: string;
+}
+
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule,
             MatButtonModule, MatIconModule, MatTooltipModule, MatMenuModule, MatDatepickerModule,
-            WhatsappIconComponent, DecimalPipe],
+            WhatsappIconComponent, DecimalPipe, DatePipe],
   styles: [`
     .tab-content { padding: 20px 0; }
     @keyframes pulse-mic {
@@ -99,7 +114,7 @@ import { AbsenceDialogComponent } from './absence-dialog.component';
       </mat-form-field>
     </div>
 
-    <mat-tab-group [(selectedIndex)]="selectedTabIndex" style="background:var(--paper);border-radius:16px;border:1px solid var(--border);overflow:hidden">
+    <mat-tab-group [(selectedIndex)]="selectedTabIndex" (selectedTabChange)="onTabChange($event.index)" style="background:var(--paper);border-radius:16px;border:1px solid var(--border);overflow:hidden">
 
       <!-- TAB FOTO -->
       <mat-tab>
@@ -475,6 +490,96 @@ import { AbsenceDialogComponent } from './absence-dialog.component';
           }
         </div>
       </mat-tab>
+
+      <!-- TAB HISTORIAL VOZ -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">history</mat-icon>
+          Historial
+        </ng-template>
+        <div class="tab-content" style="padding:16px">
+
+          @if (voiceLogsLoading()) {
+            <div style="display:flex;align-items:center;gap:16px;padding:20px;background:var(--paper-deep);border-radius:12px">
+              <div class="spinner"></div>
+              <div>
+                <div style="font-weight:600;color:var(--ink)">Cargando historial</div>
+                <div style="font-size:13px;color:var(--muted-strong)">Recuperando registros de voz...</div>
+              </div>
+            </div>
+          } @else if (!voiceLogs().length) {
+            <div class="empty-state">
+              <mat-icon style="font-size:40px;width:40px;height:40px;color:var(--border)">record_voice_over</mat-icon>
+              <p style="color:var(--ink-soft);margin-top:8px">No hay registros de voz todavía</p>
+            </div>
+          } @else {
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Fecha y hora</th>
+                    <th>Lo que dijo</th>
+                    <th>Estudiante</th>
+                    <th>Tipo</th>
+                    <th>Confianza</th>
+                    <th>Resultado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (log of voiceLogs(); track log.id) {
+                    <tr>
+                      <td style="white-space:nowrap;color:var(--muted-strong)">{{log.created_at | date:'dd/MM/yy HH:mm'}}</td>
+                      <td>
+                        @if (log.transcription) {
+                          <mat-icon style="font-size:13px;width:13px;height:13px;color:var(--accent);vertical-align:middle;margin-right:3px">format_quote</mat-icon>
+                          <span style="font-style:italic;color:var(--muted-strong);font-size:13px">{{log.transcription.length > 45 ? (log.transcription | slice:0:45) + '…' : log.transcription}}</span>
+                        } @else {
+                          <span style="color:var(--muted)">—</span>
+                        }
+                      </td>
+                      <td style="font-weight:500">{{log.student_name ?? '—'}}</td>
+                      <td>
+                        @if (log.absence_type) {
+                          <span [class]="'badge-' + log.absence_type">{{log.absence_type === 'F' ? 'Falta' : 'Atraso'}}</span>
+                        } @else {
+                          <span style="color:var(--muted)">—</span>
+                        }
+                      </td>
+                      <td>
+                        @if (log.confidence !== null) {
+                          <div style="display:flex;align-items:center;gap:6px">
+                            <div class="confidence-bar" style="width:64px;max-width:64px">
+                              <div class="confidence-bar-fill"
+                                   [style.width.%]="(log.confidence ?? 0) * 100"
+                                   [style.background]="(log.confidence ?? 0) >= 0.7 ? 'var(--accent)' : '#f59e0b'">
+                              </div>
+                            </div>
+                            <span style="font-size:11px;color:var(--muted-strong)">{{((log.confidence ?? 0) * 100).toFixed(0)}}%</span>
+                          </div>
+                        } @else {
+                          <span style="color:var(--muted)">—</span>
+                        }
+                      </td>
+                      <td>
+                        @if (log.status === 'failed') {
+                          <span class="badge" style="background:#fee2e2;color:#b91c1c">Fallido</span>
+                        } @else if (log.confirmed === true) {
+                          <span class="badge" style="background:#dcfce7;color:#15803d">Confirmado</span>
+                        } @else if (log.confirmed === false) {
+                          <span class="badge" style="background:#f1f5f9;color:#64748b">Descartado</span>
+                        } @else {
+                          <span class="badge" style="background:#fef9c3;color:#92400e">Pendiente</span>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      </mat-tab>
+
     </mat-tab-group>
   `,
 })
@@ -497,8 +602,12 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   readonly voiceState = signal<'idle' | 'recording' | 'processing' | 'preview'>('idle');
   readonly voiceResult = signal<VoiceAbsenceResult | null>(null);
   readonly voiceSeconds = signal(0);
+  readonly voiceLogs = signal<VoiceLog[]>([]);
+  readonly voiceLogsLoading = signal(false);
 
   selectedTabIndex = 0;
+  private currentVoiceJobId: string | null = null;
+  private voiceLogsLoaded = false;
   selYear: number | null = null;
   selCourse: number | null = null;
   photoDate: Date | null = null;
@@ -747,15 +856,44 @@ export class AbsencesComponent implements OnInit, OnDestroy {
       fd.append('audio', blob, 'audio.webm');
       if (this.selCourse)  fd.append('course_id',        String(this.selCourse));
       if (this.selYear)    fd.append('academic_year_id',  String(this.selYear));
-      const result = await firstValueFrom(
-        this.http.post<VoiceAbsenceResult>('/api/ai/voice-absence', fd)
+
+      const { jobId } = await firstValueFrom(
+        this.http.post<{ jobId: string }>('/api/ai/voice-absence', fd)
       );
+      this.currentVoiceJobId = jobId;
+
+      const result = await this.pollJob(jobId);
       this.voiceResult.set(result);
       this.voiceState.set('preview');
     } catch (err: any) {
-      this.notify.error(err?.error?.error ?? 'No se pudo interpretar el audio', { duration: 6000 });
+      this.notify.error(err?.error?.error ?? err?.message ?? 'No se pudo interpretar el audio', { duration: 6000 });
       this.voiceState.set('idle');
     }
+  }
+
+  private pollJob(jobId: string, timeoutMs = 30_000): Promise<VoiceAbsenceResult> {
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+      const tick = async () => {
+        if (Date.now() - start > timeoutMs) {
+          reject(new Error('Tiempo de espera agotado. Intenta de nuevo.'));
+          return;
+        }
+        try {
+          const resp = await firstValueFrom(
+            this.http.get<{ status: string; result?: VoiceAbsenceResult; error?: string }>(
+              `/api/jobs/${jobId}`
+            )
+          );
+          if (resp.status === 'completed' && resp.result) { resolve(resp.result); return; }
+          if (resp.status === 'failed') { reject(new Error(resp.error ?? 'El procesamiento falló')); return; }
+          setTimeout(tick, 1500);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      setTimeout(tick, 1500);
+    });
   }
 
   async confirmVoiceAbsence(): Promise<void> {
@@ -774,6 +912,11 @@ export class AbsencesComponent implements OnInit, OnDestroy {
         ? `${result.created} registro(s) creado(s), ${result.skipped} ya existían`
         : `${result.created} registro(s) creado(s)`;
       this.notify.success(msg);
+      if (this.currentVoiceJobId) {
+        this.http.patch(`/api/jobs/${this.currentVoiceJobId}/confirm`, { confirmed: true }).subscribe();
+        this.currentVoiceJobId = null;
+        this.voiceLogsLoaded = false;
+      }
       this.voiceState.set('idle');
       this.voiceResult.set(null);
       await Promise.all([this.loadTodayAbsences(), this.loadAbsences()]);
@@ -783,8 +926,27 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   }
 
   cancelVoice(): void {
+    if (this.currentVoiceJobId) {
+      this.http.patch(`/api/jobs/${this.currentVoiceJobId}/confirm`, { confirmed: false }).subscribe();
+      this.currentVoiceJobId = null;
+      this.voiceLogsLoaded = false;
+    }
     this.voiceState.set('idle');
     this.voiceResult.set(null);
+  }
+
+  onTabChange(index: number): void {
+    if (index === 4) this.loadVoiceLogs();
+  }
+
+  loadVoiceLogs(): void {
+    if (this.voiceLogsLoaded) return;
+    this.voiceLogsLoading.set(true);
+    this.http.get<{ data: VoiceLog[] }>('/api/jobs/voice-logs').subscribe({
+      next: r => { this.voiceLogs.set(r.data); this.voiceLogsLoaded = true; },
+      error: () => {},
+      complete: () => this.voiceLogsLoading.set(false),
+    });
   }
 
   ngOnDestroy(): void {

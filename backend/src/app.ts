@@ -11,6 +11,7 @@ import { AppDataSource } from './data-source';
 import { seedSuperAdmin } from './seed';
 import routes from './routes/index';
 import { errorMiddleware } from './middleware/error.middleware';
+import { startVoiceAbsenceWorker } from './workers/voice-absence.worker';
 
 const app = express();
 
@@ -39,6 +40,7 @@ async function bootstrap() {
     console.log('[db] Conexión establecida');
 
     await seedSuperAdmin();
+    startVoiceAbsenceWorker();
 
     app.listen(PORT, () => {
       console.log(`[server] Backend escuchando en http://0.0.0.0:${PORT}`);
