@@ -46,8 +46,11 @@ async function fetchEnrollments(courseId: number, academicYearId: number, instit
   `, [courseId, academicYearId, institutionId]) as Promise<{ enrollment_id: number; name: string }[]>;
 }
 
-function todayISO(): string {
-  return new Date().toISOString().split('T')[0];
+function todayContext(): { iso: string; label: string } {
+  const now = new Date();
+  const iso = now.toISOString().split('T')[0];
+  const days = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  return { iso, label: days[now.getDay()] };
 }
 
 export async function parseVoiceAbsence(
@@ -57,29 +60,32 @@ export async function parseVoiceAbsence(
   courseId?: number,
   academicYearId?: number,
 ): Promise<VoiceAbsencePreview> {
-  const transcription = await transcribeAudio(audioBuffer, mimeType);
-
-  let studentContext = '';
-  if (courseId && academicYearId) {
-    const rows = await fetchEnrollments(courseId, academicYearId, institutionId);
-    if (rows.length) {
-      studentContext = '\nEstudiantes del curso (nombre | enrollmentId):\n'
-        + rows.map(r => `- ${r.name} | ${r.enrollment_id}`).join('\n');
-    }
+  if (!courseId || !academicYearId) {
+    throw new Error('Debes seleccionar un curso antes de registrar una inasistencia por voz');
   }
 
-  const today = todayISO();
+  const transcription = await transcribeAudio(audioBuffer, mimeType);
+
+  const rows = await fetchEnrollments(courseId, academicYearId, institutionId);
+  let studentContext = '';
+  if (rows.length) {
+    studentContext = '\nEstudiantes del curso (nombre | enrollmentId):\n'
+      + rows.map(r => `- ${r.name} | ${r.enrollment_id}`).join('\n');
+  }
+
+  const today = todayContext();
   const systemPrompt =
     `Eres un asistente que interpreta comandos de voz para un sistema de inasistencias escolares.` +
     ` El usuario habla en español y pide registrar una falta o atraso de un estudiante.` +
-    ` Hoy es ${today}. Responde ÚNICAMENTE con JSON válido sin markdown, sin explicaciones.`;
+    ` Hoy es ${today.iso} (${today.label}). Responde ÚNICAMENTE con JSON válido sin markdown, sin explicaciones.`;
 
   const userPrompt =
     `Comando de voz: "${transcription}"` +
     studentContext +
-    `\n\nDevuelve:\n{\n` +
+    `\n\nIMPORTANTE: Si el nombre mencionado no coincide claramente con algún estudiante de la lista, devuelve enrollmentId: null y confidence menor a 0.5. NO inventes ni asumas un estudiante que no esté en la lista.\n` +
+    `\nDevuelve:\n{\n` +
     `  "enrollmentId": <número del enrollmentId del estudiante mencionado, o null si no encontrado>,\n` +
-    `  "studentName": "<nombre del estudiante tal como aparece en la lista>",\n` +
+    `  "studentName": "<nombre del estudiante tal como aparece en la lista, o cadena vacía si no encontrado>",\n` +
     `  "type": "F" o "AT"  (F=falta/ausente, AT=atraso/tarde),\n` +
     `  "dateFrom": "<YYYY-MM-DD>",\n` +
     `  "dateTo": "<YYYY-MM-DD>",\n` +
@@ -112,8 +118,13 @@ export async function parseVoiceAbsence(
   const enrollmentId = typeof parsed.enrollmentId === 'number' ? parsed.enrollmentId : null;
   if (!enrollmentId) throw new Error('No se pudo identificar al estudiante en el comando de voz');
 
+  const validIds = new Set(rows.map(r => r.enrollment_id));
+  if (rows.length > 0 && !validIds.has(enrollmentId)) {
+    throw new Error('No se pudo identificar al estudiante en el comando de voz');
+  }
+
   const rawType  = String(parsed.type ?? 'F').toUpperCase();
-  const dateFrom = String(parsed.dateFrom ?? today);
+  const dateFrom = String(parsed.dateFrom ?? today.iso);
 
   return {
     transcription,

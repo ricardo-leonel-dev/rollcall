@@ -261,7 +261,12 @@ import { AbsenceDialogComponent } from './absence-dialog.component';
                   Ej: <em>«Agrega una falta a Juan Pérez hoy»</em><br>
                   o bien: <em>«Atraso de Ana Torres el martes pasado»</em>
                 </div>
-                @if (selCourse) {
+                @if (!selCourse) {
+                  <div style="font-size:13px;color:#b45309;background:#fef3c7;border-radius:8px;padding:8px 12px;margin-top:4px;display:flex;align-items:center;gap:6px">
+                    <mat-icon style="font-size:15px;width:15px;height:15px;flex-shrink:0">warning_amber</mat-icon>
+                    Selecciona un curso para poder registrar una inasistencia por voz
+                  </div>
+                } @else {
                   <div style="font-size:12px;color:var(--accent);margin-top:4px">
                     <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">info</mat-icon>
                     Se buscará en el curso seleccionado
@@ -705,6 +710,10 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   }
 
   async startRecording(): Promise<void> {
+    if (!this.selCourse || !this.selYear) {
+      this.notify.error('Selecciona un curso antes de grabar', { duration: 4000 });
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       this.audioChunks = [];
