@@ -12,7 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { DecimalPipe, DatePipe } from '@angular/common';
+import { DecimalPipe, DatePipe, SlicePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { Course, Enrollment, Absence, OcrResult, VoiceAbsenceResult } from '../../core/models/index';
 import { dateToDateString } from '../../shared/utils/date.util';
@@ -44,7 +44,7 @@ interface VoiceLog {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule,
             MatButtonModule, MatIconModule, MatTooltipModule, MatMenuModule, MatDatepickerModule,
-            WhatsappIconComponent, DecimalPipe, DatePipe],
+            WhatsappIconComponent, DecimalPipe, DatePipe, SlicePipe],
   styles: [`
     .tab-content { padding: 20px 0; }
     @keyframes pulse-mic {
