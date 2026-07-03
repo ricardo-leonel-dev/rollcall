@@ -2,14 +2,40 @@ import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import { voiceAbsenceQueue } from '../queues/voice-absence.queue';
 
-export function requireSuperAdmin(req: Request, res: Response, next: NextFunction): void {
+export function bullBoardCookieAuth(req: Request, res: Response, next: NextFunction): void {
+  const raw = req.headers.cookie ?? '';
+  const token = raw.split(';').map(c => c.trim())
+    .find(c => c.startsWith('bull_board_session='))?.split('=').slice(1).join('=');
+
+  if (!token) {
+    res.status(401).send('Sin sesión. Abre el monitor desde la app.');
+    return;
+  }
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET!) as { roleName?: string };
+    if (payload.roleName !== 'superadmin') { res.status(403).send('Solo superadmin'); return; }
+    next();
+  } catch {
+    res.status(401).send('Sesión expirada. Vuelve a abrir desde la app.');
+  }
+}
+
+export function createQueueSession(req: Request, res: Response): void {
   if (req.user?.roleName !== 'superadmin') {
     res.status(403).json({ error: 'Solo superadmin' });
     return;
   }
-  next();
+  const token = (req.headers.authorization ?? '').replace('Bearer ', '');
+  res.cookie('bull_board_session', token, {
+    httpOnly: true,
+    maxAge: 3_600_000,
+    path: '/api/admin/queues',
+    sameSite: 'strict',
+  });
+  res.json({ ok: true });
 }
 
 const serverAdapter = new ExpressAdapter();

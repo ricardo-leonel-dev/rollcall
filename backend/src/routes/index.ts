@@ -20,7 +20,6 @@ import institutionRouter     from '../controllers/institution.controller';
 import ocrRouter             from '../controllers/ocr.controller';
 import aiRouter              from '../controllers/ai.controller';
 import jobsRouter            from '../controllers/jobs.controller';
-import { serverAdapter, requireSuperAdmin } from '../controllers/bull-board';
 
 const router = Router();
 
@@ -51,6 +50,5 @@ router.use('/institutions',         institutionRouter);
 router.use('/ocr',                  ocrRouter);
 router.use('/ai',                   aiRouter);
 router.use('/jobs',                 jobsRouter);
-router.use('/admin/queues',         requireSuperAdmin, serverAdapter.getRouter());
 
 export default router;
