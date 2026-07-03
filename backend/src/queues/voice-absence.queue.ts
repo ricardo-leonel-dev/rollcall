@@ -7,6 +7,7 @@ export interface VoiceAbsenceJobData {
   institutionId:  number;
   courseId:       number;
   academicYearId: number;
+  transcription?: string;
 }
 
 type JobName = 'parse';
