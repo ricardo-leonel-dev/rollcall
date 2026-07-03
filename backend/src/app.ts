@@ -12,6 +12,8 @@ import { seedSuperAdmin } from './seed';
 import routes from './routes/index';
 import { errorMiddleware } from './middleware/error.middleware';
 import { startVoiceAbsenceWorker } from './workers/voice-absence.worker';
+import { authMiddleware } from './middleware/auth.middleware';
+import { serverAdapter, bullBoardCookieAuth, createQueueSession } from './controllers/bull-board';
 
 const app = express();
 
@@ -28,6 +30,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use('/api/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.post('/api/admin/queues-session', authMiddleware, createQueueSession);
+app.use('/api/admin/queues', bullBoardCookieAuth, serverAdapter.getRouter());
 app.use('/api', routes);
 
 app.use(errorMiddleware);

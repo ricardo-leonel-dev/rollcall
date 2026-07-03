@@ -54,6 +54,13 @@ import { NAV_ITEMS } from '../../core/nav-items';
   template: `
     <div class="page-header">
       <h1 class="page-title">Administración</h1>
+      @if (auth.isSuperAdmin()) {
+        <button mat-stroked-button (click)="openQueueMonitor()"
+          style="display:flex;align-items:center;gap:6px;font-size:13px">
+          <mat-icon style="font-size:16px;width:16px;height:16px">monitor_heart</mat-icon>
+          Monitor de colas
+        </button>
+      }
     </div>
 
     <mat-tab-group style="background:var(--paper);border-radius:16px;border:1px solid var(--border);overflow:hidden">
@@ -371,6 +378,11 @@ export class AdminComponent implements OnInit {
   readonly importResult = signal<any>(null);
 
   selRole: number | null = null;
+
+  async openQueueMonitor(): Promise<void> {
+    await firstValueFrom(this.http.post('/api/admin/queues-session', {}));
+    window.open('/api/admin/queues', '_blank');
+  }
 
   async ngOnInit(): Promise<void> {
     // For a superadmin, an institution must be selected before any
