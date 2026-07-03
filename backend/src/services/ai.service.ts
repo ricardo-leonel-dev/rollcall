@@ -46,6 +46,16 @@ async function fetchEnrollments(courseId: number, academicYearId: number, instit
   `, [courseId, academicYearId, institutionId]) as Promise<{ enrollment_id: number; name: string }[]>;
 }
 
+function spokenNameMatchesRoster(spoken: string, roster: string): boolean {
+  const words = (s: string) =>
+    s.toLowerCase()
+     .normalize('NFD').replace(/[̀-ͯ]/g, '')
+     .split(/\s+/).filter(w => w.length >= 3);
+  const sw = words(spoken);
+  const rw = words(roster);
+  return sw.some(s => rw.some(r => r.startsWith(s.slice(0, 4)) || s.startsWith(r.slice(0, 4))));
+}
+
 function todayContext(): { iso: string; label: string } {
   const now = new Date();
   const iso = now.toISOString().split('T')[0];
@@ -82,8 +92,9 @@ export async function parseVoiceAbsence(
   const userPrompt =
     `Comando de voz: "${transcription}"` +
     studentContext +
-    `\n\nIMPORTANTE: Si el nombre mencionado no coincide claramente con algún estudiante de la lista, devuelve enrollmentId: null y confidence menor a 0.5. NO inventes ni asumas un estudiante que no esté en la lista.\n` +
+    `\n\nIMPORTANTE: Si el nombre mencionado NO coincide claramente con algún estudiante de la lista (incluso aproximadamente), devuelve enrollmentId: null, spokenName con el nombre que escuchaste, y confidence menor a 0.5. NO elijas el estudiante más parecido si el nombre es diferente. Solo asigna un enrollmentId si hay una coincidencia obvia.\n` +
     `\nDevuelve:\n{\n` +
+    `  "spokenName": "<nombre exacto que escuchaste en el audio, sin modificar>",\n` +
     `  "enrollmentId": <número del enrollmentId del estudiante mencionado, o null si no encontrado>,\n` +
     `  "studentName": "<nombre del estudiante tal como aparece en la lista, o cadena vacía si no encontrado>",\n` +
     `  "type": "F" o "AT"  (F=falta/ausente, AT=atraso/tarde),\n` +
@@ -123,6 +134,17 @@ export async function parseVoiceAbsence(
     throw new Error('No se pudo identificar al estudiante en el comando de voz');
   }
 
+  const confidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0.5;
+  if (confidence < 0.65) {
+    throw new Error(`No se pudo identificar con certeza al estudiante en el audio. ${transcription}`);
+  }
+
+  const spokenName  = String(parsed.spokenName ?? '');
+  const studentName = String(parsed.studentName ?? '');
+  if (spokenName && studentName && !spokenNameMatchesRoster(spokenName, studentName)) {
+    throw new Error(`El nombre mencionado ("${spokenName}") no coincide con ningún estudiante del curso. ${transcription}`);
+  }
+
   const rawType  = String(parsed.type ?? 'F').toUpperCase();
   const dateFrom = String(parsed.dateFrom ?? today.iso);
 
@@ -133,6 +155,6 @@ export async function parseVoiceAbsence(
     type:        (rawType === 'AT' ? 'AT' : 'F') as 'F' | 'AT',
     dateFrom,
     dateTo:      String(parsed.dateTo ?? dateFrom),
-    confidence:  typeof parsed.confidence === 'number' ? parsed.confidence : 0.5,
+    confidence,
   };
 }
