@@ -19,6 +19,7 @@ import exportRouter          from '../controllers/export.controller';
 import institutionRouter     from '../controllers/institution.controller';
 import ocrRouter             from '../controllers/ocr.controller';
 import aiRouter              from '../controllers/ai.controller';
+import jobsRouter            from '../controllers/jobs.controller';
 
 const router = Router();
 
@@ -48,5 +49,6 @@ router.use('/export',               exportRouter);
 router.use('/institutions',         institutionRouter);
 router.use('/ocr',                  ocrRouter);
 router.use('/ai',                   aiRouter);
+router.use('/jobs',                 jobsRouter);
 
 export default router;
