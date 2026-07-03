@@ -379,8 +379,7 @@ export class AdminComponent implements OnInit {
 
   selRole: number | null = null;
 
-  async openQueueMonitor(): Promise<void> {
-    await firstValueFrom(this.http.post('/api/admin/queues-session', {}));
+  openQueueMonitor(): void {
     window.open('/api/admin/queues', '_blank');
   }
 

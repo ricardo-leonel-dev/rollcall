@@ -136,6 +136,8 @@ services:
       - LLM_URL=${LLM_URL}
       - LLM_API_KEY=${LLM_API_KEY}
       - REDIS_URL=redis://redis:6379
+      - BULL_BOARD_USER=${BULL_BOARD_USER}
+      - BULL_BOARD_PASS=${BULL_BOARD_PASS}
       - NODE_ENV=production
     depends_on:
       postgres:
