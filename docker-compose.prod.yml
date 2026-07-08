@@ -18,7 +18,7 @@ services:
     ports:
       - "127.0.0.1:8002:8002"
     volumes:
-      - ./agente-ocr/plantilla_asistencia.xlsx:/app/plantilla_asistencia.xlsx:ro
+      - ./excel-service/plantilla_asistencia.xlsx:/app/plantilla_asistencia.xlsx:ro
       - excel_output:/app/output
     environment:
       - DATABASE_URL=${DATABASE_URL}
@@ -51,7 +51,7 @@ services:
       - DB_SCHEMA=${DB_SCHEMA}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
-      - OCR_SERVICE_URL=${OCR_SERVICE_URL}
+      - IMAGE_LLM_URL=${IMAGE_LLM_URL}
       - EXCEL_SERVICE_URL=http://excel-service:8002
       - WHISPER_URL=${WHISPER_URL}
       - LLM_URL=${LLM_URL}

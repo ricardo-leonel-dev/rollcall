@@ -14,7 +14,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { DecimalPipe, DatePipe, SlicePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
-import { Course, Enrollment, Absence, OcrResult, VoiceAbsenceResult } from '../../core/models/index';
+import { Course, Enrollment, Absence, VoiceAbsenceResult, PhotoAbsencePreview, PhotoAbsenceItem } from '../../core/models/index';
 import { dateToDateString } from '../../shared/utils/date.util';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -131,58 +131,127 @@ interface VoiceLog {
             <mat-datepicker #pickerPhoto></mat-datepicker>
           </mat-form-field>
 
-          <div class="upload-zone" (dragover)="$event.preventDefault()" (drop)="onDrop($event)">
-            <mat-icon style="font-size:48px;width:48px;height:48px;color:var(--border);margin-bottom:12px">cloud_upload</mat-icon>
-            <div style="font-weight:600;color:var(--ink-soft);margin-bottom:4px">Arrastra la foto aquí</div>
-            <div style="font-size:13px;color:var(--muted);margin-bottom:16px">o usa los botones para seleccionar</div>
-            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-              <label>
-                <input type="file" style="display:none" accept="image/*" (change)="onFileSelect($event)">
-                <span style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--accent);color:white;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">
-                  <mat-icon style="font-size:16px;width:16px;height:16px">upload_file</mat-icon> Subir imagen
-                </span>
-              </label>
-              <label class="md:hidden">
-                <input type="file" style="display:none" accept="image/*" capture="environment" (change)="onFileSelect($event)">
-                <span style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--paper);border:1px solid var(--border);color:var(--ink-soft);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">
-                  <mat-icon style="font-size:16px;width:16px;height:16px">camera_alt</mat-icon> Cámara
-                </span>
-              </label>
-            </div>
-          </div>
-
-          @if (ocrLoading()) {
-            <div style="display:flex;align-items:center;gap:16px;padding:20px;background:var(--paper-deep);border-radius:12px;margin-top:16px">
-              <div class="spinner" style="flex-shrink:0"></div>
-              <div>
-                <div style="font-weight:600;color:var(--ink-soft)">Procesando con IA...</div>
-                <div style="font-size:13px;color:var(--muted)">Esto puede tomar varios minutos</div>
+          @if (photoState() === 'idle') {
+            <div class="upload-zone" (dragover)="$event.preventDefault()" (drop)="onDrop($event)">
+              <mat-icon style="font-size:48px;width:48px;height:48px;color:var(--border);margin-bottom:12px">cloud_upload</mat-icon>
+              <div style="font-weight:600;color:var(--ink-soft);margin-bottom:4px">Arrastra la foto aquí</div>
+              <div style="font-size:13px;color:var(--muted);margin-bottom:16px">o usa los botones para seleccionar</div>
+              <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+                <label>
+                  <input type="file" style="display:none" accept="image/*" (change)="onFileSelect($event)">
+                  <span style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--accent);color:white;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">
+                    <mat-icon style="font-size:16px;width:16px;height:16px">upload_file</mat-icon> Subir imagen
+                  </span>
+                </label>
+                <label class="md:hidden">
+                  <input type="file" style="display:none" accept="image/*" capture="environment" (change)="onFileSelect($event)">
+                  <span style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--paper);border:1px solid var(--border);color:var(--ink-soft);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">
+                    <mat-icon style="font-size:16px;width:16px;height:16px">camera_alt</mat-icon> Cámara
+                  </span>
+                </label>
               </div>
             </div>
           }
 
-          @if (ocrResult()) {
-            <div style="margin-top:16px">
-              <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px 20px;margin-bottom:12px">
-                <div style="display:flex;align-items:center;gap:8px;color:#15803d;font-weight:600">
-                  <mat-icon style="font-size:20px;width:20px;height:20px">check_circle</mat-icon>
-                  {{ocrResult()!.records_created}} registros creados — Fecha: {{ocrResult()!.date}}
-                </div>
+          @if (photoState() === 'processing') {
+            <div style="display:flex;align-items:center;gap:16px;padding:20px;background:var(--paper-deep);border-radius:12px;margin-top:8px">
+              <div class="spinner" style="flex-shrink:0"></div>
+              <div>
+                <div style="font-weight:600;color:var(--ink-soft)">Analizando imagen con IA…</div>
+                <div style="font-size:13px;color:var(--muted)">Esto puede tardar varios minutos</div>
               </div>
-              @if (ocrResult()!.not_found.length) {
-                <div class="card" style="border-left:4px solid #f59e0b">
-                  <div style="font-weight:600;color:#b45309;margin-bottom:10px">
-                    <mat-icon style="vertical-align:middle;margin-right:4px">warning_amber</mat-icon>
-                    {{ocrResult()!.not_found.length}} no encontrados
+            </div>
+          }
+
+          @if (photoState() === 'preview' && photoPreview()) {
+            <div style="margin-top:8px">
+
+              <!-- Encabezado -->
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <div style="font-size:13px;color:var(--muted-strong)">
+                  <mat-icon style="font-size:15px;width:15px;height:15px;vertical-align:middle;margin-right:4px">calendar_today</mat-icon>
+                  Fecha: <strong style="color:var(--ink-soft)">{{photoPreview()!.date}}</strong>
+                  &nbsp;·&nbsp;
+                  <strong style="color:var(--ink-soft)">{{photoPreview()!.matched.length}}</strong> de {{photoPreview()!.total}} detectados coinciden
+                </div>
+                <button mat-icon-button (click)="cancelPhoto()" matTooltip="Descartar resultado" style="color:var(--muted)">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+
+              <!-- Lista de matches -->
+              @if (photoPreview()!.matched.length) {
+                <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px">
+                  @for (item of photoPreview()!.matched; track item.enrollmentId) {
+                    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border-soft);"
+                         [style.opacity]="photoSelected().has(item.enrollmentId) ? '1' : '0.45'">
+                      <button mat-icon-button (click)="togglePhotoItem(item.enrollmentId)"
+                              style="flex-shrink:0;color:var(--accent);width:32px;height:32px">
+                        <mat-icon style="font-size:20px;width:20px;height:20px">
+                          {{photoSelected().has(item.enrollmentId) ? 'check_box' : 'check_box_outline_blank'}}
+                        </mat-icon>
+                      </button>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                          {{item.studentName}}
+                        </div>
+                        @if (item.ocrName.toUpperCase() !== item.studentName.toUpperCase()) {
+                          <div style="font-size:11px;color:var(--muted);font-style:italic">OCR: {{item.ocrName}}</div>
+                        }
+                      </div>
+                      <span [class]="'badge-' + item.type" style="flex-shrink:0">
+                        {{item.type === 'F' ? 'Falta' : 'Atraso'}}
+                      </span>
+                      <div style="flex-shrink:0;width:56px">
+                        <div class="confidence-bar">
+                          <div class="confidence-bar-fill"
+                               [style.width]="(item.confidence * 100) + '%'"
+                               [style.background]="item.confidence < 0.7 ? '#f59e0b' : 'var(--accent)'">
+                          </div>
+                        </div>
+                        <div style="font-size:10px;color:var(--muted);text-align:right;margin-top:2px">
+                          {{(item.confidence * 100) | number:'1.0-0'}}%
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="empty-state" style="padding:24px">
+                  <mat-icon style="font-size:36px;width:36px;height:36px;color:var(--border)">person_search</mat-icon>
+                  <div style="margin-top:8px;color:var(--ink-soft)">Ningún estudiante del curso fue identificado en la foto</div>
+                </div>
+              }
+
+              <!-- No encontrados -->
+              @if (photoPreview()!.notFound.length) {
+                <div class="card" style="border-left:4px solid #f59e0b;margin-bottom:12px">
+                  <div style="font-weight:600;color:#b45309;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+                    <mat-icon style="font-size:18px;width:18px;height:18px">warning_amber</mat-icon>
+                    {{photoPreview()!.notFound.length}} nombre(s) no encontrado(s) en el curso
                   </div>
-                  @for (name of ocrResult()!.not_found; track name) {
-                    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #fef3c7">
-                      <span style="font-size:13px">{{name}}</span>
-                      <button mat-button color="accent" style="font-size:12px" (click)="openManualAdd(name)">Agregar</button>
+                  @for (name of photoPreview()!.notFound; track name) {
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #fef3c7">
+                      <span style="font-size:13px;color:var(--ink-soft)">{{name}}</span>
+                      <button mat-button color="accent" style="font-size:12px" (click)="openManualAdd(name)">Buscar manual</button>
                     </div>
                   }
                 </div>
               }
+
+              <!-- Acciones -->
+              @if (photoPreview()!.matched.length) {
+                <div style="display:flex;gap:10px">
+                  <button mat-flat-button color="primary" (click)="confirmPhotoAbsences()">
+                    <mat-icon>check</mat-icon>
+                    Confirmar seleccionados ({{photoSelected().size}})
+                  </button>
+                  <button mat-stroked-button (click)="cancelPhoto()">
+                    <mat-icon>close</mat-icon> Cancelar
+                  </button>
+                </div>
+              }
+
             </div>
           }
         </div>
@@ -594,8 +663,9 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   readonly courses = signal<Course[]>([]);
   readonly enrollments = signal<Enrollment[]>([]);
   readonly absences = signal<Absence[]>([]);
-  readonly ocrResult = signal<OcrResult | null>(null);
-  readonly ocrLoading = signal(false);
+  readonly photoState    = signal<'idle' | 'processing' | 'preview'>('idle');
+  readonly photoPreview  = signal<PhotoAbsencePreview | null>(null);
+  readonly photoSelected = signal<Set<number>>(new Set());
   readonly enrollLoading = signal(false);
   readonly absLoading = signal(false);
   readonly todayAbsences = signal<Absence[]>([]);
@@ -607,6 +677,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
 
   selectedTabIndex = 0;
   private currentVoiceJobId: string | null = null;
+  private photoPollingActive = false;
   private voiceLogsLoaded = false;
   selYear: number | null = null;
   selCourse: number | null = null;
@@ -723,20 +794,76 @@ export class AbsencesComponent implements OnInit, OnDestroy {
       this.notify.warning('Selecciona un curso y año lectivo primero');
       return;
     }
-    this.ocrLoading.set(true);
-    this.ocrResult.set(null);
+    this.photoState.set('processing');
+    this.photoPreview.set(null);
+    this.photoSelected.set(new Set());
+    this.photoPollingActive = true;
     try {
       const fd = new FormData();
-      fd.append('foto', file);
+      fd.append('image', file);
       fd.append('course_id', String(this.selCourse));
       fd.append('academic_year_id', String(this.selYear));
       if (this.photoDate) fd.append('date', dateToDateString(this.photoDate));
-      const result = await firstValueFrom(this.http.post<OcrResult>('/api/ocr/process-photo', fd));
-      this.ocrResult.set(result);
-      await this.loadAbsences();
+
+      const { jobId } = await firstValueFrom(
+        this.http.post<{ jobId: string }>('/api/ai/photo-absence', fd)
+      );
+
+      const preview = await this.pollJob<PhotoAbsencePreview>(jobId, 180_000);
+      if (!this.photoPollingActive) return;
+
+      this.photoSelected.set(new Set(preview.matched.map(m => m.enrollmentId)));
+      this.photoPreview.set(preview);
+      this.photoState.set('preview');
     } catch (err: any) {
-      this.notify.error(err?.error?.detail ?? err.message, { duration: 5000 });
-    } finally { this.ocrLoading.set(false); }
+      this.notify.error(err?.error?.error ?? err?.message ?? 'No se pudo procesar la foto', { duration: 6000 });
+      this.photoState.set('idle');
+    } finally {
+      this.photoPollingActive = false;
+    }
+  }
+
+  togglePhotoItem(id: number): void {
+    const s = new Set(this.photoSelected());
+    s.has(id) ? s.delete(id) : s.add(id);
+    this.photoSelected.set(s);
+  }
+
+  async confirmPhotoAbsences(): Promise<void> {
+    const preview = this.photoPreview();
+    if (!preview) return;
+    const toConfirm = preview.matched.filter(m => this.photoSelected().has(m.enrollmentId));
+    if (!toConfirm.length) { this.notify.warning('Selecciona al menos una inasistencia'); return; }
+    try {
+      let created = 0, skipped = 0;
+      for (const item of toConfirm) {
+        const r = await firstValueFrom(
+          this.http.post<{ created: number; skipped: number }>('/api/absences', {
+            enrollmentId: item.enrollmentId,
+            type: item.type,
+            dateFrom: item.date,
+            dateTo: item.date,
+          })
+        );
+        created += r.created;
+        skipped += r.skipped;
+      }
+      const msg = skipped > 0
+        ? `${created} registro(s) creado(s), ${skipped} ya existían`
+        : `${created} registro(s) creado(s)`;
+      this.notify.success(msg);
+      this.photoState.set('idle');
+      this.photoPreview.set(null);
+      await Promise.all([this.loadTodayAbsences(), this.loadAbsences()]);
+    } catch (err: any) {
+      this.notify.error(err?.error?.error ?? 'No se pudo guardar');
+    }
+  }
+
+  cancelPhoto(): void {
+    this.photoPollingActive = false;
+    this.photoState.set('idle');
+    this.photoPreview.set(null);
   }
 
   typeLabel(type: 'F' | 'AT'): string {
@@ -862,7 +989,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
       );
       this.currentVoiceJobId = jobId;
 
-      const result = await this.pollJob(jobId);
+      const result = await this.pollJob<VoiceAbsenceResult>(jobId);
       this.voiceResult.set(result);
       this.voiceState.set('preview');
     } catch (err: any) {
@@ -871,7 +998,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
     }
   }
 
-  private pollJob(jobId: string, timeoutMs = 30_000): Promise<VoiceAbsenceResult> {
+  private pollJob<T>(jobId: string, timeoutMs = 30_000): Promise<T> {
     return new Promise((resolve, reject) => {
       const start = Date.now();
       const tick = async () => {
@@ -881,7 +1008,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
         }
         try {
           const resp = await firstValueFrom(
-            this.http.get<{ status: string; result?: VoiceAbsenceResult; error?: string }>(
+            this.http.get<{ status: string; result?: T; error?: string }>(
               `/api/jobs/${jobId}`
             )
           );
@@ -950,6 +1077,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.photoPollingActive = false;
     if (this.voiceTimer) clearInterval(this.voiceTimer);
     this.mediaRecorder?.stream.getTracks().forEach(t => t.stop());
   }
