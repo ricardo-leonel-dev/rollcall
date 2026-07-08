@@ -12,11 +12,9 @@ School attendance management system (SaaS, multi-tenant). Supports manual absenc
 |---|---|---|---|
 | `frontend` | Angular 22 + PWA + Tailwind | 80 | UI served by Nginx; proxies `/api/*` to backend |
 | `backend` | Node 22 + Express 5 + TypeScript | 3000 | Main REST API |
-| `ocr-service` | Python 3.11 + FastAPI | 8001 | Photo to absence via vLLM vision model |
 | `excel-service` | Go + pgx | 8002 | Export attendance report to `.xlsx` template |
 | `postgres` | PostgreSQL 16 | 5432 | Primary DB |
-| `redis` | Redis 7 | 6379 | BullMQ job queue for voice processing |
-| `tailscale` | Tailscale | host | VPN access to AI rig (Whisper + LLM) |
+| `redis` | Redis 7 | 6379 | BullMQ job queues for voice and photo processing |
 
 ## Development Commands
 
@@ -51,7 +49,17 @@ psql $DATABASE_URL -f postgres/NN_migration.sql
 # Seed runs automatically on backend startup (creates superadmin user)
 ```
 
+No test or lint scripts are configured in either `backend/package.json` or `frontend/package.json`.
+
 ## Architecture
+
+### Backend Controller/Service Pattern
+
+Every resource follows a strict 1:1 pairing:
+- `controllers/<resource>.controller.ts` — Express route handlers, req/res parsing, HTTP status codes
+- `services/<resource>.service.ts` — business logic and raw DB queries via `AppDataSource.query()`
+
+DB queries go in services; HTTP response logic goes in controllers. Never mix the two.
 
 ### Multi-tenancy & Authorization Model
 
@@ -82,13 +90,18 @@ Module visibility (which sidebar items appear) is controlled by `user_modules` r
 5. All jobs (success and failure) are logged to `voice_absence_logs` table
 6. Bull Board dashboard at `GET /api/admin/queues` (cookie-auth via `POST /api/admin/queues-session`)
 
-### OCR Pipeline
+### Photo Absence Pipeline
 
-1. Frontend uploads photo -> `POST /api/ocr/process-photo` (backend)
-2. Backend proxies to `ocr-service` at `http://ocr-service:8001/process-photo`
-3. OCR service resizes image, calls vLLM vision model -> gets JSON of names + types
-4. Fuzzy name matching against enrolled students -> direct DB insert into `absences`
-5. Returns `{ records_created, not_found, total_in_photo }`
+Mirrors the voice pipeline — same BullMQ pattern, preview before confirm:
+
+1. Frontend uploads photo -> `POST /api/ai/photo-absence` (multipart: `image`, `course_id`, `academic_year_id`, optional `date`)
+2. Backend enqueues a BullMQ job in the `photo-absence` queue (Redis)
+3. Worker (`workers/photo-absence.worker.ts`) picks it up:
+   - Calls vision-capable LLM (`IMAGE_LLM_URL`) with base64 image + enrolled student roster as context
+   - Returns `PhotoAbsencePreview` with `matched[]`, `notFound[]`, `total`
+4. Frontend previews result; user confirms each match -> `POST /api/absences`
+5. Job results are logged to `photo_absence_logs` table
+6. Job polling uses the same `GET /api/jobs/:id` endpoint as voice
 
 ### Database Schema
 
@@ -103,6 +116,8 @@ Key entity relationships:
 - `User` -> `Role` -> `RolePermission[]` (CRUD flags per resource name)
 - `User` -> `UserCourse[]` (course-scope, per academic year)
 - `User` -> `UserModule[]` (which modules the user can see)
+- `PhotoLog` — audit trail para OCR legacy (no usar; ver `photo_absence_logs` para el pipeline actual)
+- `photo_absence_logs` — audit trail para el pipeline photo-absence (paralelo a `voice_absence_logs`)
 
 ### Frontend Architecture
 
@@ -115,15 +130,25 @@ Angular 22 with standalone components throughout (no NgModule). All routes use l
 
 Components are colocated with their dialogs in the same feature folder. Dialogs use Angular Material `MatDialog`.
 
+Two functional interceptors in `frontend/src/app/core/interceptors/` apply globally to all HTTP calls:
+- `authInterceptor` — attaches `Authorization: Bearer <token>` and `X-Institution-Id` automatically
+- `errorInterceptor` — handles HTTP error responses globally
+
+New protected routes must include `canActivate: [moduleGuard]` with `data: { module: '<key>' }`, where `<key>` matches a `user_modules.module_key` value. Current keys: `dashboard`, `absences`, `calendar`, `justifications`, `students`, `enrollments`, `admin`.
+
+Static uploads are served at `/api/uploads/<type>/` (avatars, logos, justifications). The backend creates these directories on startup from `process.cwd()/uploads/`.
+
 ### Excel Export
 
-The Go `excel-service` fills a fixed `.xlsx` template (`agente-ocr/plantilla_asistencia.xlsx`) using data from PostgreSQL. The backend calls it internally; the frontend hits `GET /api/export/excel`.
+The Go `excel-service` fills a fixed `.xlsx` template (`excel-service/plantilla_asistencia.xlsx`) using data from PostgreSQL. The backend calls it internally; the frontend hits `GET /api/export/excel`.
 
 ## Key Environment Variables
 
 See `.env.example` for all variables. Critical ones:
-- `LLM_URL` / `WHISPER_URL` — point to the AI rig (connected via Tailscale)
-- `LLM_API_KEY` — shared secret between services and the AI rig
+- `LLM_URL` — text LLM endpoint (OpenAI-compatible) for voice absence parsing
+- `WHISPER_URL` — audio transcription endpoint (faster-whisper or compatible)
+- `IMAGE_LLM_URL` — vision-capable LLM endpoint for photo absence parsing; defaults to `LLM_URL` in code if unset
+- `LLM_API_KEY` — Bearer token shared between backend and the LLM endpoints
 - `REDIS_URL` — BullMQ connection (defaults to `redis://redis:6379`)
 - `DB_SCHEMA` — PostgreSQL schema name
 - `BULL_BOARD_USER` / `BULL_BOARD_PASS` — credentials for the queue dashboard

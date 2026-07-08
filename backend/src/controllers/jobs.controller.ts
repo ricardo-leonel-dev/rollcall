@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { voiceAbsenceQueue } from '../queues/voice-absence.queue';
+import { photoAbsenceQueue } from '../queues/photo-absence.queue';
 import { requirePermission } from '../middleware/role.middleware';
 import { requireInstitution } from '../middleware/institution.middleware';
 import { AppDataSource } from '../data-source';
@@ -45,7 +46,8 @@ router.get('/voice-logs', requirePermission('absences', 'read'), async (req, res
 });
 
 router.get('/:id', async (req, res) => {
-  const job = await voiceAbsenceQueue.getJob(req.params.id);
+  const job = await voiceAbsenceQueue.getJob(req.params.id)
+           ?? await photoAbsenceQueue.getJob(req.params.id);
   if (!job) { res.status(404).json({ error: 'Job no encontrado' }); return; }
 
   const state = await job.getState();

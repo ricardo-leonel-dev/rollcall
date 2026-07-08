@@ -12,6 +12,7 @@ import { seedSuperAdmin } from './seed';
 import routes from './routes/index';
 import { errorMiddleware } from './middleware/error.middleware';
 import { startVoiceAbsenceWorker } from './workers/voice-absence.worker';
+import { startPhotoAbsenceWorker } from './workers/photo-absence.worker';
 import { authMiddleware } from './middleware/auth.middleware';
 import { serverAdapter, bullBoardCookieAuth, createQueueSession } from './controllers/bull-board';
 
@@ -45,6 +46,7 @@ async function bootstrap() {
 
     await seedSuperAdmin();
     startVoiceAbsenceWorker();
+    startPhotoAbsenceWorker();
 
     app.listen(PORT, () => {
       console.log(`[server] Backend escuchando en http://0.0.0.0:${PORT}`);

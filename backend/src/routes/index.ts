@@ -17,7 +17,6 @@ import dashboardRouter       from '../controllers/dashboard.controller';
 import importRouter          from '../controllers/import.controller';
 import exportRouter          from '../controllers/export.controller';
 import institutionRouter     from '../controllers/institution.controller';
-import ocrRouter             from '../controllers/ocr.controller';
 import aiRouter              from '../controllers/ai.controller';
 import jobsRouter            from '../controllers/jobs.controller';
 
@@ -47,7 +46,6 @@ router.use('/dashboard',            dashboardRouter);
 router.use('/import',               importRouter);
 router.use('/export',               exportRouter);
 router.use('/institutions',         institutionRouter);
-router.use('/ocr',                  ocrRouter);
 router.use('/ai',                   aiRouter);
 router.use('/jobs',                 jobsRouter);
 
