@@ -4,6 +4,7 @@ import { ExpressAdapter } from '@bull-board/express';
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { voiceAbsenceQueue } from '../queues/voice-absence.queue';
+import { photoAbsenceQueue } from '../queues/photo-absence.queue';
 
 export function bullBoardCookieAuth(req: Request, res: Response, next: NextFunction): void {
   const raw = req.headers.cookie ?? '';
@@ -29,7 +30,7 @@ export function createQueueSession(req: Request, res: Response): void {
     httpOnly: true,
     maxAge: 3_600_000,
     sameSite: 'lax',
-    secure: true,
+    secure: process.env.NODE_ENV === 'production',
   });
   res.json({ ok: true });
 }
@@ -38,7 +39,10 @@ const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath('/api/admin/queues');
 
 createBullBoard({
-  queues: [new BullMQAdapter(voiceAbsenceQueue)],
+  queues: [
+    new BullMQAdapter(voiceAbsenceQueue),
+    new BullMQAdapter(photoAbsenceQueue),
+  ],
   serverAdapter,
 });
 

@@ -203,3 +203,19 @@ export interface VoiceAbsenceResult {
   dateTo:        string;
   confidence:    number;
 }
+
+export interface PhotoAbsenceItem {
+  enrollmentId: number;
+  studentName:  string;
+  ocrName:      string;
+  type:         'F' | 'AT';
+  date:         string;
+  confidence:   number;
+}
+
+export interface PhotoAbsencePreview {
+  date:     string;
+  matched:  PhotoAbsenceItem[];
+  notFound: string[];
+  total:    number;
+}

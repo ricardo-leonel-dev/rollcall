@@ -1,29 +1,6 @@
 services:
 
   # ─────────────────────────────────────────
-  # TAILSCALE — acceso remoto seguro
-  # ─────────────────────────────────────────
-  tailscale:
-    image: tailscale/tailscale:latest
-    container_name: tailscale
-    restart: unless-stopped
-    hostname: ai-rig
-    network_mode: host
-    privileged: true
-    volumes:
-      - tailscale_data:/var/lib/tailscale
-      - /dev/net/tun:/dev/net/tun
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-      - NET_RAW
-    environment:
-      - TS_AUTHKEY=${TS_AUTHKEY}
-      - TS_STATE_DIR=/var/lib/tailscale
-      - TS_USERSPACE=false
-      - TS_ACCEPT_DNS=true
-
-  # ─────────────────────────────────────────
   # POSTGRESQL — base de datos principal
   # NOTA: Si ya existe volumen postgres_data de instalación anterior,
   # ejecutar: docker volume rm ai-personal_postgres_data
@@ -53,28 +30,6 @@ services:
       start_period: 10s
 
   # ─────────────────────────────────────────
-  # OCR SERVICE — Python 3.11 + FastAPI
-  # Procesa fotos de listas manuscritas via llama-server (rig remoto)
-  # ─────────────────────────────────────────
-  ocr-service:
-    build:
-      context: ./ocr-service
-      dockerfile: Dockerfile
-    container_name: ocr-service
-    restart: unless-stopped
-    ports:
-      - "8001:8001"
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - DB_SCHEMA=${DB_SCHEMA}
-      - VLLM_URL=${LLM_URL}
-      - VISION_MODEL=${VISION_MODEL}
-      - AI_API_KEY=${LLM_API_KEY}
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  # ─────────────────────────────────────────
   # EXCEL-SERVICE — Go
   # Export de reportes a la plantilla .xlsx + import de nómina (en progreso)
   # ─────────────────────────────────────────
@@ -87,7 +42,7 @@ services:
     ports:
       - "8002:8002"
     volumes:
-      - ./agente-ocr/plantilla_asistencia.xlsx:/app/plantilla_asistencia.xlsx:ro
+      - ./excel-service/plantilla_asistencia.xlsx:/app/plantilla_asistencia.xlsx:ro
       - excel_output:/app/output
     environment:
       - DATABASE_URL=${DATABASE_URL}
@@ -130,11 +85,11 @@ services:
       - DB_SCHEMA=${DB_SCHEMA}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
-      - OCR_SERVICE_URL=http://ocr-service:8001
       - EXCEL_SERVICE_URL=http://excel-service:8002
       - WHISPER_URL=${WHISPER_URL}
       - LLM_URL=${LLM_URL}
       - LLM_API_KEY=${LLM_API_KEY}
+      - IMAGE_LLM_URL=${IMAGE_LLM_URL}
       - REDIS_URL=redis://redis:6379
       - BULL_BOARD_USER=${BULL_BOARD_USER}
       - BULL_BOARD_PASS=${BULL_BOARD_PASS}
@@ -168,7 +123,6 @@ services:
         condition: service_healthy
 
 volumes:
-  tailscale_data:
   postgres_data:
   redis_data:
   excel_output:

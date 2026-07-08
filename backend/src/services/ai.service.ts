@@ -1,8 +1,9 @@
 import { AppDataSource } from '../data-source';
 
-const WHISPER_URL = process.env.WHISPER_URL ?? '';
-const LLM_URL     = process.env.LLM_URL ?? '';
-const LLM_API_KEY = process.env.LLM_API_KEY ?? '';
+const WHISPER_URL     = process.env.WHISPER_URL ?? '';
+const LLM_URL         = process.env.LLM_URL ?? '';
+const LLM_API_KEY     = process.env.LLM_API_KEY ?? '';
+const IMAGE_LLM_URL   = process.env.IMAGE_LLM_URL || LLM_URL;
 
 const llmHeaders = (): Record<string, string> => ({
   'Content-Type': 'application/json',
@@ -158,5 +159,126 @@ export async function parseVoiceAbsence(
     dateFrom,
     dateTo:      String(parsed.dateTo ?? dateFrom),
     confidence,
+  };
+}
+
+// ─── Photo Absence ────────────────────────────────────────────────────────────
+
+export interface PhotoAbsenceItem {
+  enrollmentId: number;
+  studentName:  string;
+  ocrName:      string;
+  type:         'F' | 'AT';
+  date:         string;
+  confidence:   number;
+}
+
+export interface PhotoAbsencePreview {
+  date:     string;
+  matched:  PhotoAbsenceItem[];
+  notFound: string[];
+  total:    number;
+}
+
+const PHOTO_SYSTEM_PROMPT =
+  `Eres un asistente que interpreta fotos de listas de inasistencias escolares escritas a mano.` +
+  ` Analiza la imagen y extrae cada nombre con su tipo de inasistencia.` +
+  ` Tipos: F = falta (ausente), AT = atraso (llegó tarde). Si no se especifica el tipo asume F.` +
+  ` Para cada nombre detectado, identifica el enrollmentId que corresponde en la lista de estudiantes.` +
+  ` Responde ÚNICAMENTE con JSON válido sin markdown, sin explicaciones.`;
+
+export async function parsePhotoAbsence(
+  imageBuffer: Buffer,
+  mimeType: string,
+  institutionId: number,
+  courseId: number,
+  academicYearId: number,
+  dateOverride?: string,
+): Promise<PhotoAbsencePreview> {
+  const rows = await fetchEnrollments(courseId, academicYearId, institutionId);
+
+  const rosterContext = rows.length
+    ? '\nEstudiantes del curso (nombre | enrollmentId):\n' + rows.map(r => `- ${r.name} | ${r.enrollment_id}`).join('\n')
+    : '';
+
+  const today = todayContext();
+  const dateHint = dateOverride ? `La fecha de la lista es ${dateOverride}.` : `Hoy es ${today.iso}.`;
+
+  const userPromptText =
+    `${dateHint} Extrae todos los nombres e inasistencias de la foto.` +
+    rosterContext +
+    `\n\nDevuelve:\n{\n` +
+    `  "date": "<YYYY-MM-DD de la lista, o sin_fecha>",\n` +
+    `  "records": [\n` +
+    `    { "name": "<nombre tal como aparece en la foto>", "enrollmentId": <número o null>, "type": "F" o "AT", "confidence": <0.0-1.0> }\n` +
+    `  ]\n` +
+    `}`;
+
+  const imageB64 = imageBuffer.toString('base64');
+  const imageUrl = `data:${mimeType};base64,${imageB64}`;
+
+  const llmResp = await fetch(`${IMAGE_LLM_URL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: llmHeaders(),
+    body: JSON.stringify({
+      model: 'local',
+      messages: [
+        { role: 'system', content: PHOTO_SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: imageUrl } },
+            { type: 'text',      text: userPromptText },
+          ],
+        },
+      ],
+      max_tokens: 1024,
+      temperature: 0.1,
+    }),
+  });
+  if (!llmResp.ok) throw new Error(`LLM error ${llmResp.status}: ${await llmResp.text()}`);
+
+  const llmData = await llmResp.json() as { choices: { message: { content: string } }[] };
+  let raw = llmData.choices[0].message.content.trim();
+  if (raw.startsWith('```')) raw = raw.split('\n').slice(1, -1).join('\n');
+
+  let parsed: { date?: string; records?: { name: string; enrollmentId: unknown; type?: string; confidence?: number }[] };
+  try { parsed = JSON.parse(raw); }
+  catch { throw new Error(`LLM devolvió JSON inválido: ${raw.slice(0, 200)}`); }
+
+  const resolvedDate =
+    dateOverride ??
+    (parsed.date && parsed.date !== 'sin_fecha' ? parsed.date : today.iso);
+
+  const validIds = new Map(rows.map(r => [r.enrollment_id, r.name]));
+  const matched: PhotoAbsenceItem[] = [];
+  const notFound: string[] = [];
+
+  for (const rec of parsed.records ?? []) {
+    const ocrName    = String(rec.name ?? '').trim();
+    const confidence = typeof rec.confidence === 'number' ? rec.confidence : 0.5;
+    const rawType    = String(rec.type ?? 'F').toUpperCase();
+    const type       = (rawType === 'AT' ? 'AT' : 'F') as 'F' | 'AT';
+    const enrollmentId = typeof rec.enrollmentId === 'number' ? rec.enrollmentId : null;
+
+    if (!enrollmentId || !validIds.has(enrollmentId)) {
+      notFound.push(ocrName);
+      continue;
+    }
+
+    const studentName = validIds.get(enrollmentId)!;
+    if (!spokenNameMatchesRoster(ocrName, studentName)) {
+      notFound.push(ocrName);
+      continue;
+    }
+
+    matched.push({ enrollmentId, studentName, ocrName, type, date: resolvedDate, confidence });
+  }
+
+  return {
+    date:     resolvedDate,
+    matched,
+    notFound,
+    total:    (parsed.records ?? []).length,
   };
 }

@@ -3,6 +3,7 @@ import multer from 'multer';
 import { requirePermission } from '../middleware/role.middleware';
 import { requireInstitution } from '../middleware/institution.middleware';
 import { voiceAbsenceQueue } from '../queues/voice-absence.queue';
+import { photoAbsenceQueue } from '../queues/photo-absence.queue';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -28,6 +29,32 @@ router.post('/voice-absence', requirePermission('absences', 'create'),
       institutionId: req.institutionId!,
       courseId,
       academicYearId,
+    });
+
+    res.status(202).json({ jobId: job.id });
+  }
+);
+
+router.post('/photo-absence', requirePermission('absences', 'create'),
+  upload.single('image'),
+  async (req, res) => {
+    if (!req.file) { res.status(400).json({ error: 'Imagen requerida' }); return; }
+
+    const courseId       = req.body.course_id        ? +req.body.course_id        : undefined;
+    const academicYearId = req.body.academic_year_id  ? +req.body.academic_year_id  : undefined;
+
+    if (!courseId || !academicYearId) {
+      res.status(400).json({ error: 'Debes seleccionar un curso antes de procesar una foto' });
+      return;
+    }
+
+    const job = await photoAbsenceQueue.add('parse' as const, {
+      imageBase64:   req.file.buffer.toString('base64'),
+      mimeType:      req.file.mimetype,
+      institutionId: req.institutionId!,
+      courseId,
+      academicYearId,
+      date:          req.body.date || undefined,
     });
 
     res.status(202).json({ jobId: job.id });
