@@ -1,3 +1,2 @@
-SET search_path TO attendance;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS title VARCHAR(50);
-ALTER TABLE users ADD COLUMN IF NOT EXISTS signature_label VARCHAR(150);
+ALTER TABLE attendance.users ADD COLUMN IF NOT EXISTS title VARCHAR(50);
+ALTER TABLE attendance.users ADD COLUMN IF NOT EXISTS signature_label VARCHAR(150);
