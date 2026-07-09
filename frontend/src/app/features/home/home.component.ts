@@ -9,7 +9,14 @@ import { SECTIONS, SectionItem } from '../../core/nav-items';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MatIconModule],
   styles: [`
-    .launcher-wrap { max-width: 880px; }
+    .page-center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 64px - 48px);
+    }
+
+    .launcher-wrap { max-width: 880px; width: 100%; }
 
     .greeting-text {
       font-family: 'Nunito', sans-serif;
@@ -109,6 +116,7 @@ import { SECTIONS, SectionItem } from '../../core/nav-items';
     .app-card:hover .app-arrow mat-icon { transform: translateX(3px); }
   `],
   template: `
+    <div class="page-center">
     <div class="launcher-wrap">
       <div class="greeting-text">
         Bienvenido{{firstName() ? ', ' + firstName() : ''}}
@@ -129,6 +137,7 @@ import { SECTIONS, SectionItem } from '../../core/nav-items';
           </button>
         }
       </div>
+    </div>
     </div>
   `,
 })
