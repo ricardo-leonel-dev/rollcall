@@ -8,17 +8,27 @@ const router = Router();
 router.use(requireInstitution);
 
 router.get('/excel', requirePermission('export','read'), async (req, res) => {
-  const { course_id, academic_year_id, date_from, date_to } = req.query as Record<string, string>;
-  if (!course_id || !academic_year_id || !date_from || !date_to) {
-    res.status(400).json({ error: 'course_id, academic_year_id, date_from, date_to son requeridos' });
-    return;
-  }
-  if (req.courseIds && !req.courseIds.includes(+course_id)) {
-    res.status(404).json({ error: 'Course not found' });
+  const { course_ids, academic_year_id, date_from, date_to } = req.query as Record<string, string>;
+  if (!course_ids || !academic_year_id || !date_from || !date_to) {
+    res.status(400).json({ error: 'course_ids, academic_year_id, date_from, date_to son requeridos' });
     return;
   }
 
-  const ocrResp = await svc.exportExcel(req.institutionId!, +course_id, +academic_year_id, date_from, date_to);
+  const courseIds = course_ids.split(',').map(s => parseInt(s.trim(), 10));
+  if (courseIds.some(id => isNaN(id))) {
+    res.status(400).json({ error: 'course_ids debe ser una lista de enteros separados por coma' });
+    return;
+  }
+
+  if (req.courseIds) {
+    const unauthorized = courseIds.filter(id => !req.courseIds!.includes(id));
+    if (unauthorized.length > 0) {
+      res.status(404).json({ error: 'Course not found' });
+      return;
+    }
+  }
+
+  const ocrResp = await svc.exportExcel(req.institutionId!, courseIds, +academic_year_id, date_from, date_to);
 
   const contentType = ocrResp.headers.get('content-type') || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   const disposition = ocrResp.headers.get('content-disposition') || 'attachment; filename="asistencia.xlsx"';
