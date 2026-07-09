@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, OnInit, signal, computed, inject } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,18 +8,18 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatDialog } from '@angular/material/dialog';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { map } from 'rxjs';
+import { filter, map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { ProfileDialogComponent, resolveAvatarPreset } from '../components/profile-dialog/profile-dialog.component';
-import { NAV_ITEMS } from '../../core/nav-items';
+import { SECTIONS, SubNavItem } from '../../core/nav-items';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule, MatIconModule, MatButtonModule, MatTooltipModule, MatSelectModule],
+  imports: [RouterOutlet, RouterLink, FormsModule, MatIconModule, MatButtonModule, MatTooltipModule, MatSelectModule],
   styles: [`
     :host { display: flex; height: 100vh; overflow: hidden; }
 
@@ -34,8 +34,8 @@ import { NAV_ITEMS } from '../../core/nav-items';
       position: relative;
     }
     aside.collapsed { width: 64px; }
-    /* book spine — a thin warm highlight down the inner edge, like the gilt
-       edge of a ledger cover */
+    aside.sidebar-hidden { width: 0; min-width: 0; }
+    /* book spine — thin warm highlight down the inner edge */
     aside::after {
       content: '';
       position: absolute;
@@ -82,6 +82,11 @@ import { NAV_ITEMS } from '../../core/nav-items';
       transition: all 0.15s ease;
       white-space: nowrap;
       overflow: hidden;
+      cursor: pointer;
+      background: none;
+      border: none;
+      width: 100%;
+      text-align: left;
     }
     .nav-item:hover { background: rgba(255,237,213,0.07); color: #f5f0e8; }
     .nav-item.active { background: color-mix(in srgb, var(--accent) 25%, transparent); color: color-mix(in srgb, var(--accent) 55%, white); }
@@ -89,8 +94,27 @@ import { NAV_ITEMS } from '../../core/nav-items';
     .nav-icon { font-size: 20px !important; width: 20px !important; height: 20px !important; flex-shrink: 0; }
     .nav-label { font-size: 14px; font-weight: 500; }
 
-    .nav-section { color: #6b5d4f; font-size: 10px; font-weight: 700; text-transform: uppercase;
-                   letter-spacing: 0.08em; padding: 8px 12px 4px; margin-top: 8px; }
+    .nav-back {
+      color: #6b5d4f;
+      margin-bottom: 8px;
+    }
+    .nav-back:hover { color: #f5f0e8; }
+
+    .nav-section {
+      color: #6b5d4f;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 8px 12px 4px;
+      margin-top: 8px;
+      white-space: nowrap;
+    }
+    .nav-divider {
+      height: 1px;
+      background: rgba(255,237,213,0.08);
+      margin: 8px 12px;
+    }
 
     .user-area {
       padding: 12px 8px;
@@ -159,11 +183,16 @@ import { NAV_ITEMS } from '../../core/nav-items';
     @media (max-width: 767px) {
       aside { position: fixed; left: 0; top: 0; bottom: 0; z-index: 100; width: 240px; transform: translateX(-100%); }
       aside.mobile-open { transform: translateX(0); }
+      aside.sidebar-hidden { width: 240px; transform: translateX(-100%); }
       .overlay { display: block; }
     }
   `],
   template: `
-    <aside [class.collapsed]="collapsed() && !isMobile()" [class.mobile-open]="mobileOpen()">
+    <aside
+      [class.sidebar-hidden]="!showSidebar() && !isMobile()"
+      [class.collapsed]="collapsed() && !isMobile()"
+      [class.mobile-open]="mobileOpen() && showSidebar()">
+
       <div class="brand">
         <div class="brand-icon">
           <mat-icon class="nav-icon">school</mat-icon>
@@ -179,33 +208,29 @@ import { NAV_ITEMS } from '../../core/nav-items';
       </div>
 
       <nav>
-        <a class="nav-item" routerLink="/inicio" routerLinkActive="active"
-           [matTooltip]="collapsed() && !isMobile() ? 'Inicio' : ''" matTooltipPosition="right"
-           (click)="isMobile() && closeMobile()">
-          <mat-icon class="nav-icon">apps</mat-icon>
+        <!-- Back to home -->
+        <a class="nav-item nav-back" routerLink="/home" (click)="closeMobile()"
+           [matTooltip]="collapsed() && !isMobile() ? 'Inicio' : ''" matTooltipPosition="right">
+          <mat-icon class="nav-icon">arrow_back</mat-icon>
           @if (!collapsed() || isMobile()) { <span class="nav-label">Inicio</span> }
         </a>
-        @if (mainNav().length) {
-          <div class="nav-section" *ngIf="!collapsed() || isMobile()">Principal</div>
-        }
-        @for (item of mainNav(); track item.route) {
-          <a class="nav-item" [routerLink]="item.route" routerLinkActive="active"
-             [matTooltip]="collapsed() && !isMobile() ? item.label : ''" matTooltipPosition="right"
-             (click)="isMobile() && closeMobile()">
-            <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
-            @if (!collapsed() || isMobile()) { <span class="nav-label">{{item.label}}</span> }
-          </a>
-        }
-        @if (mgmtNav().length) {
-          <div class="nav-section" *ngIf="!collapsed() || isMobile()">Gestión</div>
-        }
-        @for (item of mgmtNav(); track item.route) {
-          <a class="nav-item" [routerLink]="item.route" routerLinkActive="active"
-             [matTooltip]="collapsed() && !isMobile() ? item.label : ''" matTooltipPosition="right"
-             (click)="isMobile() && closeMobile()">
-            <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
-            @if (!collapsed() || isMobile()) { <span class="nav-label">{{item.label}}</span> }
-          </a>
+
+        @if (activeSectionData()) {
+          <div class="nav-divider"></div>
+          @if (!collapsed() || isMobile()) {
+            <div class="nav-section">{{activeSectionData()!.label}}</div>
+          }
+          @for (item of visibleSubnav(); track item.label) {
+            <a class="nav-item"
+               [class.active]="isSubnavActive(item)"
+               [routerLink]="item.route"
+               [queryParams]="item.queryParams ?? null"
+               [matTooltip]="collapsed() && !isMobile() ? item.label : ''" matTooltipPosition="right"
+               (click)="closeMobile()">
+              <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
+              @if (!collapsed() || isMobile()) { <span class="nav-label">{{item.label}}</span> }
+            </a>
+          }
         }
       </nav>
 
@@ -236,15 +261,17 @@ import { NAV_ITEMS } from '../../core/nav-items';
       </div>
     </aside>
 
-    @if (isMobile() && mobileOpen()) {
+    @if (isMobile() && mobileOpen() && showSidebar()) {
       <div class="fixed inset-0 bg-black/40 z-50" style="backdrop-filter:blur(2px)" (click)="closeMobile()"></div>
     }
 
     <main>
       <header>
-        <button mat-icon-button class="menu-toggle" (click)="toggleMenu()">
-          <mat-icon>{{isMobile() ? 'menu' : (collapsed() ? 'menu_open' : 'menu')}}</mat-icon>
-        </button>
+        @if (showSidebar()) {
+          <button mat-icon-button class="menu-toggle" (click)="toggleMenu()">
+            <mat-icon>{{isMobile() ? 'menu' : (collapsed() ? 'menu_open' : 'menu')}}</mat-icon>
+          </button>
+        }
         <span style="flex:1"></span>
         <button mat-icon-button style="color:var(--muted-strong)" (click)="theme.toggle()" [matTooltip]="theme.dark() ? 'Modo claro' : 'Modo oscuro'">
           <mat-icon>{{theme.dark() ? 'light_mode' : 'dark_mode'}}</mat-icon>
@@ -286,6 +313,7 @@ export class LayoutComponent implements OnInit {
   readonly institutionContext = inject(InstitutionContextService);
   readonly academicYearContext = inject(AcademicYearContextService);
   readonly theme = inject(ThemeService);
+  private readonly router = inject(Router);
   private readonly bp = inject(BreakpointObserver);
   private readonly dialog = inject(MatDialog);
 
@@ -293,8 +321,6 @@ export class LayoutComponent implements OnInit {
   // interceptor only attaches once institutionContext has picked one — gate
   // the routed page behind that so no child component's ngOnInit fires an
   // institution-scoped request before the header exists (was a real 400 race).
-  // Also waits for academicYearContext: every page now defaults its year
-  // selector to the resolved active year instead of guessing on its own.
   readonly institutionReady = signal(false);
 
   async ngOnInit(): Promise<void> {
@@ -345,6 +371,45 @@ export class LayoutComponent implements OnInit {
 
   closeMobile(): void { this.mobileOpen.set(false); }
 
-  readonly mainNav = computed(() => NAV_ITEMS.filter(i => i.section === 'main' && this.auth.canAccessModule(i.key)));
-  readonly mgmtNav = computed(() => NAV_ITEMS.filter(i => i.section === 'mgmt' && this.auth.canAccessModule(i.key)));
+  // Track current URL to derive the active section
+  readonly currentUrl = toSignal(
+    this.router.events.pipe(
+      filter(e => e instanceof NavigationEnd),
+      map(() => this.router.url)
+    ),
+    { initialValue: this.router.url }
+  );
+
+  // The first URL path segment, null when on /home or root
+  readonly activeSection = computed(() => {
+    const segment = this.currentUrl().split('?')[0].split('/')[1] ?? '';
+    return (segment && segment !== 'home') ? segment : null;
+  });
+
+  readonly showSidebar = computed(() => !!this.activeSection());
+
+  readonly activeSectionData = computed(() =>
+    SECTIONS.find(s => s.key === this.activeSection()) ?? null
+  );
+
+  readonly visibleSubnav = computed(() => {
+    const section = this.activeSectionData();
+    if (!section) return [];
+    return section.subnav.filter(item => {
+      if (item.superAdminOnly && !this.auth.isSuperAdmin()) return false;
+      if (item.moduleKey) return this.auth.canAccessModule(item.moduleKey);
+      return true; // placeholders always visible
+    });
+  });
+
+  isSubnavActive(item: SubNavItem): boolean {
+    const url = this.currentUrl();
+    const qIdx = url.indexOf('?');
+    const pathname = qIdx >= 0 ? url.slice(0, qIdx) : url;
+    const search = qIdx >= 0 ? url.slice(qIdx + 1) : '';
+    if (pathname !== item.route) return false;
+    if (!item.queryParams || Object.keys(item.queryParams).length === 0) return true;
+    const params = new URLSearchParams(search);
+    return Object.entries(item.queryParams).every(([k, v]) => params.get(k) === v);
+  }
 }
