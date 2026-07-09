@@ -42,7 +42,6 @@ services:
     ports:
       - "8002:8002"
     volumes:
-      - ./excel-service/plantilla_asistencia.xlsx:/app/plantilla_asistencia.xlsx:ro
       - excel_output:/app/output
     environment:
       - DATABASE_URL=${DATABASE_URL}
