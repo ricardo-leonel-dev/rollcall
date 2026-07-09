@@ -1,22 +1,90 @@
-export interface NavItem {
-  key: string;
+export interface SubNavItem {
   route: string;
   icon: string;
   label: string;
-  section: 'main' | 'mgmt';
-  description: string;
+  moduleKey?: string;
+  placeholder?: boolean;
+  superAdminOnly?: boolean;
+  queryParams?: Record<string, string>;
 }
 
-// Single source of truth for the app's navigable modules — used by the
-// sidebar, the "Inicio" launcher, the per-user module permission UI in
-// Admin, and the module route guard. `key` matches the route path and the
-// module_key stored in user_modules.
-export const NAV_ITEMS: NavItem[] = [
-  { key: 'dashboard',      route: '/dashboard',      icon: 'dashboard',            label: 'Dashboard',       section: 'main', description: 'Resumen de asistencia, indicadores y top de inasistencias.' },
-  { key: 'absences',       route: '/absences',       icon: 'event_busy',           label: 'Inasistencias',   section: 'main', description: 'Marcar faltas y atrasos por estudiante y rango de fechas.' },
-  { key: 'calendar',       route: '/calendar',       icon: 'calendar_month',       label: 'Calendario',      section: 'main', description: 'Vista mensual de inasistencias por curso.' },
-  { key: 'justifications', route: '/justifications', icon: 'task_alt',             label: 'Justificaciones', section: 'main', description: 'Crear y revisar justificaciones de inasistencias.' },
-  { key: 'students',       route: '/students',       icon: 'groups',               label: 'Estudiantes',     section: 'mgmt', description: 'Datos de estudiantes y sus representantes.' },
-  { key: 'enrollments',    route: '/enrollments',    icon: 'assignment_ind',       label: 'Matrículas',      section: 'mgmt', description: 'Matricular estudiantes a cursos y años lectivos.' },
-  { key: 'admin',          route: '/admin',          icon: 'admin_panel_settings', label: 'Administración',  section: 'mgmt', description: 'Usuarios, cursos, años lectivos, permisos e instituciones.' },
+export interface SectionItem {
+  key: string;
+  icon: string;
+  label: string;
+  description: string;
+  subnav: SubNavItem[];
+}
+
+export const SECTIONS: SectionItem[] = [
+  {
+    key: 'students',
+    icon: 'groups',
+    label: 'Estudiantes',
+    description: 'Perfil académico, datos personales y seguimiento integral de cada estudiante.',
+    subnav: [
+      { route: '/students/list',        icon: 'format_list_bulleted', label: 'Listado',    moduleKey: 'students' },
+      { route: '/students/enrollments', icon: 'assignment_ind',       label: 'Matrículas', moduleKey: 'enrollments' },
+      { route: '/students/history',     icon: 'history',              label: 'Historial',  placeholder: true },
+    ],
+  },
+  {
+    key: 'inspectors',
+    icon: 'manage_search',
+    label: 'Inspectoría',
+    description: 'Control de inasistencias, justificaciones y citaciones de estudiantes.',
+    subnav: [
+      { route: '/inspectors/dashboard',      icon: 'dashboard',  label: 'Dashboard',                        moduleKey: 'dashboard' },
+      { route: '/inspectors/absences',       icon: 'event_busy', label: 'Administración de faltas',         moduleKey: 'absences' },
+      { route: '/inspectors/justifications', icon: 'task_alt',   label: 'Administración de justificaciones', moduleKey: 'justifications' },
+      { route: '/inspectors/citations',      icon: 'campaign',   label: 'Administración de citaciones',     placeholder: true },
+    ],
+  },
+  {
+    key: 'teachers',
+    icon: 'school',
+    label: 'Profesores',
+    description: 'Registro de asistencia, calificaciones, citaciones por docente y novedades del aula.',
+    subnav: [
+      { route: '/teachers/dashboard', icon: 'dashboard',            label: 'Dashboard',              placeholder: true },
+      { route: '/teachers/absences',  icon: 'how_to_reg',           label: 'Manejo de faltas y atrasos', placeholder: true },
+      { route: '/teachers/grades',    icon: 'grading',              label: 'Calificaciones',         placeholder: true },
+      { route: '/teachers/citations', icon: 'campaign',             label: 'Manejo de citaciones',   placeholder: true },
+      { route: '/teachers/news',      icon: 'notifications_active', label: 'Ingreso de novedades',   placeholder: true },
+    ],
+  },
+  {
+    key: 'calendar',
+    icon: 'calendar_month',
+    label: 'Calendario',
+    description: 'Vista rápida de eventos, inasistencias, citaciones y justificaciones.',
+    subnav: [
+      { route: '/calendar', icon: 'calendar_month', label: 'Calendario', moduleKey: 'calendar' },
+    ],
+  },
+  {
+    key: 'admin',
+    icon: 'admin_panel_settings',
+    label: 'Administración',
+    description: 'Usuarios, cursos, años lectivos, roles y configuración institucional.',
+    subnav: [
+      { route: '/admin', icon: 'manage_accounts', label: 'Usuarios',       moduleKey: 'admin', queryParams: { tab: 'users' } },
+      { route: '/admin', icon: 'class',           label: 'Cursos',         moduleKey: 'admin', queryParams: { tab: 'courses' } },
+      { route: '/admin', icon: 'calendar_today',  label: 'Años lectivos',  moduleKey: 'admin', queryParams: { tab: 'years' } },
+      { route: '/admin', icon: 'security',        label: 'Permisos',       moduleKey: 'admin', queryParams: { tab: 'permissions' } },
+      { route: '/admin', icon: 'upload_file',     label: 'Importar nómina', moduleKey: 'admin', queryParams: { tab: 'roster' } },
+      { route: '/admin', icon: 'corporate_fare',  label: 'Instituciones',  moduleKey: 'admin', queryParams: { tab: 'institutions' }, superAdminOnly: true },
+    ],
+  },
+];
+
+// Flat list of module keys for the user-modules permission selector in Admin
+export const MODULE_KEYS: { key: string; label: string }[] = [
+  { key: 'dashboard',      label: 'Dashboard (Inspectoría)' },
+  { key: 'absences',       label: 'Inasistencias' },
+  { key: 'justifications', label: 'Justificaciones' },
+  { key: 'students',       label: 'Estudiantes' },
+  { key: 'enrollments',    label: 'Matrículas' },
+  { key: 'calendar',       label: 'Calendario' },
+  { key: 'admin',          label: 'Administración' },
 ];

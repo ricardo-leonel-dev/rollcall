@@ -58,7 +58,7 @@ export class AuthService {
 
   async login(username: string, password: string, rememberMe = true): Promise<void> {
     await this.loginSetup(username, password, rememberMe);
-    await this.router.navigate(['/inicio']);
+    await this.router.navigate(['/home']);
   }
 
   logout(): void {

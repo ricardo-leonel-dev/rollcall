@@ -248,7 +248,7 @@ export class LoginComponent {
     if (success) {
       this.loginSuccess.set(true);
       await new Promise<void>(r => setTimeout(r, 650));
-      this.router.navigate(['/inicio']);
+      this.router.navigate(['/home']);
     }
   }
 }
