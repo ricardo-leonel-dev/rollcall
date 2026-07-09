@@ -78,13 +78,72 @@ export const SECTIONS: SectionItem[] = [
   },
 ];
 
-// Flat list of module keys for the user-modules permission selector in Admin
+export interface ModuleNode {
+  key: string;
+  label: string;
+  children?: ModuleNode[];
+}
+
+// Hierarchical module tree for the permission dialog.
+export const MODULE_TREE: ModuleNode[] = [
+  {
+    key: 'dashboard',
+    label: 'Dashboard (Inspectoría)',
+  },
+  {
+    key: 'absences',
+    label: 'Inasistencias',
+    children: [
+      { key: 'absences:manual', label: 'Entrada manual' },
+      { key: 'absences:voice',  label: 'Reconocimiento de voz' },
+      { key: 'absences:photo',  label: 'OCR por foto' },
+    ],
+  },
+  {
+    key: 'justifications',
+    label: 'Justificaciones',
+  },
+  {
+    key: 'students',
+    label: 'Estudiantes',
+    children: [
+      { key: 'students:list',        label: 'Listado de estudiantes' },
+      { key: 'students:enrollments', label: 'Matrículas' },
+    ],
+  },
+  {
+    key: 'calendar',
+    label: 'Calendario',
+  },
+  {
+    key: 'admin',
+    label: 'Administración',
+    children: [
+      { key: 'admin:users',       label: 'Usuarios' },
+      { key: 'admin:courses',     label: 'Cursos' },
+      { key: 'admin:years',       label: 'Años lectivos' },
+      { key: 'admin:permissions', label: 'Permisos de rol' },
+      { key: 'admin:roster',      label: 'Importar nómina' },
+    ],
+  },
+];
+
+// Flat list of module keys for legacy use (module selector dropdown)
 export const MODULE_KEYS: { key: string; label: string }[] = [
-  { key: 'dashboard',      label: 'Dashboard (Inspectoría)' },
-  { key: 'absences',       label: 'Inasistencias' },
-  { key: 'justifications', label: 'Justificaciones' },
-  { key: 'students',       label: 'Estudiantes' },
-  { key: 'enrollments',    label: 'Matrículas' },
-  { key: 'calendar',       label: 'Calendario' },
-  { key: 'admin',          label: 'Administración' },
+  { key: 'dashboard',             label: 'Dashboard (Inspectoría)' },
+  { key: 'absences',              label: 'Inasistencias' },
+  { key: 'absences:manual',       label: '↳ Entrada manual' },
+  { key: 'absences:voice',        label: '↳ Voz' },
+  { key: 'absences:photo',        label: '↳ Foto OCR' },
+  { key: 'justifications',        label: 'Justificaciones' },
+  { key: 'students',              label: 'Estudiantes' },
+  { key: 'students:list',         label: '↳ Listado' },
+  { key: 'students:enrollments',  label: '↳ Matrículas' },
+  { key: 'calendar',              label: 'Calendario' },
+  { key: 'admin',                 label: 'Administración' },
+  { key: 'admin:users',           label: '↳ Usuarios' },
+  { key: 'admin:courses',         label: '↳ Cursos' },
+  { key: 'admin:years',           label: '↳ Años lectivos' },
+  { key: 'admin:permissions',     label: '↳ Permisos de rol' },
+  { key: 'admin:roster',          label: '↳ Importar nómina' },
 ];

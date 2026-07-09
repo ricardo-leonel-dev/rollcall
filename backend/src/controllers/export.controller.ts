@@ -2,12 +2,18 @@ import { Router } from 'express';
 import { requirePermission } from '../middleware/role.middleware';
 import { requireInstitution } from '../middleware/institution.middleware';
 import * as svc from '../services/export.service';
+import { getSigners } from '../services/user.service';
 
 const router = Router();
 
 router.use(requireInstitution);
 
 router.get('/excel', requirePermission('export','read'), async (req, res) => {
+  if (!req.institutionId) {
+    res.status(400).json({ error: 'Institución requerida' });
+    return;
+  }
+
   const { course_ids, academic_year_id, date_from, date_to } = req.query as Record<string, string>;
   if (!course_ids || !academic_year_id || !date_from || !date_to) {
     res.status(400).json({ error: 'course_ids, academic_year_id, date_from, date_to son requeridos' });
@@ -28,7 +34,8 @@ router.get('/excel', requirePermission('export','read'), async (req, res) => {
     }
   }
 
-  const ocrResp = await svc.exportExcel(req.institutionId!, courseIds, +academic_year_id, date_from, date_to);
+  const signers = await getSigners(req.institutionId);
+  const ocrResp = await svc.exportExcel(req.institutionId, courseIds, +academic_year_id, date_from, date_to, signers);
 
   const contentType = ocrResp.headers.get('content-type') || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   const disposition = ocrResp.headers.get('content-disposition') || 'attachment; filename="asistencia.xlsx"';

@@ -145,6 +145,8 @@ export interface User {
   institutionId: number | null;
   avatarUrl: string | null;
   isActive: boolean;
+  title?: string | null;
+  signatureLabel?: string | null;
   courseIds?: number[];
   moduleKeys?: string[] | null;
   institution?: InstitutionBranding | null;
@@ -182,6 +184,8 @@ export interface AuthResponse {
     roleId: number | null;
     institutionId: number | null;
     avatarUrl: string | null;
+    title?: string | null;
+    signatureLabel?: string | null;
     institution?: InstitutionBranding | null;
     moduleKeys?: string[] | null;
   };
