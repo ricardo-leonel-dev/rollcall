@@ -7,5 +7,5 @@ export const moduleGuard: CanActivateFn = (route) => {
   const router = inject(Router);
   const key = route.data['module'] as string | undefined;
   if (!key || auth.canAccessModule(key)) return true;
-  return router.createUrlTree(['/inicio']);
+  return router.createUrlTree(['/home']);
 };

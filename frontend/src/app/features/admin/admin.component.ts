@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, signal, inject, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { MatTabsModule } from '@angular/material/tabs';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
@@ -9,7 +9,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
-import { firstValueFrom } from 'rxjs';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { firstValueFrom, map } from 'rxjs';
 import { AcademicYear, Course, User, Role, RolePermission, Institution } from '../../core/models/index';
 import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
@@ -21,12 +22,12 @@ import { AcademicYearDialogComponent } from './academic-year-dialog.component';
 import { CourseDialogComponent } from './course-dialog.component';
 import { UserDialogComponent } from './user-dialog.component';
 import { RoleDialogComponent } from './role-dialog.component';
-import { NAV_ITEMS } from '../../core/nav-items';
+import { MODULE_KEYS } from '../../core/nav-items';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule,
+  imports: [FormsModule, MatFormFieldModule, MatSelectModule,
             MatInputModule, MatButtonModule, MatIconModule, MatCheckboxModule],
   styles: [`
     .tab-content { padding: 20px; }
@@ -63,59 +64,49 @@ import { NAV_ITEMS } from '../../core/nav-items';
       }
     </div>
 
-    <mat-tab-group style="background:var(--paper);border-radius:16px;border:1px solid var(--border);overflow:hidden">
+    <div style="background:var(--paper);border-radius:16px;border:1px solid var(--border);overflow:hidden;min-height:400px">
 
       <!-- INSTITUCIONES (solo superadmin) -->
-      @if (auth.isSuperAdmin()) {
-        <mat-tab>
-          <ng-template mat-tab-label>
-            <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">corporate_fare</mat-icon>
-            Instituciones
-          </ng-template>
-          <div class="tab-content">
-            <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-              <button mat-flat-button color="primary" (click)="openInstitutionDialog()">
-                <mat-icon>add</mat-icon> Agregar institución
-              </button>
-            </div>
-            @for (inst of institutionContext.institutions(); track inst.id) {
-              <div class="admin-row">
-                <div style="display:flex;align-items:center;gap:12px">
-                  <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
-                    @if (inst.logoUrl) {
-                      <img [src]="inst.logoUrl" alt="" style="width:100%;height:100%;object-fit:cover">
-                    } @else {
-                      <mat-icon style="color:var(--accent)">corporate_fare</mat-icon>
-                    }
-                  </div>
-                  <div style="font-weight:600">{{inst.name}}</div>
-                </div>
-                <div class="admin-row-actions">
-                  <button mat-icon-button style="color:var(--muted-strong)" (click)="openInstitutionDialog(inst)"><mat-icon>edit</mat-icon></button>
-                  <input type="color" title="Color primario" [value]="inst.primaryColor || '#6366f1'"
-                         (change)="updateInstitutionColor(inst, 'primaryColor', $any($event.target).value)"
-                         style="width:28px;height:28px;border:none;border-radius:6px;cursor:pointer;background:none">
-                  <input type="color" title="Color secundario" [value]="inst.secondaryColor || '#8b5cf6'"
-                         (change)="updateInstitutionColor(inst, 'secondaryColor', $any($event.target).value)"
-                         style="width:28px;height:28px;border:none;border-radius:6px;cursor:pointer;background:none">
-                  <input #logoInput type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden
-                         (change)="uploadInstitutionLogo(inst.id, $event)">
-                  <button mat-icon-button title="Subir logo" (click)="logoInput.click()"><mat-icon>image</mat-icon></button>
-                  <span [class]="inst.isActive ? 'badge-J' : 'badge-gray'">{{inst.isActive ? 'Activa' : 'Inactiva'}}</span>
-                  <button mat-icon-button style="color:#b91c1c" (click)="deactivateInstitution(inst.id)"><mat-icon>delete_outline</mat-icon></button>
-                </div>
-              </div>
-            }
+      @if (activeTab() === 'institutions' && auth.isSuperAdmin()) {
+        <div class="tab-content">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+            <button mat-flat-button color="primary" (click)="openInstitutionDialog()">
+              <mat-icon>add</mat-icon> Agregar institución
+            </button>
           </div>
-        </mat-tab>
+          @for (inst of institutionContext.institutions(); track inst.id) {
+            <div class="admin-row">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
+                  @if (inst.logoUrl) {
+                    <img [src]="inst.logoUrl" alt="" style="width:100%;height:100%;object-fit:cover">
+                  } @else {
+                    <mat-icon style="color:var(--accent)">corporate_fare</mat-icon>
+                  }
+                </div>
+                <div style="font-weight:600">{{inst.name}}</div>
+              </div>
+              <div class="admin-row-actions">
+                <button mat-icon-button style="color:var(--muted-strong)" (click)="openInstitutionDialog(inst)"><mat-icon>edit</mat-icon></button>
+                <input type="color" title="Color primario" [value]="inst.primaryColor || '#6366f1'"
+                       (change)="updateInstitutionColor(inst, 'primaryColor', $any($event.target).value)"
+                       style="width:28px;height:28px;border:none;border-radius:6px;cursor:pointer;background:none">
+                <input type="color" title="Color secundario" [value]="inst.secondaryColor || '#8b5cf6'"
+                       (change)="updateInstitutionColor(inst, 'secondaryColor', $any($event.target).value)"
+                       style="width:28px;height:28px;border:none;border-radius:6px;cursor:pointer;background:none">
+                <input #logoInput type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden
+                       (change)="uploadInstitutionLogo(inst.id, $event)">
+                <button mat-icon-button title="Subir logo" (click)="logoInput.click()"><mat-icon>image</mat-icon></button>
+                <span [class]="inst.isActive ? 'badge-J' : 'badge-gray'">{{inst.isActive ? 'Activa' : 'Inactiva'}}</span>
+                <button mat-icon-button style="color:#b91c1c" (click)="deactivateInstitution(inst.id)"><mat-icon>delete_outline</mat-icon></button>
+              </div>
+            </div>
+          }
+        </div>
       }
 
       <!-- AÑOS LECTIVOS -->
-      <mat-tab>
-        <ng-template mat-tab-label>
-          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">calendar_today</mat-icon>
-          Años Lectivos
-        </ng-template>
+      @if (activeTab() === 'years') {
         <div class="tab-content">
           <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
             <button mat-flat-button color="primary" (click)="openYearDialog()">
@@ -144,14 +135,10 @@ import { NAV_ITEMS } from '../../core/nav-items';
             </div>
           }
         </div>
-      </mat-tab>
+      }
 
       <!-- CURSOS -->
-      <mat-tab>
-        <ng-template mat-tab-label>
-          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">class</mat-icon>
-          Cursos
-        </ng-template>
+      @if (activeTab() === 'courses') {
         <div class="tab-content">
           <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
             <button mat-flat-button color="primary" (click)="openCourseDialog()">
@@ -191,14 +178,10 @@ import { NAV_ITEMS } from '../../core/nav-items';
             }
           </div>
         </div>
-      </mat-tab>
+      }
 
       <!-- USUARIOS -->
-      <mat-tab>
-        <ng-template mat-tab-label>
-          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">manage_accounts</mat-icon>
-          Usuarios
-        </ng-template>
+      @if (activeTab() === 'users') {
         <div class="tab-content">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
             @if (academicYearContext.selected(); as activeYear) {
@@ -233,7 +216,7 @@ import { NAV_ITEMS } from '../../core/nav-items';
                   <mat-form-field appearance="outline" style="width:240px;margin:0">
                     <mat-label>{{u.moduleKeys?.length ? 'Acceso limitado' : 'Acceso a todo'}}</mat-label>
                     <mat-select multiple [(ngModel)]="u.moduleKeys" (closed)="updateUserModules(u.id, u.moduleKeys ?? [])">
-                      @for (n of navItems; track n.key) { <mat-option [value]="n.key">{{n.label}}</mat-option> }
+                      @for (n of moduleKeys; track n.key) { <mat-option [value]="n.key">{{n.label}}</mat-option> }
                     </mat-select>
                   </mat-form-field>
                 }
@@ -242,14 +225,10 @@ import { NAV_ITEMS } from '../../core/nav-items';
             </div>
           }
         </div>
-      </mat-tab>
+      }
 
       <!-- PERMISOS -->
-      <mat-tab>
-        <ng-template mat-tab-label>
-          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">security</mat-icon>
-          Permisos
-        </ng-template>
+      @if (activeTab() === 'permissions') {
         <div class="tab-content">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
             <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:200px;margin:0">
@@ -295,14 +274,10 @@ import { NAV_ITEMS } from '../../core/nav-items';
             </button>
           }
         </div>
-      </mat-tab>
+      }
 
       <!-- IMPORTAR NÓMINA -->
-      <mat-tab>
-        <ng-template mat-tab-label>
-          <mat-icon style="margin-right:6px;font-size:18px;width:18px;height:18px">upload_file</mat-icon>
-          Importar Nómina
-        </ng-template>
+      @if (activeTab() === 'roster') {
         <div class="tab-content">
           <p style="color:var(--muted-strong);font-size:14px;margin-bottom:20px">
             Sube el archivo Excel de nómina. Cada hoja = un curso. Fila 6 = encabezados, fila 7+ = estudiantes.
@@ -357,14 +332,16 @@ import { NAV_ITEMS } from '../../core/nav-items';
             </div>
           }
         </div>
-      </mat-tab>
-    </mat-tab-group>
+      }
+    </div>
   `,
 })
 export class AdminComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly notify = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   readonly auth = inject(AuthService);
   readonly institutionContext = inject(InstitutionContextService);
   readonly academicYearContext = inject(AcademicYearContextService);
@@ -379,18 +356,27 @@ export class AdminComponent implements OnInit {
 
   selRole: number | null = null;
 
+  readonly activeTab = toSignal(
+    this.route.queryParamMap.pipe(map(p => p.get('tab') ?? 'users')),
+    { initialValue: this.route.snapshot.queryParamMap.get('tab') ?? 'users' }
+  );
+
+  readonly moduleKeys = MODULE_KEYS;
+
   async openQueueMonitor(): Promise<void> {
     await firstValueFrom(this.http.post('/api/admin/queues-session', {}));
     window.open('/api/admin/queues', '_blank');
   }
 
   async ngOnInit(): Promise<void> {
+    // Default to users tab if no tab param in URL
+    if (!this.route.snapshot.queryParamMap.get('tab')) {
+      await this.router.navigate([], { queryParams: { tab: 'users' }, replaceUrl: true });
+    }
     // For a superadmin, an institution must be selected before any
     // institution-scoped endpoint below will succeed — load/auto-select
     // first. A brand-new superadmin with zero institutions yet simply gets
     // empty lists below until they create one in the Instituciones tab.
-    // academicYearContext is already loaded by layout.component.ts before
-    // this page mounts.
     if (this.auth.isSuperAdmin()) await this.institutionContext.loadInstitutions();
     await this.loadAll();
   }
@@ -520,8 +506,6 @@ export class AdminComponent implements OnInit {
     this.notify.success('Cursos actualizados');
     await this.loadAll();
   }
-
-  readonly navItems = NAV_ITEMS;
 
   async updateUserModules(userId: number, moduleKeys: string[]): Promise<void> {
     await firstValueFrom(this.http.put(`/api/users/${userId}/modules`, { moduleKeys }));
