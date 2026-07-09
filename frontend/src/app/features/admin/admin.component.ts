@@ -21,6 +21,7 @@ import { InstitutionDialogComponent } from './institution-dialog.component';
 import { AcademicYearDialogComponent } from './academic-year-dialog.component';
 import { CourseDialogComponent } from './course-dialog.component';
 import { UserDialogComponent } from './user-dialog.component';
+import { UserPermissionsDialogComponent } from './user-permissions-dialog.component';
 import { RoleDialogComponent } from './role-dialog.component';
 import { MODULE_KEYS } from '../../core/nav-items';
 
@@ -37,10 +38,6 @@ import { MODULE_KEYS } from '../../core/nav-items';
       margin-bottom: 8px;
     }
     .admin-row-actions { display: flex; align-items: center; gap: 8px; }
-    /* Below this width, every row stacks the same way regardless of how
-       long its name/title is — relying on flex-wrap alone let a long name
-       push that row's actions to a second line while a short-named sibling
-       row stayed on one line, making rows misalign with each other. */
     @media (max-width: 1280px) {
       .admin-row { flex-direction: column; align-items: flex-start; }
       .admin-row-actions { flex-wrap: wrap; width: 100%; }
@@ -50,6 +47,12 @@ import { MODULE_KEYS } from '../../core/nav-items';
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: white; display: flex; align-items: center; justify-content: center;
       font-size: 14px; font-weight: 700; flex-shrink: 0;
+    }
+    .hidden-mobile { display: block; }
+    .hidden-desktop { display: none; }
+    @media (max-width: 768px) {
+      .hidden-mobile { display: none; }
+      .hidden-desktop { display: block; }
     }
   `],
   template: `
@@ -183,47 +186,94 @@ import { MODULE_KEYS } from '../../core/nav-items';
       <!-- USUARIOS -->
       @if (activeTab() === 'users') {
         <div class="tab-content">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-            @if (academicYearContext.selected(); as activeYear) {
-              <span style="font-size:13px;color:var(--muted)">Asignando cursos para el año <strong>{{activeYear.name}}</strong> — cambialo con el selector de año arriba.</span>
-            } @else {
-              <span style="font-size:13px;color:var(--muted)">Crea un año lectivo primero para poder asignar cursos a los usuarios.</span>
-            }
+          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
             <button mat-flat-button color="primary" (click)="openUserDialog()">
               <mat-icon>person_add</mat-icon> Nuevo usuario
             </button>
           </div>
-          @for (u of users(); track u.id) {
-            <div class="admin-row">
-              <div style="display:flex;align-items:center;gap:12px">
-                <div class="user-avatar">{{(u.fullName || u.username)[0].toUpperCase()}}</div>
-                <div>
-                  <div style="font-weight:600">{{u.fullName || u.username}}</div>
-                  <div style="font-size:12px;color:var(--muted)">@{{u.username}} · <span style="color:var(--accent)">{{u.roleName}}</span></div>
+
+          <!-- Desktop table -->
+          <div class="data-table-wrap hidden-mobile">
+            <table class="data-table">
+              <thead><tr>
+                <th>#</th>
+                <th>Usuario</th>
+                <th>Cuenta</th>
+                <th>Firma</th>
+                <th></th>
+              </tr></thead>
+              <tbody>
+                @for (u of users(); track u.id; let i = $index) {
+                  <tr>
+                    <td style="color:var(--muted);width:36px">{{i+1}}</td>
+                    <td>
+                      <div style="display:flex;align-items:center;gap:10px">
+                        <div class="user-avatar">{{(u.fullName || u.username)[0].toUpperCase()}}</div>
+                        <div>
+                          <div style="font-weight:600">{{u.fullName || u.username}}</div>
+                          <div style="font-size:12px;color:var(--muted)">
+                            @if (u.moduleKeys?.length) { <span class="badge-gray" style="margin-right:4px">Acceso limitado</span> }
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div style="font-size:13px;color:var(--muted)">@{{u.username}}</div>
+                      <span style="font-size:12px;color:var(--accent);font-weight:600">{{u.roleName}}</span>
+                    </td>
+                    <td style="font-size:12px;color:var(--muted-strong)">
+                      @if (u.title || u.signatureLabel) {
+                        <div style="line-height:1.5">
+                          @if (u.title || u.fullName) {
+                            <div>{{[u.title, u.fullName].filter(Boolean).join(' ')}}</div>
+                          }
+                          @if (u.signatureLabel) {
+                            <div style="color:var(--muted)">{{u.signatureLabel}}</div>
+                          }
+                        </div>
+                      } @else {
+                        <span style="color:var(--border)">—</span>
+                      }
+                    </td>
+                    <td>
+                      <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
+                        @if (u.roleName !== 'superadmin') {
+                          <button mat-icon-button style="color:var(--muted-strong)" title="Editar usuario" (click)="openUserDialog(u)"><mat-icon>edit</mat-icon></button>
+                          <button mat-icon-button style="color:var(--accent)" title="Configurar permisos" (click)="openPermissionsDialog(u)"><mat-icon>manage_accounts</mat-icon></button>
+                        }
+                        <button mat-icon-button style="color:#b91c1c" title="Eliminar" (click)="deleteUser(u.id)"><mat-icon>delete_outline</mat-icon></button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile cards -->
+          <div class="hidden-desktop">
+            @for (u of users(); track u.id) {
+              <div class="admin-row">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <div class="user-avatar">{{(u.fullName || u.username)[0].toUpperCase()}}</div>
+                  <div>
+                    <div style="font-weight:600">{{u.fullName || u.username}}</div>
+                    <div style="font-size:12px;color:var(--muted)">@{{u.username}} · <span style="color:var(--accent)">{{u.roleName}}</span></div>
+                    @if (u.signatureLabel) {
+                      <div style="font-size:11px;color:var(--muted)">{{u.signatureLabel}}</div>
+                    }
+                  </div>
+                </div>
+                <div class="admin-row-actions">
+                  @if (u.roleName !== 'superadmin') {
+                    <button mat-icon-button style="color:var(--muted-strong)" (click)="openUserDialog(u)"><mat-icon>edit</mat-icon></button>
+                    <button mat-icon-button style="color:var(--accent)" (click)="openPermissionsDialog(u)"><mat-icon>manage_accounts</mat-icon></button>
+                  }
+                  <button mat-icon-button style="color:#b91c1c" (click)="deleteUser(u.id)"><mat-icon>delete_outline</mat-icon></button>
                 </div>
               </div>
-              <div class="admin-row-actions">
-                @if (u.roleName !== 'superadmin') {
-                  <button mat-icon-button style="color:var(--muted-strong)" (click)="openUserDialog(u)"><mat-icon>edit</mat-icon></button>
-                  @if (academicYearContext.selectedId()) {
-                    <mat-form-field appearance="outline" style="width:240px;margin:0">
-                      <mat-label>{{u.courseIds?.length ? 'Cursos asignados' : 'Ve todos los cursos'}}</mat-label>
-                      <mat-select multiple [(ngModel)]="u.courseIds" (closed)="updateUserCourses(u.id, u.courseIds ?? [])">
-                        @for (c of courses(); track c.id) { <mat-option [value]="c.id">{{c.name}}</mat-option> }
-                      </mat-select>
-                    </mat-form-field>
-                  }
-                  <mat-form-field appearance="outline" style="width:240px;margin:0">
-                    <mat-label>{{u.moduleKeys?.length ? 'Acceso limitado' : 'Acceso a todo'}}</mat-label>
-                    <mat-select multiple [(ngModel)]="u.moduleKeys" (closed)="updateUserModules(u.id, u.moduleKeys ?? [])">
-                      @for (n of moduleKeys; track n.key) { <mat-option [value]="n.key">{{n.label}}</mat-option> }
-                    </mat-select>
-                  </mat-form-field>
-                }
-                <button mat-icon-button style="color:#b91c1c" (click)="deleteUser(u.id)"><mat-icon>delete_outline</mat-icon></button>
-              </div>
-            </div>
-          }
+            }
+          </div>
         </div>
       }
 
@@ -448,6 +498,16 @@ export class AdminComponent implements OnInit {
     this.dialog.open(UserDialogComponent, {
       width: '460px',
       data: { mode: user ? 'edit' : 'create', user, roles: this.roles(), institutions: this.institutionContext.institutions() },
+    }).afterClosed().subscribe(async ok => {
+      if (ok) await this.loadAll();
+    });
+  }
+
+  openPermissionsDialog(user: User): void {
+    this.dialog.open(UserPermissionsDialogComponent, {
+      width: '580px',
+      maxHeight: '90vh',
+      data: { user, courses: this.courses() },
     }).afterClosed().subscribe(async ok => {
       if (ok) await this.loadAll();
     });

@@ -26,6 +26,12 @@ export class User {
   @Column({ name: 'is_active', default: true })
   isActive!: boolean;
 
+  @Column({ nullable: true, type: 'varchar', length: 50 })
+  title!: string | null;
+
+  @Column({ name: 'signature_label', nullable: true, type: 'varchar', length: 150 })
+  signatureLabel!: string | null;
+
   @Column({ name: 'notification_template', type: 'text', nullable: true })
   notificationTemplate!: string | null;
 
