@@ -13,7 +13,15 @@ const repo = () => AppDataSource.getRepository(User);
 
 // Fixed set of navigable modules — not a DB-driven resource, so validated
 // against this whitelist rather than a foreign key.
-export const MODULE_KEYS = ['dashboard', 'absences', 'calendar', 'justifications', 'students', 'enrollments', 'admin'];
+export const MODULE_KEYS = [
+  'dashboard',
+  'absences', 'absences:manual', 'absences:voice', 'absences:photo',
+  'calendar',
+  'justifications',
+  'students', 'students:list', 'students:enrollments',
+  'enrollments',
+  'admin', 'admin:users', 'admin:courses', 'admin:years', 'admin:permissions', 'admin:roster',
+];
 
 async function assertRoleAssignable(roleId: number | undefined, isActorSuperAdmin: boolean) {
   if (!roleId) return;
@@ -66,7 +74,7 @@ export async function findById(institutionId: number, id: number) {
 // bound to any institution) — enforced below, never trusted blindly.
 export async function create(isActorSuperAdmin: boolean, targetInstitutionId: number | null, data: {
   username: string; password: string; fullName?: string;
-  email?: string; roleId?: number;
+  email?: string; roleId?: number; title?: string; signatureLabel?: string;
 }) {
   await assertRoleAssignable(data.roleId, isActorSuperAdmin);
 
@@ -88,6 +96,8 @@ export async function create(isActorSuperAdmin: boolean, targetInstitutionId: nu
     email: data.email ?? null,
     roleId: data.roleId ?? null,
     institutionId: targetInstitutionId,
+    title: data.title ?? null,
+    signatureLabel: data.signatureLabel ?? null,
     isActive: true,
   });
   const saved = await repo().save(u);
@@ -97,15 +107,18 @@ export async function create(isActorSuperAdmin: boolean, targetInstitutionId: nu
 
 export async function update(institutionId: number, isActorSuperAdmin: boolean, id: number, data: Partial<{
   password: string; fullName: string; email: string; roleId: number; isActive: boolean;
+  title: string; signatureLabel: string;
 }>) {
   await assertRoleAssignable(data.roleId, isActorSuperAdmin);
 
   const u = await findById(institutionId, id);
   if (data.password) u.passwordHash = await bcrypt.hash(data.password, 10);
-  if (data.fullName !== undefined)  u.fullName = data.fullName;
-  if (data.email !== undefined)     u.email    = data.email;
-  if (data.roleId !== undefined)    u.roleId   = data.roleId;
-  if (data.isActive !== undefined)  u.isActive = data.isActive;
+  if (data.fullName !== undefined)        u.fullName       = data.fullName;
+  if (data.email !== undefined)           u.email          = data.email;
+  if (data.roleId !== undefined)          u.roleId         = data.roleId;
+  if (data.isActive !== undefined)        u.isActive       = data.isActive;
+  if (data.title !== undefined)           u.title          = data.title;
+  if (data.signatureLabel !== undefined)  u.signatureLabel = data.signatureLabel;
   const saved = await repo().save(u);
   const { passwordHash: _, ...rest } = saved;
   return rest;
@@ -116,6 +129,20 @@ export async function remove(institutionId: number, id: number) {
   u.deletedAt = new Date();
   u.isActive = false;
   await repo().save(u);
+}
+
+// Returns users with signature data for use in Excel export.
+export async function getSigners(institutionId: number): Promise<{ name: string; title: string; label: string }[]> {
+  const users = await repo().find({
+    where: { institutionId, isActive: true, deletedAt: IsNull() },
+  });
+  return users
+    .filter(u => u.signatureLabel)
+    .map(u => ({
+      name: u.fullName ?? u.username,
+      title: u.title ?? '',
+      label: u.signatureLabel!,
+    }));
 }
 
 // Replaces a user's course assignments for one academic year. Empty array =

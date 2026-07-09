@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -480,7 +481,7 @@ func stripExternalLinks(zipPath string) error {
 
 // processCourse writes one course into a fresh copy of the template and returns
 // the path to the resulting temp file. The caller is responsible for removing it.
-func processCourse(plantillaPath, outputDir, ts string, cd courseData, sheetName string, diasDelRango []time.Time) (string, error) {
+func processCourse(plantillaPath, outputDir, ts string, cd courseData, sheetName string, diasDelRango []time.Time, signers []Signer) (string, error) {
 	tempPath := filepath.Join(outputDir, fmt.Sprintf("temp_%d_%s.xlsx", cd.id, ts))
 	if err := copyFile(plantillaPath, tempPath); err != nil {
 		return "", err
@@ -537,6 +538,10 @@ outerBorder:
 		f.Close()
 		os.Remove(tempPath)
 		return "", err
+	}
+
+	if len(signers) > 0 {
+		escribirFirmas(f, base, signers)
 	}
 
 	rowMap, err := getStudentRowMap(f, base)
@@ -640,6 +645,60 @@ outerBorder:
 	return tempPath, nil
 }
 
+// ── signers ───────────────────────────────────────────────────────────────────
+
+type Signer struct {
+	Name  string `json:"name"`
+	Title string `json:"title"`
+	Label string `json:"label"`
+}
+
+// signerDisplayName returns "TITLE NAME" or just "NAME" when title is empty.
+func signerDisplayName(s Signer) string {
+	if s.Title != "" {
+		return s.Title + " " + s.Name
+	}
+	return s.Name
+}
+
+// labelToSignatureCol maps a signature_label to the column index (1-based) for
+// row 44/45 of the template. Returns 0 when the label does not match any slot.
+func labelToSignatureCol(label string) int {
+	upper := strings.ToUpper(strings.TrimSpace(label))
+	switch {
+	case strings.Contains(upper, "DOCENTE TUTOR") || strings.Contains(upper, "DOCENTE TUTORA"):
+		return 4 // col D
+	case strings.Contains(upper, "INSPECTOR PISO") || (strings.Contains(upper, "INSPECTOR") && strings.Contains(upper, "PISO")):
+		return 26 // col Z
+	case upper == "INSPECTOR GENERAL":
+		return 45 // col AS
+	case strings.Contains(upper, "RECTOR"):
+		return 64 // col BL
+	}
+	return 0
+}
+
+// escribirFirmas writes signer name (row 44) and label (row 45) to the template,
+// and also sets cell A7 to the tutor/inspector signer's display name.
+func escribirFirmas(f *excelize.File, sheet string, signers []Signer) {
+	for _, s := range signers {
+		col := labelToSignatureCol(s.Label)
+		if col == 0 {
+			continue
+		}
+		nameRef, _ := excelize.CoordinatesToCellName(col, 44)
+		labelRef, _ := excelize.CoordinatesToCellName(col, 45)
+		f.SetCellValue(sheet, nameRef, signerDisplayName(s))
+		f.SetCellValue(sheet, labelRef, s.Label)
+
+		// Row 7 gets the docente tutor or inspector piso signer name
+		upper := strings.ToUpper(strings.TrimSpace(s.Label))
+		if strings.Contains(upper, "DOCENTE TUTOR") || strings.Contains(upper, "INSPECTOR PISO") {
+			f.SetCellValue(sheet, "A7", signerDisplayName(s))
+		}
+	}
+}
+
 // ── handler ───────────────────────────────────────────────────────────────────
 
 func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) http.HandlerFunc {
@@ -653,6 +712,11 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 		if errI != nil || errY != nil || errC != nil {
 			http.Error(w, "institution_id, course_ids and academic_year_id must be integers", http.StatusBadRequest)
 			return
+		}
+
+		var signers []Signer
+		if raw := q.Get("signers"); raw != "" {
+			_ = json.Unmarshal([]byte(raw), &signers)
 		}
 		fDesde, err := time.Parse("2006-01-02", dateFromStr)
 		if err != nil {
@@ -766,7 +830,7 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 		// Process each course in its own fresh template copy
 		tempPaths := make([]string, 0, len(courses))
 		for i, cd := range courses {
-			p, err := processCourse(plantillaPath, outputDir, ts, cd, sheetNames[i], diasDelRango)
+			p, err := processCourse(plantillaPath, outputDir, ts, cd, sheetNames[i], diasDelRango, signers)
 			if err != nil {
 				for _, old := range tempPaths {
 					os.Remove(old)

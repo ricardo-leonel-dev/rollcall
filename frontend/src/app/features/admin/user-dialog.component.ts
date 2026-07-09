@@ -22,6 +22,15 @@ export interface UserDialogData {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule],
+  styles: [`
+    .sig-preview {
+      display: inline-flex; flex-direction: column; gap: 2px;
+      background: var(--paper-deep); border: 1px solid var(--border-soft);
+      border-radius: 10px; padding: 8px 14px; font-size: 12px;
+      color: var(--muted-strong); margin-top: 4px; margin-bottom: 8px; line-height: 1.6;
+    }
+    .sig-preview strong { color: var(--ink-soft); }
+  `],
   template: `
     <h2 mat-dialog-title style="font-family:'Nunito',sans-serif">{{data.mode === 'edit' ? 'Editar usuario' : 'Nuevo usuario'}}</h2>
     <mat-dialog-content>
@@ -55,6 +64,23 @@ export interface UserDialogData {
           </mat-select>
         </mat-form-field>
       }
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <mat-form-field appearance="outline" style="width:30%">
+          <mat-label>Título</mat-label>
+          <input matInput [(ngModel)]="title" placeholder="Ing., Lcda., Dr.">
+        </mat-form-field>
+        <mat-form-field appearance="outline" style="width:70%">
+          <mat-label>Cargo para firmas en reportes</mat-label>
+          <input matInput [(ngModel)]="signatureLabel" placeholder="INSPECTOR PISO 1, INSPECTOR GENERAL…">
+        </mat-form-field>
+      </div>
+      @if (title || signatureLabel || fullName) {
+        <div class="sig-preview">
+          <strong>{{title ? title + ' ' + (fullName || username) : (fullName || username)}}</strong>
+          @if (signatureLabel) { <span>{{signatureLabel}}</span> }
+        </div>
+      }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button (click)="dialogRef.close(false)">Cancelar</button>
@@ -77,6 +103,8 @@ export class UserDialogComponent {
   email = this.data.user?.email ?? '';
   roleId: number | null = this.data.user?.roleId ?? null;
   institutionId: number | null = null;
+  title = this.data.user?.title ?? '';
+  signatureLabel = this.data.user?.signatureLabel ?? '';
   readonly saving = signal(false);
 
   canSave(): boolean {
@@ -89,7 +117,10 @@ export class UserDialogComponent {
     this.saving.set(true);
     try {
       if (this.data.mode === 'edit') {
-        const body: Record<string, unknown> = { fullName: this.fullName, email: this.email, roleId: this.roleId };
+        const body: Record<string, unknown> = {
+          fullName: this.fullName, email: this.email, roleId: this.roleId,
+          title: this.title || null, signatureLabel: this.signatureLabel || null,
+        };
         if (this.password) body['password'] = this.password;
         await firstValueFrom(this.http.put(`/api/users/${this.data.user!.id}`, body));
         this.notify.success('Usuario actualizado');
@@ -97,6 +128,7 @@ export class UserDialogComponent {
         await firstValueFrom(this.http.post('/api/users', {
           username: this.username, password: this.password, fullName: this.fullName,
           email: this.email, roleId: this.roleId, institutionId: this.institutionId,
+          title: this.title || null, signatureLabel: this.signatureLabel || null,
         }));
         this.notify.success('Usuario creado');
       }

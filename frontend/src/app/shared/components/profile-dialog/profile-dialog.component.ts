@@ -41,6 +41,8 @@ interface Me {
   email: string | null;
   notificationTemplate: string | null;
   avatarUrl: string | null;
+  title: string | null;
+  signatureLabel: string | null;
 }
 
 @Component({
@@ -82,6 +84,32 @@ interface Me {
         </mat-form-field>
         <div style="display:flex;justify-content:flex-end;margin-top:8px">
           <button mat-flat-button color="primary" (click)="saveProfile()" [disabled]="savingProfile()">Guardar</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Firma en reportes</div>
+        <p style="font-size:13px;color:var(--muted-strong);margin-top:0">
+          Esta información aparece en los reportes de asistencia exportados a Excel.
+        </p>
+        <div style="display:flex;gap:8px">
+          <mat-form-field appearance="outline" style="width:30%">
+            <mat-label>Título</mat-label>
+            <input matInput [(ngModel)]="title" placeholder="Ing., Lcda., Dr.">
+          </mat-form-field>
+          <mat-form-field appearance="outline" style="width:70%">
+            <mat-label>Cargo para firma</mat-label>
+            <input matInput [(ngModel)]="signatureLabel" placeholder="INSPECTOR PISO 1, INSPECTOR GENERAL…">
+          </mat-form-field>
+        </div>
+        @if (title || signatureLabel || fullName) {
+          <div style="background:var(--paper-deep);border:1px solid var(--border-soft);border-radius:10px;padding:8px 14px;font-size:12px;color:var(--muted-strong);margin-bottom:8px;line-height:1.8">
+            <div style="color:var(--ink-soft);font-weight:600">{{title ? title + ' ' + fullName : fullName}}</div>
+            @if (signatureLabel) { <div>{{signatureLabel}}</div> }
+          </div>
+        }
+        <div style="display:flex;justify-content:flex-end">
+          <button mat-flat-button color="primary" (click)="saveSignature()" [disabled]="savingSignature()">Guardar firma</button>
         </div>
       </div>
 
@@ -174,9 +202,12 @@ export class ProfileDialogComponent implements OnInit {
   readonly savingPassword = signal(false);
   readonly savingTemplate = signal(false);
   readonly savingAvatar = signal(false);
+  readonly savingSignature = signal(false);
 
   fullName = '';
   email = '';
+  title = '';
+  signatureLabel = '';
   currentPassword = '';
   newPassword = '';
   confirmPassword = '';
@@ -191,6 +222,8 @@ export class ProfileDialogComponent implements OnInit {
     const me = await firstValueFrom(this.http.get<Me>('/api/auth/me'));
     this.fullName = me.fullName ?? '';
     this.email = me.email ?? '';
+    this.title = me.title ?? '';
+    this.signatureLabel = me.signatureLabel ?? '';
     this.template.set(me.notificationTemplate || DEFAULT_NOTIFICATION_TEMPLATE);
     this.avatarUrl.set(me.avatarUrl);
     this.selectedPreset.set(resolveAvatarPreset(me.avatarUrl)?.id ?? null);
@@ -207,6 +240,17 @@ export class ProfileDialogComponent implements OnInit {
       this.auth.updateLocalUser({ fullName: this.fullName, email: this.email });
       this.notify.success('Perfil actualizado');
     } finally { this.savingProfile.set(false); }
+  }
+
+  async saveSignature(): Promise<void> {
+    this.savingSignature.set(true);
+    try {
+      await firstValueFrom(this.http.put('/api/auth/me', {
+        title: this.title || null,
+        signatureLabel: this.signatureLabel || null,
+      }));
+      this.notify.success('Firma actualizada');
+    } finally { this.savingSignature.set(false); }
   }
 
   async savePassword(): Promise<void> {
