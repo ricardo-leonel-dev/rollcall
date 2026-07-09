@@ -40,6 +40,9 @@ func main() {
 	if plantillaPath == "" {
 		plantillaPath = "/app/plantilla_asistencia.xlsx"
 	}
+	if info, err := os.Stat(plantillaPath); err != nil || info.IsDir() {
+		log.Fatalf("plantilla not found or is a directory: %s", plantillaPath)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler(pool))
