@@ -225,7 +225,7 @@ import { MODULE_KEYS } from '../../core/nav-items';
                       @if (u.title || u.signatureLabel) {
                         <div style="line-height:1.5">
                           @if (u.title || u.fullName) {
-                            <div>{{[u.title, u.fullName].filter(Boolean).join(' ')}}</div>
+                            <div>{{u.title ? u.title + ' ' + u.fullName : u.fullName}}</div>
                           }
                           @if (u.signatureLabel) {
                             <div style="color:var(--muted)">{{u.signatureLabel}}</div>

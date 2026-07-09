@@ -77,7 +77,7 @@ export interface UserDialogData {
       </div>
       @if (title || signatureLabel || fullName) {
         <div class="sig-preview">
-          <strong>{{[title, fullName || username].filter(Boolean).join(' ')}}</strong>
+          <strong>{{title ? title + ' ' + (fullName || username) : (fullName || username)}}</strong>
           @if (signatureLabel) { <span>{{signatureLabel}}</span> }
         </div>
       }

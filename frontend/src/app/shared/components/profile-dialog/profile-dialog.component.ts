@@ -104,7 +104,7 @@ interface Me {
         </div>
         @if (title || signatureLabel || fullName) {
           <div style="background:var(--paper-deep);border:1px solid var(--border-soft);border-radius:10px;padding:8px 14px;font-size:12px;color:var(--muted-strong);margin-bottom:8px;line-height:1.8">
-            <div style="color:var(--ink-soft);font-weight:600">{{[title, fullName].filter(Boolean).join(' ')}}</div>
+            <div style="color:var(--ink-soft);font-weight:600">{{title ? title + ' ' + fullName : fullName}}</div>
             @if (signatureLabel) { <div>{{signatureLabel}}</div> }
           </div>
         }
