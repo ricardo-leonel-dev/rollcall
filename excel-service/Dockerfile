@@ -8,6 +8,7 @@ RUN CGO_ENABLED=0 go build -o excel-service .
 FROM alpine:3.20
 WORKDIR /app
 COPY --from=builder /app/excel-service .
+COPY plantilla_asistencia.xlsx /app/
 RUN mkdir -p /app/output
 EXPOSE 8002
 CMD ["./excel-service"]

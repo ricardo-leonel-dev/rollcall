@@ -5,6 +5,7 @@
 
 # Data files
 *.xlsx
+!excel-service/plantilla_asistencia.xlsx
 *.csv
 *.tar.gz
 *.zip
