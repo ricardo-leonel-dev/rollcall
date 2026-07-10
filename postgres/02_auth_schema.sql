@@ -119,7 +119,7 @@ DECLARE
   v_resources    TEXT[] := ARRAY[
     'students','absences','justifications','guardians',
     'enrollments','courses','academic_years','users',
-    'roles','dashboard','import','export'
+    'roles','dashboard','import','export','reports'
   ];
 BEGIN
   SELECT id INTO v_admin_id     FROM roles WHERE name = 'admin';
