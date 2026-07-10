@@ -191,6 +191,20 @@ export interface AuthResponse {
   };
 }
 
+export interface StudentReportItem {
+  id: number;
+  studentName: string;
+  rosterNumber: number | null;
+  absences: number;
+  tardies: number;
+  justified: number;
+}
+
+export interface CourseReport {
+  course: { id: number; name: string };
+  students: StudentReportItem[];
+}
+
 export interface OcrResult {
   date: string;
   records_created: number;

@@ -37,6 +37,7 @@ export const SECTIONS: SectionItem[] = [
       { route: '/inspectors/dashboard',      icon: 'dashboard',  label: 'Dashboard',                        moduleKey: 'dashboard' },
       { route: '/inspectors/absences',       icon: 'event_busy', label: 'Administración de faltas',         moduleKey: 'absences' },
       { route: '/inspectors/justifications', icon: 'task_alt',   label: 'Administración de justificaciones', moduleKey: 'justifications' },
+      { route: '/inspectors/student-report',  icon: 'summarize',  label: 'Informe estudiantil',              moduleKey: 'student-report' },
       { route: '/inspectors/citations',      icon: 'campaign',   label: 'Administración de citaciones',     placeholder: true },
     ],
   },
@@ -104,6 +105,10 @@ export const MODULE_TREE: ModuleNode[] = [
     label: 'Justificaciones',
   },
   {
+    key: 'student-report',
+    label: 'Informe estudiantil',
+  },
+  {
     key: 'students',
     label: 'Estudiantes',
     children: [
@@ -136,6 +141,7 @@ export const MODULE_KEYS: { key: string; label: string }[] = [
   { key: 'absences:voice',        label: '↳ Voz' },
   { key: 'absences:photo',        label: '↳ Foto OCR' },
   { key: 'justifications',        label: 'Justificaciones' },
+  { key: 'student-report',        label: 'Informe estudiantil' },
   { key: 'students',              label: 'Estudiantes' },
   { key: 'students:list',         label: '↳ Listado' },
   { key: 'students:enrollments',  label: '↳ Matrículas' },

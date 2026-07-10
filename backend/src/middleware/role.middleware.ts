@@ -11,6 +11,8 @@ export function requirePermission(resource: string, action: Action) {
       return;
     }
 
+    if (req.user.roleName === 'superadmin') { next(); return; }
+
     const repo = AppDataSource.getRepository(RolePermission);
     const perm = await repo.findOne({
       where: { roleId: req.user.roleId, resource },
