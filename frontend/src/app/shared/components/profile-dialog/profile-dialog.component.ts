@@ -249,6 +249,7 @@ export class ProfileDialogComponent implements OnInit {
         title: this.title || null,
         signatureLabel: this.signatureLabel || null,
       }));
+      this.auth.updateLocalUser({ title: this.title || null, signatureLabel: this.signatureLabel || null });
       this.notify.success('Firma actualizada');
     } finally { this.savingSignature.set(false); }
   }
