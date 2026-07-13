@@ -7,7 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, retry } from 'rxjs';
 import { Absence } from '../../core/models/index';
 import { NotificationService } from '../../core/services/notification.service';
 
@@ -274,7 +274,11 @@ export class JustificationCreateDialogComponent {
         if (s.pendingFiles.length) {
           const fd = new FormData();
           for (const f of s.pendingFiles) fd.append('files', f);
-          await firstValueFrom(this.http.post(`/api/justifications/${created.id}/attachments`, fd));
+          await firstValueFrom(
+            this.http.post(`/api/justifications/${created.id}/attachments`, fd).pipe(
+              retry({ count: 2, delay: 2000 }),
+            ),
+          );
         }
       } catch (err: any) {
         errors.push(`Semana del ${s.weekKey}: ${err?.error?.error ?? 'error'}`);
