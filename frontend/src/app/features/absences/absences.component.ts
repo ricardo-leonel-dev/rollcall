@@ -706,6 +706,10 @@ export class AbsencesComponent implements OnInit, OnDestroy {
     if (courseParam) {
       this.selCourse = Number(courseParam);
       this.studentSearch = params.get('student') ?? '';
+      const dateFromParam = params.get('dateFrom');
+      const dateToParam = params.get('dateTo');
+      if (dateFromParam) this.dateFrom = new Date(dateFromParam + 'T00:00:00');
+      if (dateToParam) this.dateTo = new Date(dateToParam + 'T00:00:00');
       this.selectedTabIndex = 2;
       await this.onFiltersChange();
       this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });

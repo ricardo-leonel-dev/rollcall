@@ -78,6 +78,12 @@ export async function findAll(
         WHERE ja.justification_id = j.id
       ), '[]') AS "absenceIds",
       COALESCE((
+        SELECT json_agg(json_build_object('id', a.id, 'date', a.date) ORDER BY a.date)
+        FROM justification_absences ja
+        JOIN absences a ON a.id = ja.absence_id
+        WHERE ja.justification_id = j.id
+      ), '[]') AS "absenceDates",
+      COALESCE((
         SELECT json_agg(json_build_object(
           'id', att.id,
           'fileName', att.file_name,
