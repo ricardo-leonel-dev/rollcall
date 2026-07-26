@@ -710,7 +710,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
       const dateToParam = params.get('dateTo');
       if (dateFromParam) this.dateFrom = new Date(dateFromParam + 'T00:00:00');
       if (dateToParam) this.dateTo = new Date(dateToParam + 'T00:00:00');
-      this.selectedTabIndex = 2;
+      this.selectedTabIndex = 3; // Listado
       await this.onFiltersChange();
       this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
     }
