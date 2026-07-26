@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, signal, computed, inject, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -7,6 +8,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule, MatTooltip } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { Justification, Course, Absence } from '../../core/models/index';
@@ -18,9 +20,11 @@ import { JustificationCreateDialogComponent, JustifyGroup } from './justificatio
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule],
+  imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule, MatTooltipModule],
   styles: [`
     .tab-content { padding: 20px 0; }
+    .detail-stamps { display: inline-flex; gap: 4px; cursor: pointer; padding: 2px; border-radius: 8px; transition: background .12s ease; }
+    .detail-stamps:hover { background: var(--paper-deep); }
     /* Evidencias — mismo lenguaje visual que el wizard de creación */
     .evidence-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 4px; }
     .evidence-tile {
@@ -229,9 +233,15 @@ import { JustificationCreateDialogComponent, JustifyGroup } from './justificatio
                               </div>
                             }
                             <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
-                              <span class="stamp stamp-j">
-                                <mat-icon style="font-size:12px;width:12px;height:12px">event</mat-icon>
-                                {{j.absenceIds?.length ?? 0}} falta(s)
+                              <span class="detail-stamps"
+                                    #tip="matTooltip"
+                                    [matTooltip]="justificationTooltip(j)"
+                                    matTooltipClass="detail-tooltip"
+                                    (click)="onPillClick(j, tip)">
+                                <span class="stamp stamp-j">
+                                  <mat-icon style="font-size:12px;width:12px;height:12px">event</mat-icon>
+                                  {{j.absenceIds?.length ?? 0}} falta(s)
+                                </span>
                               </span>
                               <span style="font-size:12px;color:var(--muted)">{{j.createdAt?.substring(0, 10)}}</span>
                             </div>
@@ -308,6 +318,7 @@ import { JustificationCreateDialogComponent, JustifyGroup } from './justificatio
 })
 export class JustificationsComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
   private readonly notify = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
   readonly academicYearContext = inject(AcademicYearContextService);
@@ -529,6 +540,49 @@ export class JustificationsComponent implements OnInit {
       await firstValueFrom(this.http.delete(`/api/justifications/${id}`));
       this.notify.success('Eliminada');
       await this.loadHistorial();
+    });
+  }
+
+  justificationTooltip(j: Justification): string {
+    const dates = j.absenceDates ?? [];
+    const lines = !dates.length ? ['Sin fechas registradas'] : dates.map(d => {
+      const [, m, day] = d.date.split('-');
+      return `${day}/${m}`;
+    });
+    if (window.innerWidth < 768) lines.push('', 'Toca de nuevo para ir a Inasistencias');
+    return lines.join('\n');
+  }
+
+  private lastTappedJustification: number | null = null;
+
+  onPillClick(j: Justification, tip: MatTooltip): void {
+    // En mobile no hay hover — el primer tap muestra las fechas cubiertas
+    // (no navega de una, para poder leerlas); un segundo tap sobre la misma
+    // justificación confirma la intención de revisarla y navega. En desktop
+    // el hover ya muestra el tooltip, así que el click navega directo.
+    if (window.innerWidth < 768) {
+      if (this.lastTappedJustification === j.id) {
+        this.lastTappedJustification = null;
+        this.goToAbsencesForJustification(j);
+      } else {
+        this.lastTappedJustification = j.id;
+        tip.show();
+      }
+      return;
+    }
+    this.goToAbsencesForJustification(j);
+  }
+
+  goToAbsencesForJustification(j: Justification): void {
+    const dates = (j.absenceDates ?? []).map(d => d.date).sort();
+    if (!dates.length || !j.courseId) return;
+    this.router.navigate(['/absences'], {
+      queryParams: {
+        course: j.courseId,
+        student: j.studentName,
+        dateFrom: dates[0],
+        dateTo: dates[dates.length - 1],
+      },
     });
   }
 }

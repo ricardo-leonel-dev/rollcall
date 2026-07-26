@@ -99,6 +99,7 @@ export interface Justification {
   notifiedBy: string | null;
   isActive: boolean;
   absenceIds: number[];
+  absenceDates: { id: number; date: string }[];
   attachments: JustificationAttachment[];
   createdAt: string;
   studentName?: string;
