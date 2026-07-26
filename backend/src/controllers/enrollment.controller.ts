@@ -10,9 +10,12 @@ router.use(requireInstitution);
 
 router.get('/', requirePermission(R,'read'), async (req, res) => {
   const courseId  = req.query.course_id ? +req.query.course_id : undefined;
+  const courseIdsFilter = req.query.course_ids
+    ? String(req.query.course_ids).split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n))
+    : undefined;
   const yearId    = req.query.academic_year_id ? +req.query.academic_year_id : undefined;
   const studentId = req.query.student_id ? +req.query.student_id : undefined;
-  res.json(await svc.findAll(req.institutionId!, req.courseIds ?? null, courseId, yearId, studentId));
+  res.json(await svc.findAll(req.institutionId!, req.courseIds ?? null, courseId, yearId, studentId, courseIdsFilter));
 });
 
 router.post('/',   requirePermission(R,'create'), async (req, res) => res.status(201).json(await svc.create(req.institutionId!, req.courseIds ?? null, req.body)));
