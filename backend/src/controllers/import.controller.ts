@@ -13,7 +13,7 @@ router.post('/roster', requirePermission('import','create'),
   upload.single('file'),
   async (req, res) => {
     if (!req.file) { res.status(400).json({ error: 'Archivo requerido' }); return; }
-    const result = await svc.importRoster(req.institutionId!, req.file.buffer);
+    const result = await svc.importRoster(req.institutionId!, req.file.buffer, req.user?.id ?? null);
     res.json(result);
   }
 );

@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, signal, computed, inject, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -319,6 +319,7 @@ import { JustificationCreateDialogComponent, JustifyGroup } from './justificatio
 export class JustificationsComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly notify = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
   readonly academicYearContext = inject(AcademicYearContextService);
@@ -374,7 +375,20 @@ export class JustificationsComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     this.courses.set(await firstValueFrom(this.http.get<Course[]>('/api/courses')));
     const active = this.academicYearContext.selected();
-    if (active) { this.selYear = active.id; await this.loadHistorial(); }
+    if (active) this.selYear = active.id;
+
+    const params = this.route.snapshot.queryParamMap;
+    const courseParam = params.get('course');
+    if (courseParam) {
+      this.selCourse = Number(courseParam);
+      const enrollmentParam = params.get('enrollmentId');
+      await this.onCourseChange();
+      if (enrollmentParam) this.selStudentHistorial.set(Number(enrollmentParam));
+      this.selectedTabIndex = 1;
+      this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+    } else if (this.selYear) {
+      await this.loadHistorial();
+    }
   }
 
   async loadHistorial(): Promise<void> {
