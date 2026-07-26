@@ -107,7 +107,7 @@ function businessDaysInRange(dateFrom: string, dateTo: string): string[] {
 
 export async function createRange(institutionId: number, courseIds: number[] | null, data: {
   enrollmentId: number; type: 'F' | 'AT'; dateFrom: string; dateTo: string; notes?: string;
-}): Promise<{ created: number; skipped: number }> {
+}, createdByUserId: number | null = null): Promise<{ created: number; skipped: number }> {
   if (!['F', 'AT'].includes(data.type)) {
     throw Object.assign(new Error('Invalid type. Only F or AT'), { status: 400 });
   }
@@ -153,6 +153,7 @@ export async function createRange(institutionId: number, courseIds: number[] | n
           deletedAt: null as unknown as Date,
           isActive: true,
           updatedAt: new Date(),
+          createdByUserId,
         });
       }
       for (const date of toInsert) {
@@ -162,6 +163,7 @@ export async function createRange(institutionId: number, courseIds: number[] | n
           date,
           type: data.type,
           notes: data.notes ?? null,
+          createdByUserId,
         });
         await em.save(a);
       }

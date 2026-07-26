@@ -33,6 +33,9 @@ export class Enrollment {
   @Column({ name: 'student_email', type: 'varchar', nullable: true })
   studentEmail!: string | null;
 
+  @Column({ name: 'created_by_user_id', type: 'integer', nullable: true })
+  createdByUserId!: number | null;
+
   @Column({ name: 'is_active', default: true })
   isActive!: boolean;
 

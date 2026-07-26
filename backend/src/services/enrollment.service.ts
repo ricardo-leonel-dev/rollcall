@@ -94,7 +94,7 @@ export async function create(institutionId: number, courseIds: number[] | null, 
   studentId: number; courseId: number; academicYearId: number;
   guardianId?: number; rosterNumber?: number; isEnrolled?: boolean;
   studentPhone?: string; studentEmail?: string;
-}) {
+}, createdByUserId: number | null = null) {
   await assertOwnership(institutionId, courseIds, data);
   if (!data.rosterNumber) {
     const [row] = await AppDataSource.query(
@@ -105,7 +105,7 @@ export async function create(institutionId: number, courseIds: number[] | null, 
     );
     data.rosterNumber = Number(row.next);
   }
-  const e = repo().create({ ...data, institutionId });
+  const e = repo().create({ ...data, institutionId, createdByUserId });
   return repo().save(e);
 }
 

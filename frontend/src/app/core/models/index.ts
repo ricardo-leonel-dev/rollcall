@@ -108,6 +108,47 @@ export interface Justification {
   academicYearId?: number;
 }
 
+export interface StudentHistorySummaryItem {
+  id: number;
+  date: string;
+  createdAt: string;
+  isJustified: boolean;
+}
+
+export interface StudentJustificationSummaryItem {
+  id: number;
+  reason: string;
+  createdAt: string;
+  absenceDates: string[];
+}
+
+export interface StudentHistorySummary {
+  enrollment: {
+    enrollmentId: number;
+    studentName: string;
+    idNumber: string | null;
+    rosterNumber: number | null;
+    courseId: number;
+    courseName: string;
+    academicYearId: number;
+    academicYear: string;
+  };
+  absences: { total: number; items: StudentHistorySummaryItem[] };
+  tardies: { total: number; items: StudentHistorySummaryItem[] };
+  justifications: { total: number; items: StudentJustificationSummaryItem[] };
+  citations: { status: 'not_implemented' };
+}
+
+export interface TimelineEvent {
+  type: 'enrollment' | 'absence' | 'tardy' | 'justification';
+  recordedAt: string;
+  occurredAt: string | null;
+  title: string;
+  description: string;
+  createdByName: string | null;
+  origin: string | null;
+}
+
 export interface DashboardSummary {
   totalAbsences: number;
   totalTardies: number;

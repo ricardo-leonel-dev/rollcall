@@ -24,6 +24,9 @@ export class Absence {
   @Column({ name: 'photo_source', type: 'varchar', nullable: true })
   photoSource!: string | null;
 
+  @Column({ name: 'created_by_user_id', type: 'integer', nullable: true })
+  createdByUserId!: number | null;
+
   @Column({ name: 'is_active', default: true })
   isActive!: boolean;
 
