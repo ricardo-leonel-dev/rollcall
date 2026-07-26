@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialog } from '@angular/material/dialog';
 import { ExportConfigDialogComponent } from './export-config-dialog.component';
+import { ExcelExportDialogComponent } from './excel-export-dialog.component';
 
 const REPORT_CARDS = [
   {
@@ -47,6 +48,17 @@ const REPORT_CARDS = [
     accentBorder: '#a5b4fc',
     gradientFrom: '#a5b4fc',
     gradientTo: '#6366f1',
+  },
+  {
+    id: 'EXCEL' as const,
+    label: 'Exportar Excel',
+    icon: 'grid_on',
+    desc: 'Genera el calendario de asistencia mensual en Excel, una hoja por curso.',
+    accent: '#0d9488',
+    accentSoft: '#f0fdfa',
+    accentBorder: '#5eead4',
+    gradientFrom: '#5eead4',
+    gradientTo: '#0d9488',
   },
 ];
 
@@ -211,6 +223,13 @@ export class StudentReportComponent {
   readonly cards = REPORT_CARDS;
 
   openConfig(card: typeof REPORT_CARDS[number]): void {
+    if (card.id === 'EXCEL') {
+      this.dialog.open(ExcelExportDialogComponent, {
+        width: '480px',
+        data: { label: card.label, accent: card.accent, icon: card.icon },
+      });
+      return;
+    }
     this.dialog.open(ExportConfigDialogComponent, {
       width: '520px',
       data: { mode: card.id, label: card.label, accent: card.accent, icon: card.icon },

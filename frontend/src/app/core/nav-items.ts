@@ -23,9 +23,8 @@ export const SECTIONS: SectionItem[] = [
     label: 'Estudiantes',
     description: 'Perfil académico, datos personales y seguimiento integral de cada estudiante.',
     subnav: [
-      { route: '/students/list',        icon: 'format_list_bulleted', label: 'Listado',    moduleKey: 'students' },
-      { route: '/students/enrollments', icon: 'assignment_ind',       label: 'Matrículas', moduleKey: 'enrollments' },
-      { route: '/students/history',     icon: 'history',              label: 'Historial',  placeholder: true },
+      { route: '/students/manage',  icon: 'groups',  label: 'Administración de estudiantes', moduleKey: 'students' },
+      { route: '/students/history', icon: 'history', label: 'Historial',                     placeholder: true },
     ],
   },
   {
@@ -111,10 +110,6 @@ export const MODULE_TREE: ModuleNode[] = [
   {
     key: 'students',
     label: 'Estudiantes',
-    children: [
-      { key: 'students:list',        label: 'Listado de estudiantes' },
-      { key: 'students:enrollments', label: 'Matrículas' },
-    ],
   },
   {
     key: 'calendar',
@@ -143,8 +138,6 @@ export const MODULE_KEYS: { key: string; label: string }[] = [
   { key: 'justifications',        label: 'Justificaciones' },
   { key: 'student-report',        label: 'Informe estudiantil' },
   { key: 'students',              label: 'Estudiantes' },
-  { key: 'students:list',         label: '↳ Listado' },
-  { key: 'students:enrollments',  label: '↳ Matrículas' },
   { key: 'calendar',              label: 'Calendario' },
   { key: 'admin',                 label: 'Administración' },
   { key: 'admin:users',           label: '↳ Usuarios' },

@@ -40,7 +40,7 @@ async function assertOwnership(institutionId: number, courseIds: number[] | null
   }
 }
 
-export async function findAll(institutionId: number, courseIds: number[] | null, courseId?: number, academicYearId?: number, studentId?: number) {
+export async function findAll(institutionId: number, courseIds: number[] | null, courseId?: number, academicYearId?: number, studentId?: number, courseIdsFilter?: number[]) {
   const conditions: string[] = ['institution_id = $1'];
   const params: any[] = [institutionId];
   let i = 2;
@@ -48,6 +48,7 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
   if (courseId)       { conditions.push(`course_id = $${i++}`);        params.push(courseId); }
   if (academicYearId) { conditions.push(`academic_year_id = $${i++}`); params.push(academicYearId); }
   if (studentId)      { conditions.push(`student_id = $${i++}`);       params.push(studentId); }
+  if (courseIdsFilter && courseIdsFilter.length) { conditions.push(`course_id = ANY($${i++})`); params.push(courseIdsFilter); }
 
   return AppDataSource.query(
     `SELECT
@@ -76,7 +77,7 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
        is_active       AS "isActive"
      FROM v_enrollments_detail
      WHERE ${conditions.join(' AND ')}
-     ORDER BY academic_year_id DESC, full_name`,
+     ORDER BY academic_year_id DESC, course, "rosterNumber"`,
     params
   );
 }
