@@ -25,7 +25,7 @@ function padDigits(raw: string): string {
   return trimmed;
 }
 
-export async function importRoster(institutionId: number, buffer: Buffer): Promise<{
+export async function importRoster(institutionId: number, buffer: Buffer, createdByUserId: number | null = null): Promise<{
   coursesProcessed: number; studentsCreated: number; studentsUpdated: number;
   enrollmentsCreated: number; enrollmentsUpdated: number; guardiansUpdated: number;
   errors: string[];
@@ -181,6 +181,7 @@ export async function importRoster(institutionId: number, buffer: Buffer): Promi
             isEnrolled: enrolled,
             studentPhone,
             studentEmail,
+            createdByUserId,
           }));
           stats.enrollmentsCreated++;
         } else {

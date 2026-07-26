@@ -17,6 +17,9 @@ export class Justification {
   @Column({ name: 'notified_by', nullable: true, type: 'varchar' })
   notifiedBy!: string | null;
 
+  @Column({ name: 'created_by_user_id', type: 'integer', nullable: true })
+  createdByUserId!: number | null;
+
   @Column({ name: 'is_active', default: true })
   isActive!: boolean;
 

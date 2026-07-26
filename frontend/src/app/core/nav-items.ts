@@ -24,7 +24,7 @@ export const SECTIONS: SectionItem[] = [
     description: 'Perfil académico, datos personales y seguimiento integral de cada estudiante.',
     subnav: [
       { route: '/students/manage',  icon: 'groups',  label: 'Administración de estudiantes', moduleKey: 'students' },
-      { route: '/students/history', icon: 'history', label: 'Historial',                     placeholder: true },
+      { route: '/students/history', icon: 'history', label: 'Historial',                     moduleKey: 'students' },
     ],
   },
   {

@@ -25,7 +25,7 @@ export const routes: Routes = [
         path: 'students',
         children: [
           { path: 'manage',  loadComponent: () => import('./features/students/student-management.component').then(m => m.StudentManagementComponent), canActivate: [moduleGuard], data: { module: 'students' } },
-          { path: 'history', ...placeholder('Historial de estudiantes') },
+          { path: 'history', loadComponent: () => import('./features/students/student-history.component').then(m => m.StudentHistoryComponent), canActivate: [moduleGuard], data: { module: 'students' } },
           { path: '',        redirectTo: 'manage', pathMatch: 'full' },
         ],
       },

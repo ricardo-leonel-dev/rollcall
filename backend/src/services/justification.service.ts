@@ -122,7 +122,7 @@ export async function findById(institutionId: number, courseIds: number[] | null
 export async function create(institutionId: number, courseIds: number[] | null, data: {
   enrollmentId: number; reason: string;
   notifiedBy?: string; absenceIds: number[];
-}) {
+}, createdByUserId: number | null = null) {
   if (!data.absenceIds?.length) {
     throw Object.assign(new Error('At least one absence is required'), { status: 400 });
   }
@@ -148,6 +148,7 @@ export async function create(institutionId: number, courseIds: number[] | null, 
       enrollmentId: data.enrollmentId,
       reason: data.reason,
       notifiedBy: data.notifiedBy ?? null,
+      createdByUserId,
     });
     const saved = await em.save(j);
 
