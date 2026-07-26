@@ -24,10 +24,9 @@ export const routes: Routes = [
       {
         path: 'students',
         children: [
-          { path: 'list',        loadComponent: () => import('./features/students/students.component').then(m => m.StudentsComponent), canActivate: [moduleGuard], data: { module: 'students' } },
-          { path: 'enrollments', loadComponent: () => import('./features/enrollments/enrollments.component').then(m => m.EnrollmentsComponent), canActivate: [moduleGuard], data: { module: 'enrollments' } },
-          { path: 'history',     ...placeholder('Historial de estudiantes') },
-          { path: '',            redirectTo: 'list', pathMatch: 'full' },
+          { path: 'manage',  loadComponent: () => import('./features/students/student-management.component').then(m => m.StudentManagementComponent), canActivate: [moduleGuard], data: { module: 'students' } },
+          { path: 'history', ...placeholder('Historial de estudiantes') },
+          { path: '',        redirectTo: 'manage', pathMatch: 'full' },
         ],
       },
 
@@ -66,7 +65,9 @@ export const routes: Routes = [
       { path: 'dashboard',      redirectTo: 'inspectors/dashboard',        pathMatch: 'full' },
       { path: 'absences',       redirectTo: 'inspectors/absences',         pathMatch: 'full' },
       { path: 'justifications', redirectTo: 'inspectors/justifications',   pathMatch: 'full' },
-      { path: 'enrollments',    redirectTo: 'students/enrollments',        pathMatch: 'full' },
+      { path: 'enrollments',           redirectTo: 'students/manage',      pathMatch: 'full' },
+      { path: 'students/list',         redirectTo: 'students/manage',      pathMatch: 'full' },
+      { path: 'students/enrollments',  redirectTo: 'students/manage',      pathMatch: 'full' },
 
       { path: '', redirectTo: 'home', pathMatch: 'full' },
     ],

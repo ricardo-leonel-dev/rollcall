@@ -18,8 +18,7 @@ export const MODULE_KEYS = [
   'absences', 'absences:manual', 'absences:voice', 'absences:photo',
   'calendar',
   'justifications',
-  'students', 'students:list', 'students:enrollments',
-  'enrollments',
+  'students',
   'admin', 'admin:users', 'admin:courses', 'admin:years', 'admin:permissions', 'admin:roster',
   'student-report',
 ];
