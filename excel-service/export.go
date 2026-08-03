@@ -704,19 +704,26 @@ func signerDisplayName(s Signer) string {
 	return name
 }
 
+const (
+	colDocenteTutor     = 4  // D
+	colInspectorPiso    = 26 // Z
+	colInspectorGeneral = 45 // AS
+	colRector           = 64 // BL
+)
+
 // labelToSignatureCol maps a signature_label to the column index (1-based) for
 // row 44/45 of the template. Returns 0 when the label does not match any slot.
 func labelToSignatureCol(label string) int {
 	upper := strings.ToUpper(strings.TrimSpace(label))
 	switch {
 	case strings.Contains(upper, "DOCENTE TUTOR") || strings.Contains(upper, "DOCENTE TUTORA"):
-		return 4 // col D
+		return colDocenteTutor
 	case strings.Contains(upper, "INSPECTOR PISO") || (strings.Contains(upper, "INSPECTOR") && strings.Contains(upper, "PISO")):
-		return 26 // col Z
+		return colInspectorPiso
 	case upper == "INSPECTOR GENERAL":
-		return 45 // col AS
+		return colInspectorGeneral
 	case strings.Contains(upper, "RECTOR"):
-		return 64 // col BL
+		return colRector
 	}
 	return 0
 }
@@ -734,9 +741,10 @@ func escribirFirmas(f *excelize.File, sheet string, signers []Signer) {
 		f.SetCellValue(sheet, nameRef, signerDisplayName(s))
 		f.SetCellValue(sheet, labelRef, s.Label)
 
-		// Row 7 gets the docente tutor or inspector piso signer name
-		upper := strings.ToUpper(strings.TrimSpace(s.Label))
-		if strings.Contains(upper, "DOCENTE TUTOR") || strings.Contains(upper, "INSPECTOR PISO") {
+		// A7 (under "INSPECTORA/DOCENTE TUTOR") reflects the docente tutor or
+		// either inspector variant — not the rector. Reuses the same `col`
+		// classification as the signature block so both stay in sync.
+		if col == colDocenteTutor || col == colInspectorPiso || col == colInspectorGeneral {
 			f.SetCellValue(sheet, "A7", signerDisplayName(s))
 		}
 	}
