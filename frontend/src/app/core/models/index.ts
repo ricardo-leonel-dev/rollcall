@@ -9,6 +9,8 @@ export interface AcademicYear {
 export interface Course {
   id: number;
   name: string;
+  fullName: string | null;
+  paralelo: string | null;
   shift: string;
   isActive: boolean;
 }

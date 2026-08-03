@@ -4,10 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { firstValueFrom } from 'rxjs';
 import { Course } from '../../core/models/index';
 import { NotificationService } from '../../core/services/notification.service';
+import { SHIFT_OPTIONS } from '../../shared/utils/shift.util';
 
 export interface CourseDialogData {
   mode: 'create' | 'edit';
@@ -17,14 +19,32 @@ export interface CourseDialogData {
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule],
+  imports: [FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule],
   template: `
     <h2 mat-dialog-title style="font-family:'Nunito',sans-serif">{{data.mode === 'edit' ? 'Editar curso' : 'Nuevo curso'}}</h2>
     <mat-dialog-content>
       <mat-form-field appearance="outline" style="width:100%;margin-top:4px">
-        <mat-label>Nombre del curso</mat-label>
-        <input matInput [(ngModel)]="name" placeholder="Ej: OCTAVO A BÁSICA SUPERIOR">
+        <mat-label>Nombre completo</mat-label>
+        <input matInput [(ngModel)]="fullName" placeholder="Ej: DÉCIMO">
       </mat-form-field>
+      <mat-form-field appearance="outline" style="width:100%">
+        <mat-label>Nombre abreviado</mat-label>
+        <input matInput [(ngModel)]="name" placeholder="Ej: 10MO BS">
+      </mat-form-field>
+      <div style="display:flex;gap:12px">
+        <mat-form-field appearance="outline" style="flex:1">
+          <mat-label>Paralelo</mat-label>
+          <input matInput [(ngModel)]="paralelo" placeholder="Ej: A">
+        </mat-form-field>
+        <mat-form-field appearance="outline" style="flex:1">
+          <mat-label>Jornada</mat-label>
+          <mat-select [(ngModel)]="shift">
+            @for (opt of shiftOptions; track opt.value) {
+              <mat-option [value]="opt.value">{{opt.label}}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button (click)="dialogRef.close(false)">Cancelar</button>
@@ -40,18 +60,24 @@ export class CourseDialogComponent {
   private readonly http = inject(HttpClient);
   private readonly notify = inject(NotificationService);
 
+  readonly shiftOptions = SHIFT_OPTIONS;
+
   name = this.data.course?.name ?? '';
+  fullName = this.data.course?.fullName ?? '';
+  paralelo = this.data.course?.paralelo ?? '';
+  shift = this.data.course?.shift ?? 'MATUTINA';
   readonly saving = signal(false);
 
   async save(): Promise<void> {
     if (!this.name) return;
     this.saving.set(true);
+    const payload = { name: this.name, fullName: this.fullName, paralelo: this.paralelo, shift: this.shift };
     try {
       if (this.data.mode === 'edit') {
-        await firstValueFrom(this.http.put(`/api/courses/${this.data.course!.id}`, { name: this.name }));
+        await firstValueFrom(this.http.put(`/api/courses/${this.data.course!.id}`, payload));
         this.notify.success('Curso actualizado');
       } else {
-        await firstValueFrom(this.http.post('/api/courses', { name: this.name }));
+        await firstValueFrom(this.http.post('/api/courses', payload));
         this.notify.success('Curso creado');
       }
       this.dialogRef.close(true);

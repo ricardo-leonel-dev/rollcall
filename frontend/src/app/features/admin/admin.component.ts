@@ -150,12 +150,13 @@ import { MODULE_KEYS } from '../../core/nav-items';
           </div>
           <div class="data-table-wrap hidden md:block">
             <table class="data-table">
-              <thead><tr><th>#</th><th>Nombre del curso</th><th>Jornada</th><th></th></tr></thead>
+              <thead><tr><th>#</th><th>Nombre del curso</th><th>Paralelo</th><th>Jornada</th><th></th></tr></thead>
               <tbody>
                 @for (c of courses(); track c.id; let i = $index) {
                   <tr>
                     <td style="color:var(--muted);width:36px">{{i+1}}</td>
                     <td style="font-weight:500">{{c.name}}</td>
+                    <td>{{c.paralelo || '—'}}</td>
                     <td><span class="badge-info">{{c.shift}}</span></td>
                     <td>
                       <button mat-icon-button style="color:var(--muted-strong)" (click)="openCourseDialog(c)"><mat-icon>edit</mat-icon></button>
@@ -171,6 +172,7 @@ import { MODULE_KEYS } from '../../core/nav-items';
               <div class="admin-row">
                 <div>
                   <div style="font-weight:600">{{c.name}}</div>
+                  <div style="font-size:12px;color:var(--muted)">{{c.paralelo ? 'Paralelo ' + c.paralelo : ''}}</div>
                   <span class="badge-info" style="margin-top:4px;display:inline-block">{{c.shift}}</span>
                 </div>
                 <div class="admin-row-actions">
