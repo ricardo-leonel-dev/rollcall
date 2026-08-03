@@ -1,5 +1,7 @@
 -- Adds structured grade fields to courses: a spelled-out full name and a
 -- free-text paralelo, and turns shift into a real controlled value.
+SET search_path TO attendance, public;
+
 ALTER TABLE courses
   ADD COLUMN IF NOT EXISTS full_name VARCHAR(150),
   ADD COLUMN IF NOT EXISTS paralelo VARCHAR(10);
