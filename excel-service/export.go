@@ -46,6 +46,8 @@ type rosterStudent struct {
 type courseData struct {
 	id        int
 	name      string
+	fullName  string
+	shift     string
 	roster    []rosterStudent
 	registros []absenceRecord
 }
@@ -130,6 +132,43 @@ func escribirNomina(f *excelize.File, sheet string, roster []rosterStudent) erro
 		}
 	}
 	return nil
+}
+
+var ordinalWords = map[string]string{
+	"1": "PRIMERO", "2": "SEGUNDO", "3": "TERCERO", "4": "CUARTO", "5": "QUINTO",
+	"6": "SEXTO", "7": "SÉPTIMO", "8": "OCTAVO", "9": "NOVENO", "10": "DÉCIMO",
+}
+var reGradeOrdinal = regexp.MustCompile(`^(\d{1,2})(?:ERO|ER|DO|RO|TO|MO|VO|NO|MA)\b`)
+
+// gradoDesdeAbreviado infers the grade word from a leading numeral-ordinal
+// abbreviation in the course's abbreviated name (e.g. "10MO F BS" -> "DÉCIMO F BS").
+// Used only as a fallback for courses without a structured full_name yet.
+func gradoDesdeAbreviado(courseName string) string {
+	upper := strings.ToUpper(strings.TrimSpace(courseName))
+	loc := reGradeOrdinal.FindStringSubmatchIndex(upper)
+	if loc == nil {
+		return upper
+	}
+	word, ok := ordinalWords[upper[loc[2]:loc[3]]]
+	if !ok {
+		return upper
+	}
+	return word + upper[loc[1]:]
+}
+
+// gradoDisplay prefers the structured full_name; falls back to inferring the
+// grade word from the abbreviated name for courses not yet migrated.
+func gradoDisplay(cd courseData) string {
+	if fn := strings.ToUpper(strings.TrimSpace(cd.fullName)); fn != "" {
+		return fn
+	}
+	return gradoDesdeAbreviado(cd.name)
+}
+
+// escribirGradoYJornada writes the course's grade (C9) and shift (B9) values.
+func escribirGradoYJornada(f *excelize.File, sheet string, cd courseData) {
+	f.SetCellValue(sheet, "C9", gradoDisplay(cd))
+	f.SetCellValue(sheet, "B9", strings.ToUpper(strings.TrimSpace(cd.shift)))
 }
 
 func diasHabiles(desde, hasta time.Time) []time.Time {
@@ -539,6 +578,7 @@ outerBorder:
 		os.Remove(tempPath)
 		return "", err
 	}
+	escribirGradoYJornada(f, base, cd)
 
 	if len(signers) > 0 {
 		escribirFirmas(f, base, signers)
@@ -653,12 +693,15 @@ type Signer struct {
 	Label string `json:"label"`
 }
 
-// signerDisplayName returns "TITLE NAME" or just "NAME" when title is empty.
+// signerDisplayName returns "TITLE NAME" or just "NAME" when title is empty,
+// always uppercased.
 func signerDisplayName(s Signer) string {
-	if s.Title != "" {
-		return s.Title + " " + s.Name
+	name := strings.ToUpper(strings.TrimSpace(s.Name))
+	title := strings.ToUpper(strings.TrimSpace(s.Title))
+	if title != "" {
+		return title + " " + name
 	}
-	return s.Name
+	return name
 }
 
 // labelToSignatureCol maps a signature_label to the column index (1-based) for
@@ -737,9 +780,9 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 			var cd courseData
 			cd.id = courseID
 			if err := pool.QueryRow(ctx,
-				"SELECT name FROM courses WHERE id = $1 AND institution_id = $2",
+				"SELECT name, shift, COALESCE(full_name, '') FROM courses WHERE id = $1 AND institution_id = $2",
 				courseID, institutionID,
-			).Scan(&cd.name); err != nil {
+			).Scan(&cd.name, &cd.shift, &cd.fullName); err != nil {
 				http.Error(w, fmt.Sprintf("Course %d not found", courseID), http.StatusNotFound)
 				return
 			}

@@ -8,6 +8,12 @@ export class Course {
   @Column({ name: 'name', type: 'varchar' })
   name!: string;
 
+  @Column({ name: 'full_name', type: 'varchar', nullable: true })
+  fullName!: string | null;
+
+  @Column({ name: 'paralelo', type: 'varchar', length: 10, nullable: true })
+  paralelo!: string | null;
+
   @Column({ name: 'institution_id', type: 'integer' })
   institutionId!: number;
 

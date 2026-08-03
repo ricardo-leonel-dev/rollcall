@@ -6,6 +6,9 @@ import { cascadeSoftDeleteEnrollment } from './enrollment.service';
 
 const repo = () => AppDataSource.getRepository(Course);
 
+export const SHIFTS = ['MATUTINA', 'VESPERTINA', 'NOCTURNA'] as const;
+export type Shift = typeof SHIFTS[number];
+
 export async function findAll(institutionId: number, courseIds: number[] | null) {
   const where: any = { institutionId, deletedAt: IsNull() };
   if (courseIds !== null) where.id = In(courseIds);
@@ -21,18 +24,32 @@ export async function findById(institutionId: number, courseIds: number[] | null
   return c;
 }
 
-export async function create(institutionId: number, data: { name: string; shift?: string }) {
+export async function create(institutionId: number, data: { name: string; fullName?: string; paralelo?: string; shift?: string }) {
+  const shift = (data.shift ?? 'MATUTINA').toUpperCase();
+  if (!SHIFTS.includes(shift as Shift)) {
+    throw Object.assign(new Error('Jornada inválida'), { status: 400 });
+  }
   const c = repo().create({
     institutionId,
     name: data.name.toUpperCase(),
-    shift: (data.shift ?? 'MATUTINA').toUpperCase(),
+    fullName: data.fullName?.toUpperCase() ?? null,
+    paralelo: data.paralelo?.toUpperCase() ?? null,
+    shift,
   });
   return repo().save(c);
 }
 
-export async function update(institutionId: number, courseIds: number[] | null, id: number, data: Partial<{ name: string; shift: string; isActive: boolean }>) {
+export async function update(institutionId: number, courseIds: number[] | null, id: number, data: Partial<{ name: string; fullName: string; paralelo: string; shift: string; isActive: boolean }>) {
   const c = await findById(institutionId, courseIds, id);
   if (data.name) data.name = data.name.toUpperCase();
+  if (data.fullName) data.fullName = data.fullName.toUpperCase();
+  if (data.paralelo) data.paralelo = data.paralelo.toUpperCase();
+  if (data.shift) {
+    data.shift = data.shift.toUpperCase();
+    if (!SHIFTS.includes(data.shift as Shift)) {
+      throw Object.assign(new Error('Jornada inválida'), { status: 400 });
+    }
+  }
   Object.assign(c, data);
   return repo().save(c);
 }
