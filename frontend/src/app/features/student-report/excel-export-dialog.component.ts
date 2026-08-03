@@ -11,8 +11,10 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDividerModule } from '@angular/material/divider';
 import { firstValueFrom } from 'rxjs';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
+import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { dateToDateString } from '../../shared/utils/date.util';
+import { toSnakeCase } from '../../shared/utils/string.util';
 import { AcademicYear, Course } from '../../core/models/index';
 
 export interface ExcelExportDialogData {
@@ -125,6 +127,7 @@ export class ExcelExportDialogComponent implements OnInit {
   readonly data = inject<ExcelExportDialogData>(MAT_DIALOG_DATA);
   private readonly http = inject(HttpClient);
   private readonly notify = inject(NotificationService);
+  private readonly auth = inject(AuthService);
   readonly academicYearContext = inject(AcademicYearContextService);
 
   readonly courses = signal<Course[]>([]);
@@ -204,7 +207,8 @@ export class ExcelExportDialogComponent implements OnInit {
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = `asistencias_${year.id}_${dateToDateString(this.dateFrom)}_${dateToDateString(this.dateTo)}.xlsx`;
+      const exporterName = this.auth.currentUser()?.fullName || this.auth.currentUser()?.username || 'usuario';
+      a.download = `asistencia_trimestral_${toSnakeCase(exporterName)}.xlsx`;
       a.click();
       URL.revokeObjectURL(blobUrl);
     } catch {
