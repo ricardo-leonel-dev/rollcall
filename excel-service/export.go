@@ -47,6 +47,7 @@ type courseData struct {
 	id        int
 	name      string
 	fullName  string
+	paralelo  string
 	shift     string
 	roster    []rosterStudent
 	registros []absenceRecord
@@ -156,11 +157,27 @@ func gradoDesdeAbreviado(courseName string) string {
 	return word + upper[loc[1]:]
 }
 
-// gradoDisplay prefers the structured full_name; falls back to inferring the
-// grade word from the abbreviated name for courses not yet migrated.
+// insertarParalelo inserts the paralelo (quoted, uppercase) right after the
+// first word of the grade text, e.g. "DÉCIMO BS" + "A" -> `DÉCIMO "A" BS`.
+func insertarParalelo(grado, paralelo string) string {
+	paralelo = strings.ToUpper(strings.TrimSpace(paralelo))
+	if paralelo == "" {
+		return grado
+	}
+	partes := strings.SplitN(grado, " ", 2)
+	if len(partes) == 2 {
+		return partes[0] + ` "` + paralelo + `" ` + partes[1]
+	}
+	return grado + ` "` + paralelo + `"`
+}
+
+// gradoDisplay prefers the structured full_name (with paralelo inserted after
+// the first word); falls back to inferring the grade word from the
+// abbreviated name for courses not yet migrated — that fallback already
+// carries the paralelo embedded (e.g. "10MO F BS"), so it isn't added again.
 func gradoDisplay(cd courseData) string {
 	if fn := strings.ToUpper(strings.TrimSpace(cd.fullName)); fn != "" {
-		return fn
+		return insertarParalelo(fn, cd.paralelo)
 	}
 	return gradoDesdeAbreviado(cd.name)
 }
@@ -788,9 +805,9 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 			var cd courseData
 			cd.id = courseID
 			if err := pool.QueryRow(ctx,
-				"SELECT name, shift, COALESCE(full_name, '') FROM courses WHERE id = $1 AND institution_id = $2",
+				"SELECT name, shift, COALESCE(full_name, ''), COALESCE(paralelo, '') FROM courses WHERE id = $1 AND institution_id = $2",
 				courseID, institutionID,
-			).Scan(&cd.name, &cd.shift, &cd.fullName); err != nil {
+			).Scan(&cd.name, &cd.shift, &cd.fullName, &cd.paralelo); err != nil {
 				http.Error(w, fmt.Sprintf("Course %d not found", courseID), http.StatusNotFound)
 				return
 			}
