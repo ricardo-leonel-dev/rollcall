@@ -11,6 +11,11 @@ import { AcademicYear } from '../../core/models/index';
 import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
 import { NotificationService } from '../../core/services/notification.service';
 
+export interface AcademicYearDialogResult {
+  startDate: string | null;
+  endDate: string | null;
+}
+
 export interface AcademicYearDialogData {
   mode: 'create' | 'edit';
   year?: AcademicYear;
@@ -49,7 +54,7 @@ export interface AcademicYearDialogData {
   `,
 })
 export class AcademicYearDialogComponent {
-  readonly dialogRef = inject(MatDialogRef<AcademicYearDialogComponent, boolean>);
+  readonly dialogRef = inject(MatDialogRef<AcademicYearDialogComponent, AcademicYearDialogResult | false>);
   readonly data: AcademicYearDialogData = inject(MAT_DIALOG_DATA);
   private readonly http = inject(HttpClient);
   private readonly notify = inject(NotificationService);
@@ -75,7 +80,7 @@ export class AcademicYearDialogComponent {
         await firstValueFrom(this.http.post('/api/academic-years', body));
         this.notify.success('Año lectivo creado');
       }
-      this.dialogRef.close(true);
+      this.dialogRef.close({ startDate: body.startDate, endDate: body.endDate });
     } catch (err: any) {
       this.notify.error(err?.error?.error ?? 'Error al guardar');
     } finally {
