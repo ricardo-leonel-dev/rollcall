@@ -129,10 +129,11 @@ export async function assertQuartersFitAcademicYearRange(em: EntityManager, acad
     where: { academicYearId, deletedAt: IsNull() },
     order: { sequenceNumber: 'ASC' },
   });
-  const offending = quarters.filter(q =>
-    q.startDate !== null && q.endDate !== null &&
-    ((startDate !== null && q.startDate < startDate) || (endDate !== null && q.endDate > endDate))
-  );
+  const offending = quarters.filter(q => {
+    if (startDate !== null && q.startDate !== null && q.startDate < startDate) return true;
+    if (endDate !== null && q.endDate !== null && q.endDate > endDate) return true;
+    return false;
+  });
   if (offending.length) {
     const detail = offending.map(q => `${q.name} (${q.startDate} a ${q.endDate})`).join(', ');
     throw Object.assign(

@@ -19,7 +19,7 @@ import { NotificationService } from '../../core/services/notification.service';
 import { QuarterService } from '../../core/services/quarter.service';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { InstitutionDialogComponent } from './institution-dialog.component';
-import { AcademicYearDialogComponent } from './academic-year-dialog.component';
+import { AcademicYearDialogComponent, AcademicYearDialogResult } from './academic-year-dialog.component';
 import { QuartersDialogComponent } from './quarters-dialog.component';
 import { CourseDialogComponent } from './course-dialog.component';
 import { UserDialogComponent } from './user-dialog.component';
@@ -462,40 +462,94 @@ export class AdminComponent implements OnInit {
       data: { mode: year ? 'edit' : 'create', year },
     }).afterClosed().subscribe(async result => {
       if (!result) return;
-      if (year) {
-        await this.warnIfQuartersOutOfRange(year, result);
-      }
+      await this.saveAcademicYear(year, result);
       await this.loadAll();
     });
   }
 
-  // When the user edits an active academic year's date range and the new range
-  // would push existing quarters out of bounds, the backend rejects with 409.
-  // We catch this client-side and surface a warning prompt so the user can fix
-  // the quarter dates first. The actual server-side check is the source of
-  // truth — this is just an early, friendlier UX.
-  private async warnIfQuartersOutOfRange(original: AcademicYear, updated: { startDate: string | null; endDate: string | null }): Promise<void> {
-    if (!original.isActive) return;
-    const datesChanged = updated.startDate !== original.startDate || updated.endDate !== original.endDate;
-    if (!datesChanged) return;
+  // The dialog is now a pure form: it returns the proposed dates (and name for
+  // create) and the caller decides whether/how to persist them. For edits on
+  // the *active* academic year whose dates actually changed, we run a pre-save
+  // check that mirrors the backend's `assertQuartersFitAcademicYearRange` and,
+  // if any quarter would be invalidated, gate the save behind a confirm dialog
+  // — no PUT goes out until the user accepts. The backend's 409 remains the
+  // ultimate authority and still surfaces via `NotificationService.error` for
+  // any corner case the client-side check misses.
+  private async saveAcademicYear(year: AcademicYear | undefined, result: AcademicYearDialogResult): Promise<void> {
+    const body = { name: result.name, startDate: result.startDate, endDate: result.endDate };
+
+    if (!year) {
+      await this.sendAcademicYearSave('create', null, body);
+      return;
+    }
+
+    const datesChanged = result.startDate !== year.startDate || result.endDate !== year.endDate;
+    if (!year.isActive || !datesChanged) {
+      await this.sendAcademicYearSave('edit', year, body);
+      return;
+    }
+
+    let quarters;
     try {
-      const quarters = await this.quarterService.getAll();
-      const offending = quarters.filter(q => {
-        if (!q.startDate || !q.endDate) return false;
-        if (updated.startDate && q.startDate < updated.startDate) return true;
-        if (updated.endDate && q.endDate > updated.endDate) return true;
-        return false;
-      });
-      if (offending.length) {
-        const detail = offending.map(q => `${q.name} (${q.startDate} a ${q.endDate})`).join(', ');
-        this.notify.warning(
-          `Los siguientes trimestres quedaron fuera del nuevo rango del año lectivo y deberán ajustarse: ${detail}`,
-          { duration: 6000 }
-        );
-        this.openQuartersDialog({ ...original, startDate: updated.startDate, endDate: updated.endDate });
+      quarters = await this.quarterService.getAll();
+    } catch (err: any) {
+      // If we can't even fetch quarters, fall through to the server-side 409 —
+      // don't block the user with a confirm dialog we can't back up with data.
+      await this.sendAcademicYearSave('edit', year, body);
+      return;
+    }
+
+    const offending = quarters.filter(q => {
+      if (result.startDate && q.startDate && q.startDate < result.startDate) return true;
+      if (result.endDate && q.endDate && q.endDate > result.endDate) return true;
+      return false;
+    });
+    if (!offending.length) {
+      await this.sendAcademicYearSave('edit', year, body);
+      return;
+    }
+
+    const proposedRange = `${result.startDate ?? '—'} a ${result.endDate ?? '—'}`;
+    const detail = offending.map(q => {
+      const cur = `${q.startDate ?? '—'} a ${q.endDate ?? '—'}`;
+      const startTooEarly = !!(result.startDate && q.startDate && q.startDate < result.startDate);
+      const endTooLate = !!(result.endDate && q.endDate && q.endDate > result.endDate);
+      const reason = startTooEarly
+        ? `inicio (${q.startDate}) antes del nuevo inicio (${result.startDate})`
+        : endTooLate
+          ? `fin (${q.endDate}) después del nuevo fin (${result.endDate})`
+          : 'fuera del nuevo rango';
+      return `• ${q.name} (actual: ${cur}) — ${reason}`;
+    }).join('\n');
+    const ok = await firstValueFrom(this.dialog.open(ConfirmDialogComponent, {
+      width: '480px',
+      data: {
+        title: 'Las nuevas fechas invalidan trimestres existentes',
+        message: `Rango propuesto del año lectivo: ${proposedRange}\n\nTrimestres afectados:\n${detail}\n\nSi continúas, el año lectivo se guardará con las nuevas fechas y se abrirá la ventana para ajustar los trimestres.`,
+        confirmLabel: 'Ajustar trimestres',
+        severity: 'primary',
+        icon: 'warning_amber',
+      },
+    }).afterClosed());
+    if (!ok) return;
+
+    await this.sendAcademicYearSave('edit', year, body);
+    // After the AY is persisted, auto-open the quarters dialog so the user can
+    // bring the affected quarters back inside the new range in the same flow.
+    this.openQuartersDialog({ ...year, startDate: result.startDate, endDate: result.endDate });
+  }
+
+  private async sendAcademicYearSave(mode: 'create' | 'edit', year: AcademicYear | null, body: { name: string; startDate: string | null; endDate: string | null }): Promise<void> {
+    try {
+      if (mode === 'edit' && year) {
+        await firstValueFrom(this.http.put(`/api/academic-years/${year.id}`, body));
+        this.notify.success('Año lectivo actualizado');
+      } else {
+        await firstValueFrom(this.http.post('/api/academic-years', body));
+        this.notify.success('Año lectivo creado');
       }
-    } catch {
-      // best-effort UX warning; server-side 409 still protects integrity
+    } catch (err: any) {
+      this.notify.error(err?.error?.error ?? 'Error al guardar');
     }
   }
 

@@ -1,17 +1,15 @@
 import { Component, ChangeDetectionStrategy, signal, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { firstValueFrom } from 'rxjs';
 import { AcademicYear } from '../../core/models/index';
 import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
-import { NotificationService } from '../../core/services/notification.service';
 
 export interface AcademicYearDialogResult {
+  name: string;
   startDate: string | null;
   endDate: string | null;
 }
@@ -47,7 +45,7 @@ export interface AcademicYearDialogData {
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button (click)="dialogRef.close(false)">Cancelar</button>
-      <button mat-flat-button color="primary" (click)="save()" [disabled]="!name || saving()">
+      <button mat-flat-button color="primary" (click)="submit()" [disabled]="!name">
         {{data.mode === 'edit' ? 'Guardar' : 'Crear'}}
       </button>
     </mat-dialog-actions>
@@ -56,35 +54,19 @@ export interface AcademicYearDialogData {
 export class AcademicYearDialogComponent {
   readonly dialogRef = inject(MatDialogRef<AcademicYearDialogComponent, AcademicYearDialogResult | false>);
   readonly data: AcademicYearDialogData = inject(MAT_DIALOG_DATA);
-  private readonly http = inject(HttpClient);
-  private readonly notify = inject(NotificationService);
 
   name = this.data.year?.name ?? '';
   startDate: Date | null = this.data.year?.startDate ? dateStringToDate(this.data.year.startDate) : null;
   endDate: Date | null = this.data.year?.endDate ? dateStringToDate(this.data.year.endDate) : null;
-  readonly saving = signal(false);
 
-  async save(): Promise<void> {
+  // Pure form: returns the proposed dates so the caller can validate against
+  // quarters (and other invariants) before deciding to send the HTTP call.
+  submit(): void {
     if (!this.name) return;
-    this.saving.set(true);
-    const body = {
+    this.dialogRef.close({
       name: this.name,
       startDate: this.startDate ? dateToDateString(this.startDate) : null,
       endDate: this.endDate ? dateToDateString(this.endDate) : null,
-    };
-    try {
-      if (this.data.mode === 'edit') {
-        await firstValueFrom(this.http.put(`/api/academic-years/${this.data.year!.id}`, body));
-        this.notify.success('Año lectivo actualizado');
-      } else {
-        await firstValueFrom(this.http.post('/api/academic-years', body));
-        this.notify.success('Año lectivo creado');
-      }
-      this.dialogRef.close({ startDate: body.startDate, endDate: body.endDate });
-    } catch (err: any) {
-      this.notify.error(err?.error?.error ?? 'Error al guardar');
-    } finally {
-      this.saving.set(false);
-    }
+    });
   }
 }
