@@ -16,9 +16,11 @@ import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { QuarterService } from '../../core/services/quarter.service';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { InstitutionDialogComponent } from './institution-dialog.component';
 import { AcademicYearDialogComponent } from './academic-year-dialog.component';
+import { QuartersDialogComponent } from './quarters-dialog.component';
 import { CourseDialogComponent } from './course-dialog.component';
 import { UserDialogComponent } from './user-dialog.component';
 import { UserPermissionsDialogComponent } from './user-permissions-dialog.component';
@@ -129,6 +131,9 @@ import { MODULE_KEYS } from '../../core/nav-items';
               </div>
               <div class="admin-row-actions">
                 <span [class]="y.isActive ? 'badge-J' : 'badge-gray'">{{y.isActive ? 'Activo' : 'Inactivo'}}</span>
+                @if (y.isActive) {
+                  <button mat-icon-button style="color:var(--accent)" title="Configurar trimestres" (click)="openQuartersDialog(y)"><mat-icon>date_range</mat-icon></button>
+                }
                 @if (!y.isActive) {
                   <button mat-icon-button style="color:var(--accent)" title="Marcar como año activo" (click)="activateYear(y.id)"><mat-icon>check_circle</mat-icon></button>
                 }
@@ -394,6 +399,7 @@ export class AdminComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly quarterService = inject(QuarterService);
   readonly auth = inject(AuthService);
   readonly institutionContext = inject(InstitutionContextService);
   readonly academicYearContext = inject(AcademicYearContextService);
@@ -454,8 +460,55 @@ export class AdminComponent implements OnInit {
     this.dialog.open(AcademicYearDialogComponent, {
       width: '420px',
       data: { mode: year ? 'edit' : 'create', year },
-    }).afterClosed().subscribe(async ok => {
-      if (ok) await this.loadAll();
+    }).afterClosed().subscribe(async result => {
+      if (!result) return;
+      if (year) {
+        await this.warnIfQuartersOutOfRange(year, result);
+      }
+      await this.loadAll();
+    });
+  }
+
+  // When the user edits an active academic year's date range and the new range
+  // would push existing quarters out of bounds, the backend rejects with 409.
+  // We catch this client-side and surface a warning prompt so the user can fix
+  // the quarter dates first. The actual server-side check is the source of
+  // truth — this is just an early, friendlier UX.
+  private async warnIfQuartersOutOfRange(original: AcademicYear, updated: { startDate: string | null; endDate: string | null }): Promise<void> {
+    if (!original.isActive) return;
+    const datesChanged = updated.startDate !== original.startDate || updated.endDate !== original.endDate;
+    if (!datesChanged) return;
+    try {
+      const quarters = await this.quarterService.getAll();
+      const offending = quarters.filter(q => {
+        if (!q.startDate || !q.endDate) return false;
+        if (updated.startDate && q.startDate < updated.startDate) return true;
+        if (updated.endDate && q.endDate > updated.endDate) return true;
+        return false;
+      });
+      if (offending.length) {
+        const detail = offending.map(q => `${q.name} (${q.startDate} a ${q.endDate})`).join(', ');
+        this.notify.warning(
+          `Los siguientes trimestres quedaron fuera del nuevo rango del año lectivo y deberán ajustarse: ${detail}`,
+          { duration: 6000 }
+        );
+        this.openQuartersDialog({ ...original, startDate: updated.startDate, endDate: updated.endDate });
+      }
+    } catch {
+      // best-effort UX warning; server-side 409 still protects integrity
+    }
+  }
+
+  openQuartersDialog(year: AcademicYear): void {
+    this.quarterService.getAll().then(quarters => {
+      this.dialog.open(QuartersDialogComponent, {
+        width: '560px',
+        data: { academicYear: year, existing: quarters },
+      }).afterClosed().subscribe(async ok => {
+        if (ok) await this.loadAll();
+      });
+    }).catch(err => {
+      this.notify.error(err?.error?.error ?? 'Error al cargar los trimestres');
     });
   }
 

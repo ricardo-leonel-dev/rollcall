@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { AcademicYear } from './entities/AcademicYear';
 import { Course } from './entities/Course';
 import { CourseAcademicYear } from './entities/CourseAcademicYear';
+import { Quarter } from './entities/Quarter';
 import { Guardian } from './entities/Guardian';
 import { Student } from './entities/Student';
 import { Enrollment } from './entities/Enrollment';
@@ -39,6 +40,7 @@ export const AppDataSource = new DataSource({
     AcademicYear,
     Course,
     CourseAcademicYear,
+    Quarter,
     Guardian,
     Student,
     Enrollment,
