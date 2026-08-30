@@ -11,7 +11,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { firstValueFrom, map } from 'rxjs';
-import { AcademicYear, Course, User, Role, RolePermission, Institution } from '../../core/models/index';
+import { AcademicYear, Course, User, Role, RolePermission, Institution, Quarter } from '../../core/models/index';
 import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
@@ -19,8 +19,8 @@ import { NotificationService } from '../../core/services/notification.service';
 import { QuarterService } from '../../core/services/quarter.service';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { InstitutionDialogComponent } from './institution-dialog.component';
-import { AcademicYearDialogComponent } from './academic-year-dialog.component';
-import { QuartersDialogComponent } from './quarters-dialog.component';
+import { AcademicYearDialogComponent, AcademicYearDialogResult } from './academic-year-dialog.component';
+import { QuartersDialogComponent, QuartersDialogResult } from './quarters-dialog.component';
 import { CourseDialogComponent } from './course-dialog.component';
 import { UserDialogComponent } from './user-dialog.component';
 import { UserPermissionsDialogComponent } from './user-permissions-dialog.component';
@@ -35,14 +35,49 @@ import { MODULE_KEYS } from '../../core/nav-items';
   styles: [`
     .tab-content { padding: 20px; }
     .admin-row {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
       padding: 12px 16px; background: var(--paper); border-radius: 12px; border: 1px solid var(--border);
       margin-bottom: 8px;
     }
     .admin-row-actions { display: flex; align-items: center; gap: 8px; }
+    .admin-row-quarters {
+      display: flex; flex-direction: row; justify-content: center;
+      flex: 1; min-width: 0;
+    }
+    .quarter-chip-list {
+      display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+      min-width: 0;
+    }
+    .period-chip {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px;
+      max-width: 100%; min-width: 0; box-sizing: border-box;
+      background: var(--paper-deep);
+      border: 1px solid var(--border-soft);
+      border-left: 2px solid var(--accent);
+      border-radius: var(--radius-sm);
+    }
+    .period-chip-name {
+      font-family: 'Nunito', sans-serif; font-weight: 600; font-size: 13px;
+      color: var(--ink);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+    }
+    .period-chip-range {
+      font-family: 'Nunito', sans-serif; font-weight: 400; font-size: 11px;
+      color: var(--muted-strong); white-space: nowrap;
+    }
+    .period-chip-empty {
+      font-family: 'Nunito', sans-serif; font-weight: 400; font-size: 12px;
+      color: var(--muted-strong);
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .period-chip-cta {
+      color: var(--accent); font-weight: 600; cursor: pointer; text-decoration: none;
+    }
+    .period-chip-cta:hover { text-decoration: underline; }
     @media (max-width: 1280px) {
       .admin-row { flex-direction: column; align-items: flex-start; }
       .admin-row-actions { flex-wrap: wrap; width: 100%; }
+      .admin-row-quarters { width: 100%; }
     }
     .user-avatar {
       width: 36px; height: 36px; border-radius: 9px;
@@ -129,6 +164,24 @@ import { MODULE_KEYS } from '../../core/nav-items';
                   <div style="font-size:12px;color:var(--muted)">{{y.startDate ?? '—'}} → {{y.endDate ?? '—'}}</div>
                 </div>
               </div>
+              @if (y.isActive) {
+                @let rows = quarterRowsFor(y.id);
+                <div class="admin-row-quarters">
+                  <div class="quarter-chip-list">
+                    @for (q of rows; track q.id) {
+                      <span class="period-chip" title="{{q.name}} · {{q.startDate ?? '—'}} → {{q.endDate ?? '—'}}">
+                        <span class="period-chip-name">{{q.name}}</span>
+                        <span class="period-chip-range">{{q.startDate ?? '—'}} → {{q.endDate ?? '—'}}</span>
+                      </span>
+                    } @empty {
+                      <span class="period-chip-empty">
+                        Sin períodos configurados.
+                        <a class="period-chip-cta" (click)="openQuartersDialog(y)">Configurar trimestres</a>
+                      </span>
+                    }
+                  </div>
+                </div>
+              }
               <div class="admin-row-actions">
                 <span [class]="y.isActive ? 'badge-J' : 'badge-gray'">{{y.isActive ? 'Activo' : 'Inactivo'}}</span>
                 @if (y.isActive) {
@@ -412,6 +465,32 @@ export class AdminComponent implements OnInit {
   readonly importLoading = signal(false);
   readonly importResult = signal<any>(null);
 
+  private readonly _quartersByYear = signal<Map<number, Quarter[]>>(new Map());
+  readonly quartersByYear = this._quartersByYear.asReadonly();
+
+  // Ordered by startDate ascending (chronological display), not by
+  // sequenceNumber — real-world quarter numbering doesn't always match
+  // calendar order (e.g. a "Primer Trimestre" created/numbered later that
+  // actually starts earliest in the year). The displayed ordinal
+  // (`q.sequenceNumber`) is left untouched; only the list order changes.
+  // Quarters without a startDate are pushed to the end, in a stable order.
+  quarterRowsFor(yearId: number): readonly Quarter[] {
+    return (this._quartersByYear().get(yearId) ?? [])
+      .slice()
+      .sort((a, b) => {
+        if (a.startDate === null && b.startDate === null) return 0;
+        if (a.startDate === null) return 1;
+        if (b.startDate === null) return -1;
+        return a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0;
+      });
+  }
+
+  private setQuartersForYear(yearId: number, quarters: readonly Quarter[]): void {
+    const next = new Map(this._quartersByYear());
+    next.set(yearId, [...quarters]);
+    this._quartersByYear.set(next);
+  }
+
   selRole: number | null = null;
 
   readonly activeTab = toSignal(
@@ -447,13 +526,17 @@ export class AdminComponent implements OnInit {
     if (!noInstitutionYet) await this.academicYearContext.load();
     const yearId = this.academicYearContext.selectedId();
     const usersUrl = yearId ? `/api/users?academic_year_id=${yearId}` : '/api/users';
-    const [courses, users, roles] = await Promise.all([
+    const [courses, users, roles, quarters] = await Promise.all([
       noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<Course[]>('/api/courses')).catch(() => []),
       noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<User[]>(usersUrl)).catch(() => []),
       firstValueFrom(this.http.get<Role[]>('/api/roles')),
+      noInstitutionYet ? Promise.resolve([] as Quarter[]) : this.quarterService.getAll().catch(() => [] as Quarter[]),
     ]);
     this.courses.set(courses);
     this.users.set(users); this.roles.set(roles);
+    if (!noInstitutionYet && yearId !== null) {
+      this.setQuartersForYear(yearId, quarters);
+    }
   }
 
   openYearDialog(year?: AcademicYear): void {
@@ -462,53 +545,115 @@ export class AdminComponent implements OnInit {
       data: { mode: year ? 'edit' : 'create', year },
     }).afterClosed().subscribe(async result => {
       if (!result) return;
-      if (year) {
-        await this.warnIfQuartersOutOfRange(year, result);
-      }
+      await this.saveAcademicYear(year, result);
       await this.loadAll();
     });
   }
 
-  // When the user edits an active academic year's date range and the new range
-  // would push existing quarters out of bounds, the backend rejects with 409.
-  // We catch this client-side and surface a warning prompt so the user can fix
-  // the quarter dates first. The actual server-side check is the source of
-  // truth — this is just an early, friendlier UX.
-  private async warnIfQuartersOutOfRange(original: AcademicYear, updated: { startDate: string | null; endDate: string | null }): Promise<void> {
-    if (!original.isActive) return;
-    const datesChanged = updated.startDate !== original.startDate || updated.endDate !== original.endDate;
-    if (!datesChanged) return;
+  // The dialog is now a pure form: it returns the proposed dates (and name for
+  // create) and the caller decides whether/how to persist them. For edits on
+  // the *active* academic year whose dates actually changed, we run a pre-save
+  // check that mirrors the backend's `assertQuartersFitAcademicYearRange` and,
+  // if any quarter would be invalidated, gate the save behind a confirm dialog
+  // — no PUT goes out until the user accepts. The backend's 409 remains the
+  // ultimate authority and still surfaces via `NotificationService.error` for
+  // any corner case the client-side check misses.
+  private async saveAcademicYear(year: AcademicYear | undefined, result: AcademicYearDialogResult): Promise<void> {
+    const body = { name: result.name, startDate: result.startDate, endDate: result.endDate };
+
+    if (!year) {
+      await this.sendAcademicYearSave('create', null, body);
+      return;
+    }
+
+    const datesChanged = result.startDate !== year.startDate || result.endDate !== year.endDate;
+    if (!year.isActive || !datesChanged) {
+      await this.sendAcademicYearSave('edit', year, body);
+      return;
+    }
+
+    let quarters;
     try {
-      const quarters = await this.quarterService.getAll();
-      const offending = quarters.filter(q => {
-        if (!q.startDate || !q.endDate) return false;
-        if (updated.startDate && q.startDate < updated.startDate) return true;
-        if (updated.endDate && q.endDate > updated.endDate) return true;
-        return false;
-      });
-      if (offending.length) {
-        const detail = offending.map(q => `${q.name} (${q.startDate} a ${q.endDate})`).join(', ');
-        this.notify.warning(
-          `Los siguientes trimestres quedaron fuera del nuevo rango del año lectivo y deberán ajustarse: ${detail}`,
-          { duration: 6000 }
-        );
-        this.openQuartersDialog({ ...original, startDate: updated.startDate, endDate: updated.endDate });
+      quarters = await this.quarterService.getAll();
+    } catch (err: any) {
+      // If we can't even fetch quarters, fall through to the server-side 409 —
+      // don't block the user with a confirm dialog we can't back up with data.
+      await this.sendAcademicYearSave('edit', year, body);
+      return;
+    }
+
+    const offending = quarters.filter(q => {
+      if (result.startDate && q.startDate && q.startDate < result.startDate) return true;
+      if (result.endDate && q.endDate && q.endDate > result.endDate) return true;
+      return false;
+    });
+    if (!offending.length) {
+      await this.sendAcademicYearSave('edit', year, body);
+      return;
+    }
+
+    const proposedRange = `${result.startDate ?? '—'} a ${result.endDate ?? '—'}`;
+    const detail = offending.map(q => {
+      const cur = `${q.startDate ?? '—'} a ${q.endDate ?? '—'}`;
+      const startTooEarly = !!(result.startDate && q.startDate && q.startDate < result.startDate);
+      const endTooLate = !!(result.endDate && q.endDate && q.endDate > result.endDate);
+      const reason = startTooEarly
+        ? `inicio (${q.startDate}) antes del nuevo inicio (${result.startDate})`
+        : endTooLate
+          ? `fin (${q.endDate}) después del nuevo fin (${result.endDate})`
+          : 'fuera del nuevo rango';
+      return `• ${q.name} (actual: ${cur}) — ${reason}`;
+    }).join('\n');
+    const ok = await firstValueFrom(this.dialog.open(ConfirmDialogComponent, {
+      width: '480px',
+      data: {
+        title: 'Las nuevas fechas invalidan trimestres existentes',
+        message: `Rango propuesto del año lectivo: ${proposedRange}\n\nTrimestres afectados:\n${detail}\n\nSi continúas, el año lectivo se guardará con las nuevas fechas y se abrirá la ventana para ajustar los trimestres.`,
+        confirmLabel: 'Ajustar trimestres',
+        severity: 'primary',
+        icon: 'warning_amber',
+      },
+    }).afterClosed());
+    if (!ok) return;
+
+    await this.sendAcademicYearSave('edit', year, body);
+    // After the AY is persisted, auto-open the quarters dialog so the user can
+    // bring the affected quarters back inside the new range in the same flow.
+    this.openQuartersDialog({ ...year, startDate: result.startDate, endDate: result.endDate });
+  }
+
+  private async sendAcademicYearSave(mode: 'create' | 'edit', year: AcademicYear | null, body: { name: string; startDate: string | null; endDate: string | null }): Promise<void> {
+    try {
+      if (mode === 'edit' && year) {
+        await firstValueFrom(this.http.put(`/api/academic-years/${year.id}`, body));
+        this.notify.success('Año lectivo actualizado');
+      } else {
+        await firstValueFrom(this.http.post('/api/academic-years', body));
+        this.notify.success('Año lectivo creado');
       }
-    } catch {
-      // best-effort UX warning; server-side 409 still protects integrity
+    } catch (err: any) {
+      this.notify.error(err?.error?.error ?? 'Error al guardar');
     }
   }
 
   openQuartersDialog(year: AcademicYear): void {
     this.quarterService.getAll().then(quarters => {
+      this.setQuartersForYear(year.id, quarters);
       this.dialog.open(QuartersDialogComponent, {
         width: '560px',
         data: { academicYear: year, existing: quarters },
-      }).afterClosed().subscribe(async ok => {
-        if (ok) await this.loadAll();
+      }).afterClosed().subscribe(async (result?: QuartersDialogResult) => {
+        if (!result?.saved) return;
+        try {
+          const fresh = await this.quarterService.getAll();
+          this.setQuartersForYear(year.id, fresh);
+        } catch (err: any) {
+          this.notify.error(err?.error?.error ?? 'Error al cargar los períodos');
+          await this.loadAll();
+        }
       });
     }).catch(err => {
-      this.notify.error(err?.error?.error ?? 'Error al cargar los trimestres');
+      this.notify.error(err?.error?.error ?? 'Error al cargar los períodos');
     });
   }
 
