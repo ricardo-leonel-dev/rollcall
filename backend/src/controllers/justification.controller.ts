@@ -40,7 +40,9 @@ router.get('/', requirePermission(R,'read'), async (req, res) => {
   const enrollmentId   = req.query.enrollment_id   ? +req.query.enrollment_id   : undefined;
   const courseId       = req.query.course_id        ? +req.query.course_id        : undefined;
   const academicYearId = req.query.academic_year_id ? +req.query.academic_year_id : undefined;
-  res.json(await svc.findAll(req.institutionId!, req.courseIds ?? null, enrollmentId, courseId, academicYearId));
+  const dateFrom       = (req.query.date_from  as string) || undefined;
+  const dateTo         = (req.query.date_to    as string) || undefined;
+  res.json(await svc.findAll(req.institutionId!, req.courseIds ?? null, enrollmentId, courseId, academicYearId, dateFrom, dateTo));
 });
 
 router.post('/',   requirePermission(R,'create'), async (req, res) => res.status(201).json(await svc.create(req.institutionId!, req.courseIds ?? null, req.body, req.user?.id ?? null)));
