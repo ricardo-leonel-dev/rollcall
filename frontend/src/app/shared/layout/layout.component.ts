@@ -12,6 +12,7 @@ import { filter, map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
+import { QuarterContextService } from '../../core/services/quarter-context.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { ProfileDialogComponent, resolveAvatarPreset } from '../components/profile-dialog/profile-dialog.component';
 import { SECTIONS, SubNavItem } from '../../core/nav-items';
@@ -312,6 +313,7 @@ export class LayoutComponent implements OnInit {
   readonly auth = inject(AuthService);
   readonly institutionContext = inject(InstitutionContextService);
   readonly academicYearContext = inject(AcademicYearContextService);
+  readonly quarterContext = inject(QuarterContextService);
   readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
   private readonly bp = inject(BreakpointObserver);
@@ -328,6 +330,14 @@ export class LayoutComponent implements OnInit {
       await this.institutionContext.loadInstitutions();
     }
     await this.academicYearContext.load();
+    // QuarterContextService.load() reenvía el `academicYearId` seleccionado a
+    // `GET /api/quarters?academic_year_id=`, así que debe correr *después* de
+    // que AcademicYearContextService ya tenga el id resuelto. El context es
+    // singleton, así que este único load en el bootstrap basta para todos los
+    // consumidores del QuarterSelectorComponent (Dashboard hoy, próximas
+    // vistas de lista en feature 6) — el componente queda "tonto", sin
+    // ngOnInit propio.
+    await this.quarterContext.load();
     this.institutionReady.set(true);
   }
 
