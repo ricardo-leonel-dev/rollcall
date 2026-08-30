@@ -535,9 +535,68 @@ func stripExternalLinks(zipPath string) error {
 
 // ── processCourse ─────────────────────────────────────────────────────────────
 
+const trimesterSheetCount = 3
+
+// trimesterOrdinalNames bridges the backend's Quarter.name vocabulary
+// ("Primer Trimestre", "Segundo Trimestre", "Tercer Trimestre") to the
+// template's sheet-position vocabulary — the two never share a common
+// substring, so an explicit ordinal-word mapping is required.
+var trimesterOrdinalNames = map[string]int{
+	"PRIMER": 0, "PRIMERO": 0,
+	"SEGUNDO": 1,
+	"TERCER":  2, "TERCERO": 2,
+}
+
+// resolveTrimesterSheetIndex resolves quarter_sequence/quarter_name (raw query
+// string values, "" when absent) into a 0-based position in the template's
+// GetSheetList() document order. quarter_sequence always wins when both are
+// supplied (R2).
+func resolveTrimesterSheetIndex(quarterSequenceRaw, quarterNameRaw string) (int, error) {
+	if quarterSequenceRaw != "" {
+		n, err := strconv.Atoi(strings.TrimSpace(quarterSequenceRaw))
+		if err != nil {
+			return 0, fmt.Errorf("invalid quarter_sequence: %s", quarterSequenceRaw)
+		}
+		if n < 1 || n > trimesterSheetCount {
+			return 0, fmt.Errorf("quarter_sequence must be between 1 and %d", trimesterSheetCount)
+		}
+		return n - 1, nil
+	}
+	if quarterNameRaw != "" {
+		first := strings.ToUpper(strings.TrimSpace(quarterNameRaw))
+		if idx := strings.IndexAny(first, " \t"); idx >= 0 {
+			first = first[:idx]
+		}
+		if pos, ok := trimesterOrdinalNames[first]; ok {
+			return pos, nil
+		}
+		return 0, fmt.Errorf("unrecognized quarter_name: %s", quarterNameRaw)
+	}
+	return 0, nil
+}
+
+// selectAndKeepSheet deletes every sheet in f except the one at sheetIndex
+// (0-based position in f.GetSheetList()) and returns the kept sheet name.
+// Returns an error if sheetIndex is out of range (R8); the caller must clean
+// up the file and any temp copy in that case.
+func selectAndKeepSheet(f *excelize.File, sheetIndex int) (string, error) {
+	sheetList := f.GetSheetList()
+	if sheetIndex >= len(sheetList) {
+		return "", fmt.Errorf("template has %d sheet(s), expected at least %d", len(sheetList), sheetIndex+1)
+	}
+	base := sheetList[sheetIndex]
+	for _, name := range sheetList {
+		if name == base {
+			continue
+		}
+		f.DeleteSheet(name)
+	}
+	return base, nil
+}
+
 // processCourse writes one course into a fresh copy of the template and returns
 // the path to the resulting temp file. The caller is responsible for removing it.
-func processCourse(plantillaPath, outputDir, ts string, cd courseData, sheetName string, diasDelRango []time.Time, signers []Signer) (string, error) {
+func processCourse(plantillaPath, outputDir, ts string, cd courseData, sheetName string, sheetIndex int, diasDelRango []time.Time, signers []Signer) (string, error) {
 	tempPath := filepath.Join(outputDir, fmt.Sprintf("temp_%d_%s.xlsx", cd.id, ts))
 	if err := copyFile(plantillaPath, tempPath); err != nil {
 		return "", err
@@ -549,9 +608,11 @@ func processCourse(plantillaPath, outputDir, ts string, cd courseData, sheetName
 		return "", err
 	}
 
-	// Delete every sheet except the first (removes 2DO TRIMESTRE, 3ER TRIMESTRE, etc.)
-	for _, extra := range f.GetSheetList()[1:] {
-		f.DeleteSheet(extra)
+	base, err := selectAndKeepSheet(f, sheetIndex)
+	if err != nil {
+		f.Close()
+		os.Remove(tempPath)
+		return "", err
 	}
 
 	// Force formula recalculation so COUNTIF totals are correct
@@ -561,8 +622,6 @@ func processCourse(plantillaPath, outputDir, ts string, cd courseData, sheetName
 		os.Remove(tempPath)
 		return "", err
 	}
-
-	base := f.GetSheetList()[0]
 
 	colMap, err := getColumnMap(f, base)
 	if err != nil {
@@ -782,6 +841,12 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 			return
 		}
 
+		sheetIndex, errQ := resolveTrimesterSheetIndex(q.Get("quarter_sequence"), q.Get("quarter_name"))
+		if errQ != nil {
+			http.Error(w, errQ.Error(), http.StatusBadRequest)
+			return
+		}
+
 		var signers []Signer
 		if raw := q.Get("signers"); raw != "" {
 			_ = json.Unmarshal([]byte(raw), &signers)
@@ -898,7 +963,7 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 		// Process each course in its own fresh template copy
 		tempPaths := make([]string, 0, len(courses))
 		for i, cd := range courses {
-			p, err := processCourse(plantillaPath, outputDir, ts, cd, sheetNames[i], diasDelRango, signers)
+			p, err := processCourse(plantillaPath, outputDir, ts, cd, sheetNames[i], sheetIndex, diasDelRango, signers)
 			if err != nil {
 				for _, old := range tempPaths {
 					os.Remove(old)
