@@ -1,0 +1,1079 @@
+{
+  "results": {
+    "step_iv": {
+      "chipsAfterSave": [
+        "Periodo Extra\n2030-01-01 → 2030-03-31",
+        "Segundo Trimestre (Smoke)\n— → —",
+        "Tercer Trimestre\n— → —"
+      ],
+      "chipStripInsideAdminRow": {
+        "chipsContainerIsChildOfAdminRow": true,
+        "chipCount": 3
+      },
+      "pass": true
+    },
+    "step_v_client": {
+      "invalidMessages": [
+        "error_outline\nLas fechas se solapan con Periodo Extra.",
+        "error_outline\nLas fechas se solapan con Periodo Extra."
+      ],
+      "saveDisabled": true,
+      "note": "Client-side computed validationErrors() caught the overlap and disabled Guardar."
+    },
+    "step_v_backend_via_ui": null,
+    "step_v_backend_direct": {
+      "status": 400,
+      "body": {
+        "error": "Las fechas se solapan con Periodo Extra (2030-01-01 a 2030-03-31)"
+      },
+      "pass": true
+    },
+    "step_vi": {
+      "preNudge": {
+        "invalidMessages": [],
+        "saveDisabled": false
+      },
+      "postNudge": {
+        "invalidMessages": [],
+        "saveDisabled": false
+      },
+      "errorToastText": "Registro duplicado",
+      "dupCardHasServerErrorClass": true,
+      "dialogStillOpen": true,
+      "note": "No client-side duplicate-name check exists in quarters-dialog.component.ts (validationErrors() only checks empty/length/date-order/AY-range/overlap), so the duplicate reaches the backend unmodified. Reaching Guardar in an enabled state required the nudge workaround above, due to the same stale-computed-signal bug documented in step (v) — NOT because of any duplicate-name-specific client check.",
+      "pass": true
+    },
+    "step_vii": {
+      "status": 404,
+      "body": {
+        "error": "Trimestre no encontrado"
+      },
+      "pass": true
+    },
+    "step_viii": {
+      "emptyStateText": "Sin períodos configurados.\nConfigurar trimestres",
+      "emptyStateChipCount": 0,
+      "reopenedCardCount": 1,
+      "pass": true
+    },
+    "cleanup": {
+      "smokeYearGone": true,
+      "realYearActive": true,
+      "finalQuarters": [
+        {
+          "id": 2,
+          "academicYearId": 1,
+          "institutionId": 2,
+          "name": "Segundo Trimestre",
+          "sequenceNumber": 2,
+          "startDate": "2026-08-11",
+          "endDate": "2026-11-06",
+          "description": "Segundo T",
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-28T08:02:28.138Z",
+          "updatedAt": "2026-08-28T15:42:43.940Z"
+        },
+        {
+          "id": 3,
+          "academicYearId": 1,
+          "institutionId": 2,
+          "name": "Tercer Trimestre",
+          "sequenceNumber": 3,
+          "startDate": "2026-11-09",
+          "endDate": "2027-02-24",
+          "description": "Tercer T",
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-28T08:02:28.138Z",
+          "updatedAt": "2026-08-28T15:42:44.002Z"
+        },
+        {
+          "id": 9,
+          "academicYearId": 1,
+          "institutionId": 2,
+          "name": "Primer Trimestre",
+          "sequenceNumber": 4,
+          "startDate": "2026-05-04",
+          "endDate": "2026-08-07",
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T06:25:51.264Z",
+          "updatedAt": "2026-08-29T08:20:08.830Z"
+        }
+      ],
+      "pass": true
+    }
+  },
+  "log": [
+    {
+      "step": "login-ok",
+      "ts": "2026-08-29T17:56:03.996Z",
+      "hasToken": true
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:04.128Z",
+      "method": "GET",
+      "url": "http://localhost/api/academic-years",
+      "status": 200,
+      "body": [
+        {
+          "id": 1,
+          "name": "2026-2027",
+          "institutionId": 2,
+          "startDate": "2026-05-04",
+          "endDate": "2027-03-05",
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-06-22T06:08:02.038Z",
+          "updatedAt": "2026-08-29T17:55:42.216Z"
+        }
+      ]
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:04.175Z",
+      "method": "GET",
+      "url": "http://localhost/api/academic-years",
+      "status": 200,
+      "body": [
+        {
+          "id": 1,
+          "name": "2026-2027",
+          "institutionId": 2,
+          "startDate": "2026-05-04",
+          "endDate": "2027-03-05",
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-06-22T06:08:02.038Z",
+          "updatedAt": "2026-08-29T17:55:42.216Z"
+        }
+      ]
+    },
+    {
+      "step": "institution-selected",
+      "ts": "2026-08-29T17:56:04.178Z",
+      "institutionId": "2"
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:04.193Z",
+      "method": "GET",
+      "url": "http://localhost/api/quarters",
+      "status": 200,
+      "body": [
+        {
+          "id": 2,
+          "academicYearId": 1,
+          "institutionId": 2,
+          "name": "Segundo Trimestre",
+          "sequenceNumber": 2,
+          "startDate": "2026-08-11",
+          "endDate": "2026-11-06",
+          "description": "Segundo T",
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-28T08:02:28.138Z",
+          "updatedAt": "2026-08-28T15:42:43.940Z"
+        },
+        {
+          "id": 3,
+          "academicYearId": 1,
+          "institutionId": 2,
+          "name": "Tercer Trimestre",
+          "sequenceNumber": 3,
+          "startDate": "2026-11-09",
+          "endDate": "2027-02-24",
+          "description": "Tercer T",
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-28T08:02:28.138Z",
+          "updatedAt": "2026-08-28T15:42:44.002Z"
+        },
+        {
+          "id": 9,
+          "academicYearId": 1,
+          "institutionId": 2,
+          "name": "Primer Trimestre",
+          "sequenceNumber": 4,
+          "startDate": "2026-05-04",
+          "endDate": "2026-08-07",
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T06:25:51.264Z",
+          "updatedAt": "2026-08-29T08:20:08.830Z"
+        }
+      ]
+    },
+    {
+      "step": "baseline-real-data",
+      "ts": "2026-08-29T17:56:04.213Z",
+      "years": [
+        {
+          "id": 1,
+          "name": "2026-2027",
+          "institutionId": 2,
+          "startDate": "2026-05-04",
+          "endDate": "2027-03-05",
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-06-22T06:08:02.038Z",
+          "updatedAt": "2026-08-29T17:55:42.216Z"
+        }
+      ],
+      "quarters": [
+        {
+          "id": 2,
+          "academicYearId": 1,
+          "institutionId": 2,
+          "name": "Segundo Trimestre",
+          "sequenceNumber": 2,
+          "startDate": "2026-08-11",
+          "endDate": "2026-11-06",
+          "description": "Segundo T",
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-28T08:02:28.138Z",
+          "updatedAt": "2026-08-28T15:42:43.940Z"
+        },
+        {
+          "id": 3,
+          "academicYearId": 1,
+          "institutionId": 2,
+          "name": "Tercer Trimestre",
+          "sequenceNumber": 3,
+          "startDate": "2026-11-09",
+          "endDate": "2027-02-24",
+          "description": "Tercer T",
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-28T08:02:28.138Z",
+          "updatedAt": "2026-08-28T15:42:44.002Z"
+        },
+        {
+          "id": 9,
+          "academicYearId": 1,
+          "institutionId": 2,
+          "name": "Primer Trimestre",
+          "sequenceNumber": 4,
+          "startDate": "2026-05-04",
+          "endDate": "2026-08-07",
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T06:25:51.264Z",
+          "updatedAt": "2026-08-29T08:20:08.830Z"
+        }
+      ]
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:04.724Z",
+      "method": "POST",
+      "url": "http://localhost/api/academic-years",
+      "status": 201,
+      "body": {
+        "id": 20,
+        "name": "T17-Smoke-62539",
+        "institutionId": 2,
+        "startDate": null,
+        "endDate": null,
+        "isActive": true,
+        "deletedAt": null,
+        "createdAt": "2026-08-29T17:56:04.655Z",
+        "updatedAt": "2026-08-29T17:56:04.655Z"
+      }
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:04.749Z",
+      "method": "GET",
+      "url": "http://localhost/api/academic-years",
+      "status": 200,
+      "body": [
+        {
+          "id": 20,
+          "name": "T17-Smoke-62539",
+          "institutionId": 2,
+          "startDate": null,
+          "endDate": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        },
+        {
+          "id": 1,
+          "name": "2026-2027",
+          "institutionId": 2,
+          "startDate": "2026-05-04",
+          "endDate": "2027-03-05",
+          "isActive": false,
+          "deletedAt": null,
+          "createdAt": "2026-06-22T06:08:02.038Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        }
+      ]
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:04.755Z",
+      "method": "GET",
+      "url": "http://localhost/api/quarters",
+      "status": 200,
+      "body": [
+        {
+          "id": 86,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Primer Trimestre",
+          "sequenceNumber": 1,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        },
+        {
+          "id": 87,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Segundo Trimestre",
+          "sequenceNumber": 2,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        },
+        {
+          "id": 88,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Tercer Trimestre",
+          "sequenceNumber": 3,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        }
+      ]
+    },
+    {
+      "step": "smoke-year-created",
+      "ts": "2026-08-29T17:56:05.183Z",
+      "smokeYearId": 20,
+      "isActive": true
+    },
+    {
+      "step": "smoke-year-seeded-quarters",
+      "ts": "2026-08-29T17:56:05.200Z",
+      "quarters": [
+        {
+          "id": 86,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Primer Trimestre",
+          "sequenceNumber": 1,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        },
+        {
+          "id": 87,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Segundo Trimestre",
+          "sequenceNumber": 2,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        },
+        {
+          "id": 88,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Tercer Trimestre",
+          "sequenceNumber": 3,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        }
+      ]
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:05.288Z",
+      "method": "GET",
+      "url": "http://localhost/api/quarters",
+      "status": 200,
+      "body": [
+        {
+          "id": 86,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Primer Trimestre",
+          "sequenceNumber": 1,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        },
+        {
+          "id": 87,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Segundo Trimestre",
+          "sequenceNumber": 2,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        },
+        {
+          "id": 88,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Tercer Trimestre",
+          "sequenceNumber": 3,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        }
+      ]
+    },
+    {
+      "step": "dialog-opened-initial-cards",
+      "ts": "2026-08-29T17:56:05.296Z",
+      "count": 3
+    },
+    {
+      "step": "step-i-rename",
+      "ts": "2026-08-29T17:56:05.310Z",
+      "before": "Segundo Trimestre",
+      "after": "Segundo Trimestre (Smoke)"
+    },
+    {
+      "step": "step-ii-add-fourth-period",
+      "ts": "2026-08-29T17:56:05.772Z",
+      "name": "Periodo Extra",
+      "startDate": "2030-01-01",
+      "endDate": "2030-03-31"
+    },
+    {
+      "step": "step-iii-delete-period",
+      "ts": "2026-08-29T17:56:05.990Z",
+      "deletedName": "Primer Trimestre",
+      "deletedQuarterId": 86
+    },
+    {
+      "step": "step-iii-pre-save-snapshot",
+      "ts": "2026-08-29T17:56:06.034Z",
+      "invalidMessages": [],
+      "saveDisabled": false,
+      "cardTexts": [
+        "01\nPrimer Trimestre\ndelete_outline\nNombre del período\nFecha inicio\nFecha fin\nDescripción (opcional)",
+        "02\nSegundo Trimestre (Smoke)\ndelete_outline\nNombre del período\nFecha inicio\nFecha fin\nDescripción (opcional)",
+        "03\nTercer Trimestre\ndelete_outline\nNombre del período\nFecha inicio\nFecha fin\nDescripción (opcional)",
+        "04\nPeriodo Extra\ndelete_outline\nNombre del período\nFecha inicio\nFecha fin\nDescripción (opcional)"
+      ]
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:06.157Z",
+      "method": "DELETE",
+      "url": "http://localhost/api/quarters/86",
+      "status": 204,
+      "body": null
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:06.190Z",
+      "method": "PUT",
+      "url": "http://localhost/api/quarters/87",
+      "status": 200,
+      "body": {
+        "id": 87,
+        "academicYearId": 20,
+        "institutionId": 2,
+        "name": "Segundo Trimestre (Smoke)",
+        "sequenceNumber": 2,
+        "startDate": null,
+        "endDate": null,
+        "description": null,
+        "isActive": true,
+        "deletedAt": null,
+        "createdAt": "2026-08-29T17:56:04.655Z",
+        "updatedAt": "2026-08-29T17:56:06.166Z"
+      }
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:06.202Z",
+      "method": "PUT",
+      "url": "http://localhost/api/quarters/88",
+      "status": 200,
+      "body": {
+        "id": 88,
+        "academicYearId": 20,
+        "institutionId": 2,
+        "name": "Tercer Trimestre",
+        "sequenceNumber": 3,
+        "startDate": null,
+        "endDate": null,
+        "description": null,
+        "isActive": true,
+        "deletedAt": null,
+        "createdAt": "2026-08-29T17:56:04.655Z",
+        "updatedAt": "2026-08-29T17:56:04.655Z"
+      }
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:06.230Z",
+      "method": "POST",
+      "url": "http://localhost/api/quarters",
+      "status": 201,
+      "body": {
+        "id": 89,
+        "academicYearId": 20,
+        "institutionId": 2,
+        "name": "Periodo Extra",
+        "sequenceNumber": 4,
+        "startDate": "2030-01-01",
+        "endDate": "2030-03-31",
+        "description": null,
+        "isActive": true,
+        "deletedAt": null,
+        "createdAt": "2026-08-29T17:56:06.203Z",
+        "updatedAt": "2026-08-29T17:56:06.203Z"
+      }
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:06.340Z",
+      "method": "GET",
+      "url": "http://localhost/api/quarters",
+      "status": 200,
+      "body": [
+        {
+          "id": 87,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Segundo Trimestre (Smoke)",
+          "sequenceNumber": 2,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:06.166Z"
+        },
+        {
+          "id": 88,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Tercer Trimestre",
+          "sequenceNumber": 3,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        },
+        {
+          "id": 89,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Periodo Extra",
+          "sequenceNumber": 4,
+          "startDate": "2030-01-01",
+          "endDate": "2030-03-31",
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:06.203Z",
+          "updatedAt": "2026-08-29T17:56:06.203Z"
+        }
+      ]
+    },
+    {
+      "step": "step-iv-chip-strip-after-save",
+      "ts": "2026-08-29T17:56:06.837Z",
+      "chips": [
+        "Periodo Extra\n2030-01-01 → 2030-03-31",
+        "Segundo Trimestre (Smoke)\n— → —",
+        "Tercer Trimestre\n— → —"
+      ]
+    },
+    {
+      "step": "step-iv-chip-dom-location",
+      "ts": "2026-08-29T17:56:06.842Z",
+      "chipsContainerIsChildOfAdminRow": true,
+      "chipCount": 3
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:06.983Z",
+      "method": "GET",
+      "url": "http://localhost/api/quarters",
+      "status": 200,
+      "body": [
+        {
+          "id": 87,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Segundo Trimestre (Smoke)",
+          "sequenceNumber": 2,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:06.166Z"
+        },
+        {
+          "id": 88,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Tercer Trimestre",
+          "sequenceNumber": 3,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        },
+        {
+          "id": 89,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Periodo Extra",
+          "sequenceNumber": 4,
+          "startDate": "2030-01-01",
+          "endDate": "2030-03-31",
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:06.203Z",
+          "updatedAt": "2026-08-29T17:56:06.203Z"
+        }
+      ]
+    },
+    {
+      "step": "step-v-input-values",
+      "ts": "2026-08-29T17:56:07.158Z",
+      "tercerStartValueBefore": "",
+      "tercerEndValueBefore": "",
+      "tercerStartValueAfter": "1/2/2030",
+      "tercerEndValueAfter": "30/4/2030"
+    },
+    {
+      "step": "step-v-client-side-overlap",
+      "ts": "2026-08-29T17:56:07.165Z",
+      "invalidMessages": [
+        "error_outline\nLas fechas se solapan con Periodo Extra.",
+        "error_outline\nLas fechas se solapan con Periodo Extra."
+      ],
+      "saveDisabled": true
+    },
+    {
+      "step": "step-v-direct-api-overlap-400",
+      "ts": "2026-08-29T17:56:07.339Z",
+      "status": 400,
+      "body": {
+        "error": "Las fechas se solapan con Periodo Extra (2030-01-01 a 2030-03-31)"
+      }
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:07.439Z",
+      "method": "GET",
+      "url": "http://localhost/api/quarters",
+      "status": 200,
+      "body": [
+        {
+          "id": 87,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Segundo Trimestre (Smoke)",
+          "sequenceNumber": 2,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:06.166Z"
+        },
+        {
+          "id": 88,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Tercer Trimestre",
+          "sequenceNumber": 3,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        },
+        {
+          "id": 89,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Periodo Extra",
+          "sequenceNumber": 4,
+          "startDate": "2030-01-01",
+          "endDate": "2030-03-31",
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:06.203Z",
+          "updatedAt": "2026-08-29T17:56:06.203Z"
+        }
+      ]
+    },
+    {
+      "step": "step-vi-duplicate-name-draft-added",
+      "ts": "2026-08-29T17:56:07.905Z",
+      "name": "Periodo Extra",
+      "invalidMessages": [],
+      "saveDisabled": false
+    },
+    {
+      "step": "step-vi-nudge-workaround-applied",
+      "ts": "2026-08-29T17:56:08.342Z",
+      "invalidMessages": [],
+      "saveDisabled": false
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:08.433Z",
+      "method": "PUT",
+      "url": "http://localhost/api/quarters/87",
+      "status": 200,
+      "body": {
+        "id": 87,
+        "academicYearId": 20,
+        "institutionId": 2,
+        "name": "Segundo Trimestre (Smoke)",
+        "sequenceNumber": 2,
+        "startDate": null,
+        "endDate": null,
+        "description": null,
+        "isActive": true,
+        "deletedAt": null,
+        "createdAt": "2026-08-29T17:56:04.655Z",
+        "updatedAt": "2026-08-29T17:56:06.166Z"
+      }
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:08.445Z",
+      "method": "PUT",
+      "url": "http://localhost/api/quarters/88",
+      "status": 200,
+      "body": {
+        "id": 88,
+        "academicYearId": 20,
+        "institutionId": 2,
+        "name": "Tercer Trimestre",
+        "sequenceNumber": 3,
+        "startDate": null,
+        "endDate": null,
+        "description": null,
+        "isActive": true,
+        "deletedAt": null,
+        "createdAt": "2026-08-29T17:56:04.655Z",
+        "updatedAt": "2026-08-29T17:56:04.655Z"
+      }
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:08.458Z",
+      "method": "PUT",
+      "url": "http://localhost/api/quarters/89",
+      "status": 200,
+      "body": {
+        "id": 89,
+        "academicYearId": 20,
+        "institutionId": 2,
+        "name": "Periodo Extra",
+        "sequenceNumber": 4,
+        "startDate": "2030-01-01",
+        "endDate": "2030-03-31",
+        "description": null,
+        "isActive": true,
+        "deletedAt": null,
+        "createdAt": "2026-08-29T17:56:06.203Z",
+        "updatedAt": "2026-08-29T17:56:06.203Z"
+      }
+    },
+    {
+      "step": "console.error",
+      "ts": "2026-08-29T17:56:08.467Z",
+      "text": "Failed to load resource: the server responded with a status of 409 (Conflict)"
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:08.472Z",
+      "method": "POST",
+      "url": "http://localhost/api/quarters",
+      "status": 409,
+      "body": {
+        "error": "Registro duplicado",
+        "detail": "duplicate key value violates unique constraint \"quarters_academic_year_id_name_key\""
+      }
+    },
+    {
+      "step": "step-vi-duplicate-name-result",
+      "ts": "2026-08-29T17:56:08.526Z",
+      "errorToastText": "Registro duplicado",
+      "dupCardHasServerErrorClass": true,
+      "dialogStillOpen": true
+    },
+    {
+      "step": "step-vii-direct-api-delete-already-deleted-404",
+      "ts": "2026-08-29T17:56:08.665Z",
+      "status": 404,
+      "body": {
+        "error": "Trimestre no encontrado"
+      }
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:08.772Z",
+      "method": "GET",
+      "url": "http://localhost/api/quarters",
+      "status": 200,
+      "body": [
+        {
+          "id": 87,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Segundo Trimestre (Smoke)",
+          "sequenceNumber": 2,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:06.166Z"
+        },
+        {
+          "id": 88,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Tercer Trimestre",
+          "sequenceNumber": 3,
+          "startDate": null,
+          "endDate": null,
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:04.655Z",
+          "updatedAt": "2026-08-29T17:56:04.655Z"
+        },
+        {
+          "id": 89,
+          "academicYearId": 20,
+          "institutionId": 2,
+          "name": "Periodo Extra",
+          "sequenceNumber": 4,
+          "startDate": "2030-01-01",
+          "endDate": "2030-03-31",
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T17:56:06.203Z",
+          "updatedAt": "2026-08-29T17:56:06.203Z"
+        }
+      ]
+    },
+    {
+      "step": "step-viii-deleted-all-periods",
+      "ts": "2026-08-29T17:56:09.134Z",
+      "count": 3
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:09.219Z",
+      "method": "DELETE",
+      "url": "http://localhost/api/quarters/87",
+      "status": 204,
+      "body": null
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:09.237Z",
+      "method": "DELETE",
+      "url": "http://localhost/api/quarters/88",
+      "status": 204,
+      "body": null
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:09.275Z",
+      "method": "DELETE",
+      "url": "http://localhost/api/quarters/89",
+      "status": 204,
+      "body": null
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:09.342Z",
+      "method": "GET",
+      "url": "http://localhost/api/quarters",
+      "status": 200,
+      "body": []
+    },
+    {
+      "step": "step-viii-empty-state",
+      "ts": "2026-08-29T17:56:09.890Z",
+      "emptyStateText": "Sin períodos configurados.\nConfigurar trimestres",
+      "emptyStateChipCount": 0
+    },
+    {
+      "step": "network",
+      "ts": "2026-08-29T17:56:10.009Z",
+      "method": "GET",
+      "url": "http://localhost/api/quarters",
+      "status": 200,
+      "body": []
+    },
+    {
+      "step": "step-viii-reopened-via-link",
+      "ts": "2026-08-29T17:56:10.026Z",
+      "reopenedCardCount": 1
+    },
+    {
+      "step": "all-steps-complete",
+      "ts": "2026-08-29T17:56:10.384Z"
+    },
+    {
+      "step": "cleanup-reactivate-real-year",
+      "ts": "2026-08-29T17:56:10.430Z",
+      "status": 200,
+      "body": {
+        "id": 1,
+        "name": "2026-2027",
+        "institutionId": 2,
+        "startDate": "2026-05-04",
+        "endDate": "2027-03-05",
+        "isActive": true,
+        "deletedAt": null,
+        "createdAt": "2026-06-22T06:08:02.038Z",
+        "updatedAt": "2026-08-29T17:56:10.388Z"
+      }
+    },
+    {
+      "step": "cleanup-delete-smoke-year",
+      "ts": "2026-08-29T17:56:10.493Z",
+      "status": 204,
+      "body": null
+    },
+    {
+      "step": "cleanup-verify-final-state",
+      "ts": "2026-08-29T17:56:10.525Z",
+      "years": [
+        {
+          "id": 1,
+          "name": "2026-2027",
+          "institutionId": 2,
+          "startDate": "2026-05-04",
+          "endDate": "2027-03-05",
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-06-22T06:08:02.038Z",
+          "updatedAt": "2026-08-29T17:56:10.388Z"
+        }
+      ],
+      "quarters": [
+        {
+          "id": 2,
+          "academicYearId": 1,
+          "institutionId": 2,
+          "name": "Segundo Trimestre",
+          "sequenceNumber": 2,
+          "startDate": "2026-08-11",
+          "endDate": "2026-11-06",
+          "description": "Segundo T",
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-28T08:02:28.138Z",
+          "updatedAt": "2026-08-28T15:42:43.940Z"
+        },
+        {
+          "id": 3,
+          "academicYearId": 1,
+          "institutionId": 2,
+          "name": "Tercer Trimestre",
+          "sequenceNumber": 3,
+          "startDate": "2026-11-09",
+          "endDate": "2027-02-24",
+          "description": "Tercer T",
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-28T08:02:28.138Z",
+          "updatedAt": "2026-08-28T15:42:44.002Z"
+        },
+        {
+          "id": 9,
+          "academicYearId": 1,
+          "institutionId": 2,
+          "name": "Primer Trimestre",
+          "sequenceNumber": 4,
+          "startDate": "2026-05-04",
+          "endDate": "2026-08-07",
+          "description": null,
+          "isActive": true,
+          "deletedAt": null,
+          "createdAt": "2026-08-29T06:25:51.264Z",
+          "updatedAt": "2026-08-29T08:20:08.830Z"
+        }
+      ]
+    }
+  ]
+}
