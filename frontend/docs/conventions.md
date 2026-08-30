@@ -84,6 +84,27 @@ component with a leaky contract.
   `verify_command`.
 - **Fixture/isolation convention:** N/A until a framework is chosen.
 
+## Smoke scripts
+
+Smoke tests live **inline in `progress/impl_<feature>.md`** as markdown steps
+plus visual references (PNGs, JSONs in `progress/`). Do **not** create new
+`.mjs` smoke scripts in `frontend/scripts/` or `progress/smoke/` — these are
+not part of the project's testing infrastructure, and the convention is
+to keep smoke procedures human-readable so future styling agents can
+follow the steps without re-running a brittle Playwright script.
+
+`frontend/scripts/` is reserved for **harness-installed scripts only**
+(`harness.sh`, `lib.sh`, `snapshot.sh`, `notion_*.sh`, `sync_postgres.sh`,
+`dev_jwt.sh` — copied by `install.sh` from the harness template, never
+edited in place). Project scratch files created during styling or
+verification that happen to live under `frontend/scripts/` are kept there
+as ephemeral local-only files via `.git/info/exclude`; they are **not**
+intended to be re-run or versioned.
+
+The visual outputs of past smokes (screenshots, JSON transcripts) stay in
+`progress/` as the durable record — they are the actual artifacts future
+agents reference when restyling a similar surface.
+
 ## Error Handling
 
 - HTTP-layer errors: centralized in `error.interceptor.ts` (401 → forced
