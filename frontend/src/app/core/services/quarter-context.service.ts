@@ -56,7 +56,18 @@ export class QuarterContextService {
   async load(): Promise<void> {
     const academicYearId = this.academicYearContext.selectedId();
     const list = await this.quarterService.getAll(academicYearId ?? undefined);
-    const sorted = [...list].sort((a, b) => a.sequenceNumber - b.sequenceNumber);
+    // Ordinal `sequenceNumber` y orden cronológico no siempre coinciden (un
+    // "Primer Trimestre" creado/numerado después puede arrancar antes en el
+    // año calendario). Ordenamos por `startDate` ascendente para que el
+    // dropdown, los pills de los export dialogs y cualquier consumidor de
+    // `context.quarters()` muestren el orden cronológico real; los quarters
+    // sin `startDate` van al final, con orden estable entre iguales.
+    const sorted = [...list].sort((a, b) => {
+      if (a.startDate === null && b.startDate === null) return 0;
+      if (a.startDate === null) return 1;
+      if (b.startDate === null) return -1;
+      return a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0;
+    });
     this._quarters.set(sorted);
     const { id, isFallback, direction } = computeDefaultQuarter(sorted, dateToDateString(new Date()));
     this._defaultQuarterId.set(id);

@@ -203,7 +203,8 @@ export class ExcelExportDialogComponent implements OnInit {
     this.generating.set(true);
     try {
       const courseIds = this.selCourseIds.join(',');
-      const url = `/api/export/excel?course_ids=${courseIds}&academic_year_id=${year.id}&date_from=${dateToDateString(this.dateFrom)}&date_to=${dateToDateString(this.dateTo)}`;
+      const quarterParam = this.activeQuarterId() !== null ? '&quarter_id=' + this.activeQuarterId() : '';
+      const url = '/api/export/excel?course_ids=' + courseIds + '&academic_year_id=' + year.id + '&date_from=' + dateToDateString(this.dateFrom) + '&date_to=' + dateToDateString(this.dateTo) + quarterParam;
       const blob = await firstValueFrom(this.http.get(url, { responseType: 'blob' }));
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');

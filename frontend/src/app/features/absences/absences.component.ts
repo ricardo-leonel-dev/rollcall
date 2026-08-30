@@ -18,6 +18,7 @@ import { Course, Enrollment, Absence, VoiceAbsenceResult, PhotoAbsencePreview, P
 import { dateToDateString, dateStringToDate } from '../../shared/utils/date.util';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { QuarterContextService } from '../../core/services/quarter-context.service';
 import { QuarterSelectorComponent } from '../../shared/components/quarter-selector/quarter-selector.component';
 import { DEFAULT_NOTIFICATION_TEMPLATE } from '../../shared/components/profile-dialog/profile-dialog.component';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
@@ -661,6 +662,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   readonly academicYearContext = inject(AcademicYearContextService);
+  private readonly quarterContext = inject(QuarterContextService);
 
   readonly courses = signal<Course[]>([]);
   readonly enrollments = signal<Enrollment[]>([]);
@@ -696,6 +698,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   private voiceTimer: ReturnType<typeof setInterval> | null = null;
 
   async ngOnInit(): Promise<void> {
+    this.applyDefaultQuarter();
     const [courses, me] = await Promise.all([
       firstValueFrom(this.http.get<Course[]>('/api/courses')),
       firstValueFrom(this.http.get<{ notificationTemplate: string | null }>('/api/auth/me')),
@@ -798,6 +801,16 @@ export class AbsencesComponent implements OnInit, OnDestroy {
     this.onFiltersChange();                                // Foto / Manual / Listado
     this.loadTodayAbsences();                              // badges "marcado hoy" del Manual
     if (this.selectedTabIndex === 4) this.loadVoiceLogs(); // Historial si está abierto
+  }
+
+  private applyDefaultQuarter(): void {
+    const id = this.quarterContext.defaultQuarterId();
+    if (id === null) return;
+    const q = this.quarterContext.quarters().find(qq => qq.id === id);
+    if (!q || !q.startDate || !q.endDate) return;
+    this.dateFrom = dateStringToDate(q.startDate);
+    this.dateTo = dateStringToDate(q.endDate);
+    this.lastAppliedQuarterId = q.id;
   }
 
   onDrop(e: DragEvent): void {

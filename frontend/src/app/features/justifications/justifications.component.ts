@@ -16,6 +16,7 @@ import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { QuarterContextService } from '../../core/services/quarter-context.service';
 import { QuarterSelectorComponent } from '../../shared/components/quarter-selector/quarter-selector.component';
 import { JustificationCreateDialogComponent, JustifyGroup } from './justification-create-dialog.component';
 
@@ -326,6 +327,7 @@ export class JustificationsComponent implements OnInit {
   private readonly notify = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
   readonly academicYearContext = inject(AcademicYearContextService);
+  private readonly quarterContext = inject(QuarterContextService);
 
   readonly courses = signal<Course[]>([]);
 
@@ -382,6 +384,7 @@ export class JustificationsComponent implements OnInit {
   );
 
   async ngOnInit(): Promise<void> {
+    this.applyDefaultQuarter();
     this.courses.set(await firstValueFrom(this.http.get<Course[]>('/api/courses')));
     const active = this.academicYearContext.selected();
     if (active) this.selYear = active.id;
@@ -457,6 +460,16 @@ export class JustificationsComponent implements OnInit {
     this.selQuarterStart = dateStringToDate(q.startDate);   // R6 — campos cargan el rango del período
     this.selQuarterEnd = dateStringToDate(q.endDate);
     this.onCourseChange();                                 // loadHistorial + loadPendingStudents en paralelo
+  }
+
+  private applyDefaultQuarter(): void {
+    const id = this.quarterContext.defaultQuarterId();
+    if (id === null) return;
+    const q = this.quarterContext.quarters().find(qq => qq.id === id);
+    if (!q || !q.startDate || !q.endDate) return;
+    this.selQuarterStart = dateStringToDate(q.startDate);
+    this.selQuarterEnd = dateStringToDate(q.endDate);
+    this.lastAppliedQuarterId = q.id;
   }
 
   async onStudentCreateChange(): Promise<void> {
