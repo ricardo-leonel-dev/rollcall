@@ -1,0 +1,47 @@
+[
+  {
+    "step": "login",
+    "ts": "2026-08-29T23:16:20.938Z",
+    "status": 200,
+    "role": "superadmin"
+  },
+  {
+    "step": "url",
+    "ts": "2026-08-29T23:16:23.256Z",
+    "url": "http://localhost:4321/inspectors/dashboard"
+  },
+  {
+    "step": "selector count",
+    "ts": "2026-08-29T23:16:23.325Z",
+    "count": 1
+  },
+  {
+    "step": "mat-select count",
+    "ts": "2026-08-29T23:16:23.328Z",
+    "count": 1
+  },
+  {
+    "step": "option texts",
+    "ts": "2026-08-29T23:16:23.809Z",
+    "texts": [
+      "Segundo Trimestre",
+      "Tercer Trimestre",
+      "Primer Trimestre"
+    ]
+  },
+  {
+    "step": "default selected text",
+    "ts": "2026-08-29T23:16:24.018Z",
+    "text": "Segundo Trimestre"
+  },
+  {
+    "step": "fallback / no-dates note count",
+    "ts": "2026-08-29T23:16:24.020Z",
+    "count": 0
+  },
+  {
+    "step": "chart header after selecting T1",
+    "ts": "2026-08-29T23:16:25.328Z",
+    "label": "Inasistencias — 2026-05-04 – 2026-08-07"
+  }
+]

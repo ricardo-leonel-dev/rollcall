@@ -31,3 +31,6 @@ pgdata/
 # Misc
 agente-ocr/output/
 *.log
+
+# Compiled Go binary (built locally, never committed)
+excel-service/excel-service

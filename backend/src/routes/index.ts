@@ -4,6 +4,7 @@ import { institutionMiddleware } from '../middleware/institution.middleware';
 
 import authRouter            from '../controllers/auth.controller';
 import academicYearRouter    from '../controllers/academic-year.controller';
+import quarterRouter         from '../controllers/quarter.controller';
 import courseRouter          from '../controllers/course.controller';
 import courseAYRouter        from '../controllers/course-academic-year.controller';
 import guardianRouter        from '../controllers/guardian.controller';
@@ -35,6 +36,7 @@ router.use(authMiddleware);
 router.use(institutionMiddleware);
 
 router.use('/academic-years',       academicYearRouter);
+router.use('/quarters',             quarterRouter);
 router.use('/courses',              courseRouter);
 router.use('/course-academic-year', courseAYRouter);
 router.use('/guardians',            guardianRouter);

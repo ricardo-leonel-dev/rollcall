@@ -3,6 +3,7 @@ import { AppDataSource } from '../data-source';
 import { AcademicYear } from '../entities/AcademicYear';
 import { Enrollment } from '../entities/Enrollment';
 import { cascadeSoftDeleteEnrollment } from './enrollment.service';
+import { assertQuartersFitAcademicYearRange, cascadeSoftDeleteQuarters, seedQuarters } from './quarter.service';
 
 const repo = () => AppDataSource.getRepository(AcademicYear);
 
@@ -32,15 +33,29 @@ export async function create(institutionId: number, data: { name: string; startD
       endDate: data.endDate ?? null,
       isActive: true,
     });
-    return em.save(ay);
+    const saved = await em.save(ay);
+    await seedQuarters(em, saved.id);
+    return saved;
   });
 }
 
 export async function update(institutionId: number, id: number, data: Partial<{ name: string; startDate: string; endDate: string; isActive: boolean }>) {
   const ay = await findById(institutionId, id);
+  const changesDates =
+    (data.startDate !== undefined && data.startDate !== ay.startDate) ||
+    (data.endDate !== undefined && data.endDate !== ay.endDate);
+
   if (data.isActive === true && !ay.isActive) {
     return AppDataSource.transaction(async (em) => {
+      if (changesDates) await assertQuartersFitAcademicYearRange(em, id, data.startDate ?? ay.startDate, data.endDate ?? ay.endDate);
       await em.update(AcademicYear, { institutionId, isActive: true }, { isActive: false });
+      Object.assign(ay, data);
+      return em.save(ay);
+    });
+  }
+  if (changesDates) {
+    return AppDataSource.transaction(async (em) => {
+      await assertQuartersFitAcademicYearRange(em, id, data.startDate ?? ay.startDate, data.endDate ?? ay.endDate);
       Object.assign(ay, data);
       return em.save(ay);
     });
@@ -54,6 +69,7 @@ export async function remove(institutionId: number, id: number) {
   await AppDataSource.transaction(async (em) => {
     const enrollments = await em.find(Enrollment, { where: { academicYearId: id, deletedAt: IsNull() } });
     for (const e of enrollments) await cascadeSoftDeleteEnrollment(em, e.id);
+    await cascadeSoftDeleteQuarters(em, id);
     await em.update(AcademicYear, { id }, { deletedAt: new Date(), isActive: false });
   });
 }

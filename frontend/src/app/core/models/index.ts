@@ -6,6 +6,20 @@ export interface AcademicYear {
   isActive: boolean;
 }
 
+export interface Quarter {
+  id: number;
+  academicYearId: number;
+  institutionId: number;
+  name: string;
+  sequenceNumber: number;
+  startDate: string | null;
+  endDate: string | null;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Course {
   id: number;
   name: string;

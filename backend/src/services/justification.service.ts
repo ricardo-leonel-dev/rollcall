@@ -30,8 +30,26 @@ export async function findAll(
   enrollmentId?: number,
   courseId?: number,
   academicYearId?: number,
+  dateFrom?: string,
+  dateTo?: string,
 ) {
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  if (dateFrom !== undefined && !DATE_RE.test(dateFrom)) {
+    throw Object.assign(new Error('date_from debe tener formato YYYY-MM-DD'), { status: 400 });
+  }
+  if (dateTo !== undefined && !DATE_RE.test(dateTo)) {
+    throw Object.assign(new Error('date_to debe tener formato YYYY-MM-DD'), { status: 400 });
+  }
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    throw Object.assign(new Error('date_from debe ser menor o igual a date_to'), { status: 400 });
+  }
+
   const params: any[] = [institutionId];
+  let dateFromIdx: number | undefined;
+  let dateToIdx: number | undefined;
+  if (dateFrom) { params.push(dateFrom); dateFromIdx = params.length; }
+  if (dateTo)   { params.push(dateTo);   dateToIdx   = params.length; }
+
   let courseFilter = '';
   if (courseIds !== null) {
     params.push(courseIds);
@@ -51,6 +69,20 @@ export async function findAll(
   if (enrollmentId) {
     params.push(enrollmentId);
     enrollmentFilter = `AND j.enrollment_id = $${params.length}`;
+  }
+
+  // AC #1: filtra por al menos una falta vinculada dentro del rango (solo si dateFrom/dateTo están presentes).
+  let dateFilter = '';
+  if (dateFromIdx || dateToIdx) {
+    dateFilter = `
+    AND EXISTS (
+      SELECT 1 FROM justification_absences ja
+      JOIN absences a ON a.id = ja.absence_id
+      WHERE ja.justification_id = j.id
+        AND a.deleted_at IS NULL
+        ${dateFromIdx ? `AND a.date >= $${dateFromIdx}` : ''}
+        ${dateToIdx   ? `AND a.date <= $${dateToIdx}`   : ''}
+    )`;
   }
 
   // Subqueries correlacionadas (una por array) en vez de LEFT JOIN + GROUP BY:
@@ -99,6 +131,7 @@ export async function findAll(
     JOIN students s ON s.id = e.student_id
     JOIN courses c ON c.id = e.course_id
     WHERE j.institution_id = $1 AND j.deleted_at IS NULL
+    ${dateFilter}
     ${courseFilter}
     ${specificCourseFilter}
     ${academicYearFilter}

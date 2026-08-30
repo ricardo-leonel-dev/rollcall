@@ -14,7 +14,7 @@ router.get('/excel', requirePermission('export','read'), async (req, res) => {
     return;
   }
 
-  const { course_ids, academic_year_id, date_from, date_to } = req.query as Record<string, string>;
+  const { course_ids, academic_year_id, date_from, date_to, quarter_id } = req.query as Record<string, string>;
   if (!course_ids || !academic_year_id || !date_from || !date_to) {
     res.status(400).json({ error: 'course_ids, academic_year_id, date_from, date_to son requeridos' });
     return;
@@ -26,6 +26,15 @@ router.get('/excel', requirePermission('export','read'), async (req, res) => {
     return;
   }
 
+  let quarterId: number | undefined;
+  if (quarter_id !== undefined) {
+    quarterId = parseInt(quarter_id, 10);
+    if (isNaN(quarterId) || quarterId <= 0) {
+      res.status(400).json({ error: 'quarter_id debe ser un entero positivo' });
+      return;
+    }
+  }
+
   if (req.courseIds) {
     const unauthorized = courseIds.filter(id => !req.courseIds!.includes(id));
     if (unauthorized.length > 0) {
@@ -35,7 +44,7 @@ router.get('/excel', requirePermission('export','read'), async (req, res) => {
   }
 
   const signers = await getSigners(req.institutionId);
-  const ocrResp = await svc.exportExcel(req.institutionId, courseIds, +academic_year_id, date_from, date_to, signers);
+  const ocrResp = await svc.exportExcel(req.institutionId, courseIds, +academic_year_id, date_from, date_to, signers, quarterId);
 
   const contentType = ocrResp.headers.get('content-type') || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   const disposition = ocrResp.headers.get('content-disposition') || 'attachment; filename="asistencia.xlsx"';

@@ -56,6 +56,24 @@ bottom, as seen throughout `src/app`:
 Component decorator field order: `standalone`, `changeDetection`, `imports`,
 `host` (if any), `styles`, `template`.
 
+## Reusability
+
+Before building a component or service that's specific to one screen, check
+whether the same concern will plausibly show up elsewhere (list views,
+dialogs, other feature pages) and, if so, build it as a standalone,
+composable unit from the start — not a bigger refactor after the second
+screen needs it. In practice this means: no host-specific assumptions baked
+into a shared component's public contract (avoid required `@Input()`s a
+future consumer can't supply); prefer injecting a shared context
+service directly over threading the same 2-3 bindings through every host
+(the existing `AcademicYearContextService`/year-switcher pattern, and
+`QuarterContextService`/`QuarterSelectorComponent` built the same way, are
+the reference examples); keep the component's own template/styles ignorant
+of which page it's rendered on. This is a bias, not a mandate — don't build
+a generic abstraction for a concern that's genuinely one-off; three similar
+inline blocks across unrelated pages is still better than a premature shared
+component with a leaky contract.
+
 ## Tests
 
 - **Test file location/naming:** none exist yet in this project — no
@@ -65,6 +83,27 @@ Component decorator field order: `standalone`, `changeDetection`, `imports`,
   exact run command in `docs/verification.md` and `.harness.json`'s
   `verify_command`.
 - **Fixture/isolation convention:** N/A until a framework is chosen.
+
+## Smoke scripts
+
+Smoke tests live **inline in `progress/impl_<feature>.md`** as markdown steps
+plus visual references (PNGs, JSONs in `progress/`). Do **not** create new
+`.mjs` smoke scripts in `frontend/scripts/` or `progress/smoke/` — these are
+not part of the project's testing infrastructure, and the convention is
+to keep smoke procedures human-readable so future styling agents can
+follow the steps without re-running a brittle Playwright script.
+
+`frontend/scripts/` is reserved for **harness-installed scripts only**
+(`harness.sh`, `lib.sh`, `snapshot.sh`, `notion_*.sh`, `sync_postgres.sh`,
+`dev_jwt.sh` — copied by `install.sh` from the harness template, never
+edited in place). Project scratch files created during styling or
+verification that happen to live under `frontend/scripts/` are kept there
+as ephemeral local-only files via `.git/info/exclude`; they are **not**
+intended to be re-run or versioned.
+
+The visual outputs of past smokes (screenshots, JSON transcripts) stay in
+`progress/` as the durable record — they are the actual artifacts future
+agents reference when restyling a similar surface.
 
 ## Error Handling
 
