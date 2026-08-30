@@ -14,10 +14,11 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { DecimalPipe, DatePipe, SlicePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
-import { Course, Enrollment, Absence, VoiceAbsenceResult, PhotoAbsencePreview, PhotoAbsenceItem } from '../../core/models/index';
-import { dateToDateString } from '../../shared/utils/date.util';
+import { Course, Enrollment, Absence, VoiceAbsenceResult, PhotoAbsencePreview, PhotoAbsenceItem, Quarter } from '../../core/models/index';
+import { dateToDateString, dateStringToDate } from '../../shared/utils/date.util';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { QuarterSelectorComponent } from '../../shared/components/quarter-selector/quarter-selector.component';
 import { DEFAULT_NOTIFICATION_TEMPLATE } from '../../shared/components/profile-dialog/profile-dialog.component';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -44,7 +45,7 @@ interface VoiceLog {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule,
             MatButtonModule, MatIconModule, MatTooltipModule, MatMenuModule, MatDatepickerModule,
-            WhatsappIconComponent, DecimalPipe, DatePipe, SlicePipe],
+            WhatsappIconComponent, QuarterSelectorComponent, DecimalPipe, DatePipe, SlicePipe],
   styles: [`
     .tab-content { padding: 20px 0; }
     @keyframes pulse-mic {
@@ -105,6 +106,7 @@ interface VoiceLog {
 
     <!-- Filtros comunes -->
     <div class="filter-bar">
+      <app-quarter-selector (quarterChange)="onQuarterChange($event)" />
       <mat-form-field appearance="outline" style="width:220px">
         <mat-label>Curso</mat-label>
         <mat-select [(ngModel)]="selCourse" (ngModelChange)="onFiltersChange()">
@@ -679,6 +681,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   private currentVoiceJobId: string | null = null;
   private photoPollingActive = false;
   private voiceLogsLoaded = false;
+  private lastAppliedQuarterId: number | null = null;
   selYear: number | null = null;
   selCourse: number | null = null;
   photoDate: Date | null = null;
@@ -734,9 +737,10 @@ export class AbsencesComponent implements OnInit, OnDestroy {
 
   async loadTodayAbsences(): Promise<void> {
     if (!this.selCourse) { this.todayAbsences.set([]); return; }
-    const today = this.todayStr();
+    const from = dateToDateString(this.dateFrom);
+    const to = dateToDateString(this.dateTo);
     const data = await firstValueFrom(
-      this.http.get<Absence[]>(`/api/absences?course_id=${this.selCourse}&date_from=${today}&date_to=${today}`)
+      this.http.get<Absence[]>(`/api/absences?course_id=${this.selCourse}&date_from=${from}&date_to=${to}`)
     );
     this.todayAbsences.set(data);
   }
@@ -775,11 +779,25 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   }
 
   clearFilters(): void {
+    // 'Limpiar' es local a los sub-filtros del Listado — el dropdown de período
+    // (R11) se preserva; el usuario puede re-aplicar re-seleccionando un período.
     this.dateFrom = null;
     this.dateTo = null;
     this.filterType = '';
     this.studentSearch = '';
     this.loadAbsences();
+  }
+
+  onQuarterChange(q: Quarter | null): void {
+    if (!q || !q.startDate || !q.endDate) return;          // R12 — período sin fechas completas, no-op
+    if (q.id === this.lastAppliedQuarterId) return;        // mismo período re-seleccionado: no toca los pickers
+    this.lastAppliedQuarterId = q.id;
+    this.dateFrom = dateStringToDate(q.startDate);         // R2 — semilla en los pickers del Listado
+    this.dateTo = dateStringToDate(q.endDate);             // (sobreescribe ediciones manuales desde el último pick)
+    this.voiceLogsLoaded = false;                          // fuerza refresh del Historial en la próxima visita
+    this.onFiltersChange();                                // Foto / Manual / Listado
+    this.loadTodayAbsences();                              // badges "marcado hoy" del Manual
+    if (this.selectedTabIndex === 4) this.loadVoiceLogs(); // Historial si está abierto
   }
 
   onDrop(e: DragEvent): void {

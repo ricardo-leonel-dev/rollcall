@@ -11,16 +11,18 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule, MatTooltip } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
-import { Justification, Course, Absence } from '../../core/models/index';
+import { Justification, Course, Absence, Quarter } from '../../core/models/index';
+import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { QuarterSelectorComponent } from '../../shared/components/quarter-selector/quarter-selector.component';
 import { JustificationCreateDialogComponent, JustifyGroup } from './justification-create-dialog.component';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule, MatTooltipModule],
+  imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule, MatTooltipModule, QuarterSelectorComponent],
   styles: [`
     .tab-content { padding: 20px 0; }
     .detail-stamps { display: inline-flex; gap: 4px; cursor: pointer; padding: 2px; border-radius: 8px; transition: background .12s ease; }
@@ -75,6 +77,7 @@ import { JustificationCreateDialogComponent, JustifyGroup } from './justificatio
 
     <!-- Filtro de curso compartido entre tabs -->
     <div class="filter-bar" style="margin-bottom:0;border-radius:var(--radius-lg) var(--radius-lg) 0 0;border-bottom:none">
+      <app-quarter-selector (quarterChange)="onQuarterChange($event)" />
       <mat-form-field appearance="outline" style="width:220px">
         <mat-label>Curso</mat-label>
         <mat-select [(ngModel)]="selCourse" (ngModelChange)="onCourseChange()">
@@ -330,6 +333,12 @@ export class JustificationsComponent implements OnInit {
   selectedTabIndex = 0;
   selYear: number | null = null;
   selCourse: number | null = null;
+  // R9: Justificaciones no tiene pickers en la página, así que estos campos
+  // cachean el rango del período seleccionado y son la única fuente de fechas
+  // para los loaders (loadHistorial + loadPendingStudents).
+  selQuarterStart: Date | null = null;
+  selQuarterEnd: Date | null = null;
+  private lastAppliedQuarterId: number | null = null;
 
   // ─── Tab 1: Nueva justificación ───────────────────────────────────────────
   readonly pendingStudents = signal<{ enrollmentId: number; fullName: string }[]>([]);
@@ -397,6 +406,10 @@ export class JustificationsComponent implements OnInit {
       const params: string[] = [];
       if (this.selYear)   params.push(`academic_year_id=${this.selYear}`);
       if (this.selCourse) params.push(`course_id=${this.selCourse}`);
+      if (this.selQuarterStart && this.selQuarterEnd) {
+        params.push(`date_from=${dateToDateString(this.selQuarterStart)}`);
+        params.push(`date_to=${dateToDateString(this.selQuarterEnd)}`);
+      }
       const qs = params.length ? '?' + params.join('&') : '';
       const data = await firstValueFrom(this.http.get<Justification[]>(`/api/justifications${qs}`));
       this.allJustifications.set(data);
@@ -405,10 +418,17 @@ export class JustificationsComponent implements OnInit {
 
   async loadPendingStudents(): Promise<void> {
     if (!this.selYear || !this.selCourse) { this.pendingStudents.set([]); return; }
+    const params: string[] = [
+      `course_id=${this.selCourse}`,
+      `academic_year_id=${this.selYear}`,
+      `is_justified=false`,
+    ];
+    if (this.selQuarterStart && this.selQuarterEnd) {
+      params.push(`date_from=${dateToDateString(this.selQuarterStart)}`);
+      params.push(`date_to=${dateToDateString(this.selQuarterEnd)}`);
+    }
     const pending = await firstValueFrom(
-      this.http.get<Absence[]>(
-        `/api/absences?course_id=${this.selCourse}&academic_year_id=${this.selYear}&is_justified=false`
-      )
+      this.http.get<Absence[]>(`/api/absences?${params.join('&')}`)
     );
     const seen = new Map<number, string>();
     for (const a of pending) {
@@ -428,6 +448,15 @@ export class JustificationsComponent implements OnInit {
     this.selectedIds.set(new Set());
     this.currentPage.set(0);
     await Promise.all([this.loadHistorial(), this.loadPendingStudents()]);
+  }
+
+  onQuarterChange(q: Quarter | null): void {
+    if (!q || !q.startDate || !q.endDate) return;          // R12 — período sin fechas completas, no-op
+    if (q.id === this.lastAppliedQuarterId) return;        // mismo período re-seleccionado: no toca los campos
+    this.lastAppliedQuarterId = q.id;
+    this.selQuarterStart = dateStringToDate(q.startDate);   // R6 — campos cargan el rango del período
+    this.selQuarterEnd = dateStringToDate(q.endDate);
+    this.onCourseChange();                                 // loadHistorial + loadPendingStudents en paralelo
   }
 
   async onStudentCreateChange(): Promise<void> {
