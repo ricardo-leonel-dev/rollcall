@@ -10,7 +10,7 @@ export interface Quarter {
   id: number;
   academicYearId: number;
   institutionId: number;
-  name: 'Primer Trimestre' | 'Segundo Trimestre' | 'Tercer Trimestre';
+  name: string;
   sequenceNumber: number;
   startDate: string | null;
   endDate: string | null;

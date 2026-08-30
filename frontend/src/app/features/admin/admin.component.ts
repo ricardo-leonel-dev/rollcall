@@ -11,7 +11,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { firstValueFrom, map } from 'rxjs';
-import { AcademicYear, Course, User, Role, RolePermission, Institution } from '../../core/models/index';
+import { AcademicYear, Course, User, Role, RolePermission, Institution, Quarter } from '../../core/models/index';
 import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
@@ -20,7 +20,7 @@ import { QuarterService } from '../../core/services/quarter.service';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { InstitutionDialogComponent } from './institution-dialog.component';
 import { AcademicYearDialogComponent, AcademicYearDialogResult } from './academic-year-dialog.component';
-import { QuartersDialogComponent } from './quarters-dialog.component';
+import { QuartersDialogComponent, QuartersDialogResult } from './quarters-dialog.component';
 import { CourseDialogComponent } from './course-dialog.component';
 import { UserDialogComponent } from './user-dialog.component';
 import { UserPermissionsDialogComponent } from './user-permissions-dialog.component';
@@ -35,14 +35,49 @@ import { MODULE_KEYS } from '../../core/nav-items';
   styles: [`
     .tab-content { padding: 20px; }
     .admin-row {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
       padding: 12px 16px; background: var(--paper); border-radius: 12px; border: 1px solid var(--border);
       margin-bottom: 8px;
     }
     .admin-row-actions { display: flex; align-items: center; gap: 8px; }
+    .admin-row-quarters {
+      display: flex; flex-direction: row; justify-content: center;
+      flex: 1; min-width: 0;
+    }
+    .quarter-chip-list {
+      display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+      min-width: 0;
+    }
+    .period-chip {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px;
+      max-width: 100%; min-width: 0; box-sizing: border-box;
+      background: var(--paper-deep);
+      border: 1px solid var(--border-soft);
+      border-left: 2px solid var(--accent);
+      border-radius: var(--radius-sm);
+    }
+    .period-chip-name {
+      font-family: 'Nunito', sans-serif; font-weight: 600; font-size: 13px;
+      color: var(--ink);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+    }
+    .period-chip-range {
+      font-family: 'Nunito', sans-serif; font-weight: 400; font-size: 11px;
+      color: var(--muted-strong); white-space: nowrap;
+    }
+    .period-chip-empty {
+      font-family: 'Nunito', sans-serif; font-weight: 400; font-size: 12px;
+      color: var(--muted-strong);
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .period-chip-cta {
+      color: var(--accent); font-weight: 600; cursor: pointer; text-decoration: none;
+    }
+    .period-chip-cta:hover { text-decoration: underline; }
     @media (max-width: 1280px) {
       .admin-row { flex-direction: column; align-items: flex-start; }
       .admin-row-actions { flex-wrap: wrap; width: 100%; }
+      .admin-row-quarters { width: 100%; }
     }
     .user-avatar {
       width: 36px; height: 36px; border-radius: 9px;
@@ -129,6 +164,24 @@ import { MODULE_KEYS } from '../../core/nav-items';
                   <div style="font-size:12px;color:var(--muted)">{{y.startDate ?? '—'}} → {{y.endDate ?? '—'}}</div>
                 </div>
               </div>
+              @if (y.isActive) {
+                @let rows = quarterRowsFor(y.id);
+                <div class="admin-row-quarters">
+                  <div class="quarter-chip-list">
+                    @for (q of rows; track q.id) {
+                      <span class="period-chip" title="{{q.name}} · {{q.startDate ?? '—'}} → {{q.endDate ?? '—'}}">
+                        <span class="period-chip-name">{{q.name}}</span>
+                        <span class="period-chip-range">{{q.startDate ?? '—'}} → {{q.endDate ?? '—'}}</span>
+                      </span>
+                    } @empty {
+                      <span class="period-chip-empty">
+                        Sin períodos configurados.
+                        <a class="period-chip-cta" (click)="openQuartersDialog(y)">Configurar trimestres</a>
+                      </span>
+                    }
+                  </div>
+                </div>
+              }
               <div class="admin-row-actions">
                 <span [class]="y.isActive ? 'badge-J' : 'badge-gray'">{{y.isActive ? 'Activo' : 'Inactivo'}}</span>
                 @if (y.isActive) {
@@ -412,6 +465,32 @@ export class AdminComponent implements OnInit {
   readonly importLoading = signal(false);
   readonly importResult = signal<any>(null);
 
+  private readonly _quartersByYear = signal<Map<number, Quarter[]>>(new Map());
+  readonly quartersByYear = this._quartersByYear.asReadonly();
+
+  // Ordered by startDate ascending (chronological display), not by
+  // sequenceNumber — real-world quarter numbering doesn't always match
+  // calendar order (e.g. a "Primer Trimestre" created/numbered later that
+  // actually starts earliest in the year). The displayed ordinal
+  // (`q.sequenceNumber`) is left untouched; only the list order changes.
+  // Quarters without a startDate are pushed to the end, in a stable order.
+  quarterRowsFor(yearId: number): readonly Quarter[] {
+    return (this._quartersByYear().get(yearId) ?? [])
+      .slice()
+      .sort((a, b) => {
+        if (a.startDate === null && b.startDate === null) return 0;
+        if (a.startDate === null) return 1;
+        if (b.startDate === null) return -1;
+        return a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0;
+      });
+  }
+
+  private setQuartersForYear(yearId: number, quarters: readonly Quarter[]): void {
+    const next = new Map(this._quartersByYear());
+    next.set(yearId, [...quarters]);
+    this._quartersByYear.set(next);
+  }
+
   selRole: number | null = null;
 
   readonly activeTab = toSignal(
@@ -447,13 +526,17 @@ export class AdminComponent implements OnInit {
     if (!noInstitutionYet) await this.academicYearContext.load();
     const yearId = this.academicYearContext.selectedId();
     const usersUrl = yearId ? `/api/users?academic_year_id=${yearId}` : '/api/users';
-    const [courses, users, roles] = await Promise.all([
+    const [courses, users, roles, quarters] = await Promise.all([
       noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<Course[]>('/api/courses')).catch(() => []),
       noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<User[]>(usersUrl)).catch(() => []),
       firstValueFrom(this.http.get<Role[]>('/api/roles')),
+      noInstitutionYet ? Promise.resolve([] as Quarter[]) : this.quarterService.getAll().catch(() => [] as Quarter[]),
     ]);
     this.courses.set(courses);
     this.users.set(users); this.roles.set(roles);
+    if (!noInstitutionYet && yearId !== null) {
+      this.setQuartersForYear(yearId, quarters);
+    }
   }
 
   openYearDialog(year?: AcademicYear): void {
@@ -555,14 +638,22 @@ export class AdminComponent implements OnInit {
 
   openQuartersDialog(year: AcademicYear): void {
     this.quarterService.getAll().then(quarters => {
+      this.setQuartersForYear(year.id, quarters);
       this.dialog.open(QuartersDialogComponent, {
         width: '560px',
         data: { academicYear: year, existing: quarters },
-      }).afterClosed().subscribe(async ok => {
-        if (ok) await this.loadAll();
+      }).afterClosed().subscribe(async (result?: QuartersDialogResult) => {
+        if (!result?.saved) return;
+        try {
+          const fresh = await this.quarterService.getAll();
+          this.setQuartersForYear(year.id, fresh);
+        } catch (err: any) {
+          this.notify.error(err?.error?.error ?? 'Error al cargar los períodos');
+          await this.loadAll();
+        }
       });
     }).catch(err => {
-      this.notify.error(err?.error?.error ?? 'Error al cargar los trimestres');
+      this.notify.error(err?.error?.error ?? 'Error al cargar los períodos');
     });
   }
 

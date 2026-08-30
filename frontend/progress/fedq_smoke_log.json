@@ -1,0 +1,343 @@
+[
+  {
+    "step": "login",
+    "ts": "2026-08-30T07:38:16.746Z",
+    "status": 200,
+    "role": "superadmin"
+  },
+  {
+    "step": "configured quarters (AY 1, sequenceNumber asc)",
+    "ts": "2026-08-30T07:38:16.834Z",
+    "configured": [
+      {
+        "id": 2,
+        "name": "Segundo Trimestre",
+        "seq": 2,
+        "startDate": "2026-08-11",
+        "endDate": "2026-11-06"
+      },
+      {
+        "id": 3,
+        "name": "Tercer Trimestre",
+        "seq": 3,
+        "startDate": "2026-11-09",
+        "endDate": "2027-02-24"
+      },
+      {
+        "id": 9,
+        "name": "Primer Trimestre",
+        "seq": 4,
+        "startDate": "2026-05-04",
+        "endDate": "2026-08-07"
+      }
+    ]
+  },
+  {
+    "step": "url",
+    "ts": "2026-08-30T07:38:18.993Z",
+    "url": "http://localhost:4323/inspectors/student-report"
+  },
+  {
+    "step": "(i) PDF dialog initial",
+    "ts": "2026-08-30T07:38:20.116Z",
+    "pills": [
+      "Segundo Trimestre",
+      "Tercer Trimestre",
+      "Primer Trimestre"
+    ],
+    "active": [
+      "Segundo Trimestre"
+    ],
+    "emptyNote": [],
+    "desde": "11/8/2026",
+    "hasta": "6/11/2026",
+    "desdeEditable": true,
+    "hastaEditable": true
+  },
+  {
+    "step": "(iii) PDF after clicking pill",
+    "ts": "2026-08-30T07:38:20.689Z",
+    "clicked": {
+      "id": 3,
+      "name": "Tercer Trimestre",
+      "seq": 3,
+      "startDate": "2026-11-09",
+      "endDate": "2027-02-24"
+    },
+    "pills": [
+      "Segundo Trimestre",
+      "Tercer Trimestre",
+      "Primer Trimestre"
+    ],
+    "active": [
+      "Tercer Trimestre"
+    ],
+    "emptyNote": [],
+    "desde": "9/11/2026",
+    "hasta": "24/2/2027",
+    "desdeEditable": true,
+    "hastaEditable": true
+  },
+  {
+    "step": "(vii) PDF title with active pill",
+    "ts": "2026-08-30T07:38:26.564Z",
+    "title": "FALTAS SEGUNDO TRIMESTRE — 10MO \"A\"BS",
+    "expectedQuarter": "Segundo Trimestre",
+    "toast": []
+  },
+  {
+    "step": "(iv) PDF after manual Desde edit",
+    "ts": "2026-08-30T07:38:27.444Z",
+    "pills": [
+      "Segundo Trimestre",
+      "Tercer Trimestre",
+      "Primer Trimestre"
+    ],
+    "active": [],
+    "emptyNote": [],
+    "desde": "1/7/2026",
+    "hasta": "6/11/2026",
+    "desdeEditable": true,
+    "hastaEditable": true
+  },
+  {
+    "step": "(vii) PDF title after manual edit",
+    "ts": "2026-08-30T07:38:31.483Z",
+    "title": "FALTAS PERÍODO PERSONALIZADO — 10MO \"A\"BS",
+    "toast": []
+  },
+  {
+    "step": "(ii) Excel dialog initial",
+    "ts": "2026-08-30T07:38:33.239Z",
+    "pills": [
+      "Segundo Trimestre",
+      "Tercer Trimestre",
+      "Primer Trimestre"
+    ],
+    "active": [
+      "Segundo Trimestre"
+    ],
+    "emptyNote": [],
+    "desde": "11/8/2026",
+    "hasta": "6/11/2026",
+    "desdeEditable": true,
+    "hastaEditable": true
+  },
+  {
+    "step": "(iii) Excel after clicking pill",
+    "ts": "2026-08-30T07:38:33.812Z",
+    "clicked": {
+      "id": 3,
+      "name": "Tercer Trimestre",
+      "seq": 3,
+      "startDate": "2026-11-09",
+      "endDate": "2027-02-24"
+    },
+    "pills": [
+      "Segundo Trimestre",
+      "Tercer Trimestre",
+      "Primer Trimestre"
+    ],
+    "active": [
+      "Tercer Trimestre"
+    ],
+    "emptyNote": [],
+    "desde": "9/11/2026",
+    "hasta": "24/2/2027",
+    "desdeEditable": true,
+    "hastaEditable": true
+  },
+  {
+    "step": "(iv) Excel after manual Hasta edit",
+    "ts": "2026-08-30T07:38:34.693Z",
+    "pills": [
+      "Segundo Trimestre",
+      "Tercer Trimestre",
+      "Primer Trimestre"
+    ],
+    "active": [],
+    "emptyNote": [],
+    "desde": "9/11/2026",
+    "hasta": "30/9/2026",
+    "desdeEditable": true,
+    "hastaEditable": true
+  },
+  {
+    "step": "(v) created 4th quarter",
+    "ts": "2026-08-30T07:38:35.787Z",
+    "id": 133,
+    "name": "Q9 Smoke",
+    "seq": 9
+  },
+  {
+    "step": "(v) PDF with 4 configured quarters",
+    "ts": "2026-08-30T07:38:38.965Z",
+    "pills": [
+      "Segundo Trimestre",
+      "Tercer Trimestre",
+      "Primer Trimestre",
+      "Q9 Smoke"
+    ],
+    "active": [
+      "Segundo Trimestre"
+    ],
+    "emptyNote": [],
+    "desde": "11/8/2026",
+    "hasta": "6/11/2026",
+    "desdeEditable": true,
+    "hastaEditable": true
+  },
+  {
+    "step": "(v) Excel with 4 configured quarters",
+    "ts": "2026-08-30T07:38:40.702Z",
+    "pills": [
+      "Segundo Trimestre",
+      "Tercer Trimestre",
+      "Primer Trimestre",
+      "Q9 Smoke"
+    ],
+    "active": [
+      "Segundo Trimestre"
+    ],
+    "emptyNote": [],
+    "desde": "11/8/2026",
+    "hasta": "6/11/2026",
+    "desdeEditable": true,
+    "hastaEditable": true
+  },
+  {
+    "step": "(v) cleanup 4th quarter",
+    "ts": "2026-08-30T07:38:41.434Z",
+    "status": 204
+  },
+  {
+    "step": "(ix) fresh AY seeded quarters",
+    "ts": "2026-08-30T07:38:41.499Z",
+    "status": 201,
+    "ayId": 30,
+    "name": "F7SMOKE-521434",
+    "seeded": [
+      {
+        "id": 134,
+        "name": "Primer Trimestre",
+        "startDate": null,
+        "endDate": null
+      },
+      {
+        "id": 135,
+        "name": "Segundo Trimestre",
+        "startDate": null,
+        "endDate": null
+      },
+      {
+        "id": 136,
+        "name": "Tercer Trimestre",
+        "startDate": null,
+        "endDate": null
+      }
+    ]
+  },
+  {
+    "step": "switched academic year",
+    "ts": "2026-08-30T07:38:46.327Z",
+    "requested": "F7SMOKE-521434",
+    "options": [
+      "F7SMOKE-521434",
+      "2026-2027"
+    ],
+    "switcherShows": "F7SMOKE-521434"
+  },
+  {
+    "step": "(vi)/(viii)/(ix) PDF on fresh AY",
+    "ts": "2026-08-30T07:38:47.343Z",
+    "pills": [],
+    "active": [],
+    "emptyNote": [
+      "No hay períodos con fechas configuradas para este año lectivo. Define los períodos en el módulo de administración o usa los selectores de fecha para establecer el rango manualmente."
+    ],
+    "desde": "",
+    "hasta": "",
+    "desdeEditable": true,
+    "hastaEditable": true
+  },
+  {
+    "step": "(vi)/(viii)/(ix) Excel on fresh AY",
+    "ts": "2026-08-30T07:38:49.197Z",
+    "pills": [],
+    "active": [],
+    "emptyNote": [
+      "No hay períodos con fechas configuradas para este año lectivo. Define los períodos en el módulo de administración o usa los selectores de fecha para establecer el rango manualmente."
+    ],
+    "desde": "",
+    "hasta": "",
+    "desdeEditable": true,
+    "hastaEditable": true
+  },
+  {
+    "step": "re-activate AY 1 (year switch, reverse direction)",
+    "ts": "2026-08-30T07:38:50.356Z",
+    "status": 200
+  },
+  {
+    "step": "year switcher after re-activating AY 1",
+    "ts": "2026-08-30T07:38:53.028Z",
+    "switcherShows": "2026-2027"
+  },
+  {
+    "step": "(viii) PDF back on AY 2026-2027",
+    "ts": "2026-08-30T07:38:54.010Z",
+    "pills": [
+      "Segundo Trimestre",
+      "Tercer Trimestre",
+      "Primer Trimestre"
+    ],
+    "active": [
+      "Segundo Trimestre"
+    ],
+    "emptyNote": [],
+    "desde": "11/8/2026",
+    "hasta": "6/11/2026",
+    "desdeEditable": true,
+    "hastaEditable": true
+  },
+  {
+    "step": "(viii) Excel back on AY 2026-2027",
+    "ts": "2026-08-30T07:38:55.838Z",
+    "pills": [
+      "Segundo Trimestre",
+      "Tercer Trimestre",
+      "Primer Trimestre"
+    ],
+    "active": [
+      "Segundo Trimestre"
+    ],
+    "emptyNote": [],
+    "desde": "11/8/2026",
+    "hasta": "6/11/2026",
+    "desdeEditable": true,
+    "hastaEditable": true
+  },
+  {
+    "step": "cleanup smoke AY",
+    "ts": "2026-08-30T07:38:56.953Z",
+    "status": 204,
+    "ayId": 30
+  },
+  {
+    "step": "restore AY 1 isActive",
+    "ts": "2026-08-30T07:38:56.960Z",
+    "status": 200
+  },
+  {
+    "step": "post-cleanup state",
+    "ts": "2026-08-30T07:38:56.972Z",
+    "quartersAY1": [
+      "2:Segundo Trimestre",
+      "3:Tercer Trimestre",
+      "9:Primer Trimestre"
+    ],
+    "years": [
+      "1:2026-2027"
+    ]
+  }
+]

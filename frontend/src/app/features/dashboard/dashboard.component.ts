@@ -9,11 +9,13 @@ import { MatInputModule } from '@angular/material/input';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatTooltipModule, MatTooltip } from '@angular/material/tooltip';
 import { FormsModule } from '@angular/forms';
-import { DashboardSummary, Course } from '../../core/models/index';
+import { DashboardSummary, Course, Quarter } from '../../core/models/index';
 import { firstValueFrom } from 'rxjs';
 import { Chart, registerables } from 'chart.js';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
-import { dateToDateString } from '../../shared/utils/date.util';
+import { QuarterContextService } from '../../core/services/quarter-context.service';
+import { QuarterSelectorComponent } from '../../shared/components/quarter-selector/quarter-selector.component';
+import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
 
 Chart.register(...registerables);
 
@@ -22,7 +24,7 @@ type PeriodPreset = 'today' | 'yesterday' | '7d' | '15d' | '30d' | 'full' | 'cus
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatSelectModule, MatFormFieldModule, MatIconModule, MatButtonModule, MatInputModule, MatDatepickerModule, MatTooltipModule, FormsModule],
+  imports: [MatSelectModule, MatFormFieldModule, MatIconModule, MatButtonModule, MatInputModule, MatDatepickerModule, MatTooltipModule, FormsModule, QuarterSelectorComponent],
   styles: [`
     .stat-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
     .stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px -8px rgba(15,23,42,.15) !important; }
@@ -49,6 +51,7 @@ type PeriodPreset = 'today' | 'yesterday' | '7d' | '15d' | '30d' | 'full' | 'cus
 
     <!-- Filtros -->
     <div class="filter-bar">
+      <app-quarter-selector (quarterChange)="onQuarterChange($event)" />
       <mat-form-field appearance="outline" style="width:220px">
         <mat-label>Curso</mat-label>
         <mat-select [(ngModel)]="selectedCourse" (ngModelChange)="loadSummary()">
@@ -261,6 +264,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   readonly academicYearContext = inject(AcademicYearContextService);
+  private readonly quarterContext = inject(QuarterContextService);
 
   @ViewChild('barChart')    barChartEl!: ElementRef<HTMLCanvasElement>;
   @ViewChild('donutChart')  donutChartEl!: ElementRef<HTMLCanvasElement>;
@@ -297,9 +301,20 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly today = new Date().toLocaleDateString('es-EC', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   async ngOnInit(): Promise<void> {
+    this.applyDefaultQuarter();
     this.courses.set(await firstValueFrom(this.http.get<Course[]>('/api/courses')));
     this.selectedYear = this.academicYearContext.selected()?.id ?? null;
     await this.loadSummary();
+  }
+
+  private applyDefaultQuarter(): void {
+    const id = this.quarterContext.defaultQuarterId();
+    if (id === null) return;
+    const q = this.quarterContext.quarters().find(qq => qq.id === id);
+    if (!q || !q.startDate || !q.endDate) return;
+    this.selectedPeriod = 'custom';
+    this.customFrom = dateStringToDate(q.startDate);
+    this.customTo = dateStringToDate(q.endDate);
   }
 
   ngAfterViewInit(): void {}
@@ -351,6 +366,22 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onCustomDateChange(): void {
     if (this.customFrom && this.customTo) this.loadSummary();
+  }
+
+  // R22: al elegir un período con fechas completas, el rango del chart pasa a
+  // ser ese período (mismo codepath que el preset 'custom'). R23: si el
+  // período no tiene startDate+endDate completos (caso `seedQuarters()` para
+  // un AY recién creado, antes de que el usuario complete las fechas) se
+  // ignora silenciosamente — el rango actual y el chart quedan intactos, sin
+  // disparar otro `loadSummary()`. R24: nunca tocamos `QuarterContextService`
+  // desde aquí, así que el selector y los presets quedan independientes.
+  onQuarterChange(q: Quarter | null): void {
+    if (!q || !q.startDate || !q.endDate) return;
+    this.selectedPeriod = 'custom';
+    this.customFrom = dateStringToDate(q.startDate);
+    this.customTo = dateStringToDate(q.endDate);
+    this.showCustomPanel = false;
+    this.loadSummary();
   }
 
   periodLabel(): string {

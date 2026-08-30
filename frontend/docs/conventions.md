@@ -56,6 +56,24 @@ bottom, as seen throughout `src/app`:
 Component decorator field order: `standalone`, `changeDetection`, `imports`,
 `host` (if any), `styles`, `template`.
 
+## Reusability
+
+Before building a component or service that's specific to one screen, check
+whether the same concern will plausibly show up elsewhere (list views,
+dialogs, other feature pages) and, if so, build it as a standalone,
+composable unit from the start — not a bigger refactor after the second
+screen needs it. In practice this means: no host-specific assumptions baked
+into a shared component's public contract (avoid required `@Input()`s a
+future consumer can't supply); prefer injecting a shared context
+service directly over threading the same 2-3 bindings through every host
+(the existing `AcademicYearContextService`/year-switcher pattern, and
+`QuarterContextService`/`QuarterSelectorComponent` built the same way, are
+the reference examples); keep the component's own template/styles ignorant
+of which page it's rendered on. This is a bias, not a mandate — don't build
+a generic abstraction for a concern that's genuinely one-off; three similar
+inline blocks across unrelated pages is still better than a premature shared
+component with a leaky contract.
+
 ## Tests
 
 - **Test file location/naming:** none exist yet in this project — no
