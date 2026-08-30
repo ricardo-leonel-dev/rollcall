@@ -14,8 +14,9 @@ import { firstValueFrom } from 'rxjs';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
-import { dateToDateString } from '../../shared/utils/date.util';
-import { AcademicYear, Course, CourseReport } from '../../core/models/index';
+import { QuarterContextService } from '../../core/services/quarter-context.service';
+import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
+import { Course, CourseReport, Quarter } from '../../core/models/index';
 
 export interface ExportConfigDialogData {
   mode: 'F' | 'AT' | 'J' | 'CUSTOM';
@@ -97,6 +98,16 @@ function formatDate(d: Date | null): string {
 
     /* ── Trimester pills ── */
     .trimester-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .trimester-empty-note {
+      font-size: 12px;
+      color: var(--muted-strong);
+      line-height: 1.5;
+      background: var(--paper-deep);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      padding: 10px 12px;
+      margin-top: 8px;
+    }
 
     /* ── CUSTOM type pills ── */
     .type-pills { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -245,26 +256,30 @@ function formatDate(d: Date | null): string {
         <mat-form-field appearance="outline">
           <mat-label>Desde</mat-label>
           <input matInput [matDatepicker]="pickerFrom" [(ngModel)]="dateFrom"
-            (ngModelChange)="activeTrimester.set(null)">
+            (ngModelChange)="activeQuarterId.set(null)">
           <mat-datepicker-toggle matIconSuffix [for]="pickerFrom"></mat-datepicker-toggle>
           <mat-datepicker #pickerFrom></mat-datepicker>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Hasta</mat-label>
           <input matInput [matDatepicker]="pickerTo" [(ngModel)]="dateTo"
-            (ngModelChange)="activeTrimester.set(null)">
+            (ngModelChange)="activeQuarterId.set(null)">
           <mat-datepicker-toggle matIconSuffix [for]="pickerTo"></mat-datepicker-toggle>
           <mat-datepicker #pickerTo></mat-datepicker>
         </mat-form-field>
       </div>
-      <div class="trimester-row">
-        @for (t of ['Primer', 'Segundo', 'Tercer']; track t; let i = $index) {
-          <button class="period-pill" [class.active]="activeTrimester() === i"
-            (click)="selectTrimester(i)">
-            {{t}} trimestre
-          </button>
-        }
-      </div>
+      @if (getDatedQuarters().length === 0) {
+        <div class="trimester-empty-note">No hay períodos con fechas configuradas para este año lectivo. Define los períodos en el módulo de administración o usa los selectores de fecha para establecer el rango manualmente.</div>
+      } @else {
+        <div class="trimester-row">
+          @for (q of getDatedQuarters(); track q.id) {
+            <button class="period-pill" [class.active]="activeQuarterId() === q.id"
+              (click)="applyQuarter(q)">
+              {{q.name}}
+            </button>
+          }
+        </div>
+      }
 
       <!-- Tipos (solo CUSTOM) -->
       @if (data.mode === 'CUSTOM') {
@@ -357,10 +372,11 @@ export class ExportConfigDialogComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly notify = inject(NotificationService);
   readonly academicYearContext = inject(AcademicYearContextService);
+  private readonly quarterContext = inject(QuarterContextService);
 
   readonly courses = signal<Course[]>([]);
   readonly generating = signal(false);
-  readonly activeTrimester = signal<number | null>(null);
+  readonly activeQuarterId = signal<number | null>(null);
   readonly colorMode = signal(true);
   readonly onlyWithRecords = signal(false);
 
@@ -378,47 +394,33 @@ export class ExportConfigDialogComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     this.courses.set(await firstValueFrom(this.http.get<Course[]>('/api/courses')));
-    const active = this.academicYearContext.selected();
-    if (active) this.setDefaultTrimester(active);
+    this.applyDefaultQuarter();
   }
 
-  private setDefaultTrimester(year: AcademicYear): void {
-    if (!year.startDate || !year.endDate) return;
-    const start = new Date(year.startDate);
-    const end = new Date(year.endDate);
-    const third = (end.getTime() - start.getTime()) / 3;
-    const bounds = [start, new Date(start.getTime() + third), new Date(start.getTime() + 2 * third), end];
-    const today = new Date();
-    const clamped = today < start ? start : today > end ? end : today;
-    const idx = bounds.slice(1).findIndex(b => clamped.getTime() <= b.getTime());
-    const i = idx === -1 ? 2 : idx;
-    this.dateFrom = bounds[i];
-    this.dateTo = bounds[i + 1];
-    this.activeTrimester.set(i);
+  private applyDefaultQuarter(): void {
+    const id = this.quarterContext.defaultQuarterId();
+    if (id === null) return;
+    const q = this.quarterContext.quarters().find(qq => qq.id === id);
+    if (q) this.applyQuarter(q);
   }
 
-  selectTrimester(i: number): void {
-    const year = this.academicYearContext.selected();
-    if (!year?.startDate || !year?.endDate) return;
-    const start = new Date(year.startDate);
-    const end = new Date(year.endDate);
-    const third = (end.getTime() - start.getTime()) / 3;
-    const bounds = [start, new Date(start.getTime() + third), new Date(start.getTime() + 2 * third), end];
-    this.dateFrom = bounds[i];
-    this.dateTo = bounds[i + 1];
-    this.activeTrimester.set(i);
+  getDatedQuarters(): Quarter[] {
+    return this.quarterContext.quarters().filter(q => q.startDate && q.endDate);
   }
 
-  private getTrimesterName(): string {
-    const year = this.academicYearContext.selected();
-    if (!this.dateFrom || !this.dateTo || !year?.startDate || !year?.endDate) return 'TRIMESTRE';
-    const start = new Date(year.startDate);
-    const end = new Date(year.endDate);
-    const third = (end.getTime() - start.getTime()) / 3;
-    const midpoint = new Date((this.dateFrom.getTime() + this.dateTo.getTime()) / 2);
-    if (midpoint <= new Date(start.getTime() + third)) return 'PRIMER TRIMESTRE';
-    if (midpoint <= new Date(start.getTime() + 2 * third)) return 'SEGUNDO TRIMESTRE';
-    return 'TERCER TRIMESTRE';
+  applyQuarter(q: Quarter | null): void {
+    if (!q || !q.startDate || !q.endDate) return;
+    this.dateFrom = dateStringToDate(q.startDate);
+    this.dateTo = dateStringToDate(q.endDate);
+    this.activeQuarterId.set(q.id);
+  }
+
+  private getTitleSection(): string {
+    const id = this.activeQuarterId();
+    if (id === null) return 'PERÍODO PERSONALIZADO';
+    const q = this.quarterContext.quarters().find(qq => qq.id === id);
+    if (!q) return 'PERÍODO PERSONALIZADO';
+    return q.name.trim().toUpperCase();
   }
 
   handleSelectChange(values: number[]): void {
@@ -505,7 +507,7 @@ export class ExportConfigDialogComponent implements OnInit {
     const useColor = this.colorMode();
     const accent = this.data.accent;
 
-    const trimesterName = this.getTrimesterName();
+    const trimesterName = this.getTitleSection();
     const dateLabel = `Del ${formatDate(this.dateFrom)} al ${formatDate(this.dateTo)}`;
 
     const mainTitle =
