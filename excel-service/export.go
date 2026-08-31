@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/xuri/excelize/v2"
@@ -575,6 +576,75 @@ func dedupeCommentShapeIDs(zipPath string) error {
 	return writeZipEntries(zipPath, entries)
 }
 
+// ── commentBoxSize ────────────────────────────────────────────────────────────
+
+const (
+	commentMinWidth  uint = 140 // matches excelize's own unset-Comment default (prepareFormCtrlOptions) — a short note's box is unchanged from today
+	commentMaxWidth  uint = 220
+	commentMinHeight uint = 60  // matches excelize's own unset-Comment default
+	commentMaxHeight uint = 300 // still manually resizable past this in Excel; just caps runaway auto-sizing
+
+	commentWrapCharsPerLine = 28 // approx chars per line at commentMaxWidth in the default VML comment font
+	commentLineHeightPx     = 16 // approx px per wrapped line at the default font size
+)
+
+// commentBoxSize computes a VML comment box Width/Height (pixels) from the
+// comment's combined "Nota: .../Justificación: ..." text, so short notes
+// stay compact and long notes get a taller box without manual resizing in
+// Excel (R1-R5). Width and Height are each clamped to
+// [commentMin*, commentMax*] regardless of text length.
+func commentBoxSize(text string) (width, height uint) {
+	lines := strings.Split(text, "\n")
+	maxLineLen := 0
+	wrappedLines := 0
+	for _, line := range lines {
+		n := utf8.RuneCountInString(line)
+		if n > maxLineLen {
+			maxLineLen = n
+		}
+		w := n / commentWrapCharsPerLine
+		if n%commentWrapCharsPerLine != 0 || n == 0 {
+			w++
+		}
+		wrappedLines += w
+	}
+	width = commentMinWidth
+	if maxLineLen > commentWrapCharsPerLine {
+		width = commentMaxWidth
+	}
+	height = commentMinHeight
+	if wrappedLines > 1 {
+		height += uint(wrappedLines-1) * commentLineHeightPx
+	}
+	if height > commentMaxHeight {
+		height = commentMaxHeight
+	}
+	return width, height
+}
+
+// diagonalNoteBorder marks an F/AT/J cell that has an attached note: a thin
+// double diagonal line rising from the bottom-left to the top-right corner
+// (excelize's diagonalUp), appended to the cell's existing border list.
+// Excel's own comment-triangle indicator is a fixed red triangle, not
+// configurable via OOXML/excelize, and disappears against styleF's red fill
+// — this is the visible "this cell has a note" signal instead (R7). A
+// marker character in the cell's text value was explicitly rejected:
+// COUNTIF-based totals elsewhere in the template depend on the cell holding
+// exactly "F"/"AT"/"J" (R9).
+var diagonalNoteBorder = excelize.Border{Type: "diagonalUp", Style: 6, Color: "000000"}
+
+// appendDiagonalBorder returns a new slice with diagonalNoteBorder appended
+// to base, without mutating base's backing array. base (templateBorder) is
+// reused across every style NewStyle call in processCourse; appending to it
+// in place via append(base, ...) would risk a shared-backing-array aliasing
+// bug the moment base has spare capacity.
+func appendDiagonalBorder(base []excelize.Border) []excelize.Border {
+	out := make([]excelize.Border, len(base)+1)
+	copy(out, base)
+	out[len(base)] = diagonalNoteBorder
+	return out
+}
+
 // ── processCourse ─────────────────────────────────────────────────────────────
 
 const trimesterSheetCount = 3
@@ -691,6 +761,11 @@ outerBorder:
 	styleJ, _ := f.NewStyle(&excelize.Style{Border: templateBorder, Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"C6EFCE"}}, Alignment: &excelize.Alignment{Horizontal: "center"}})
 	styleP, _ := f.NewStyle(&excelize.Style{Border: templateBorder, Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"DDEBF7"}}, Alignment: &excelize.Alignment{Horizontal: "center"}})
 
+	noteBorder := appendDiagonalBorder(templateBorder)
+	styleFNote, _ := f.NewStyle(&excelize.Style{Border: noteBorder, Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"FFC7CE"}}, Alignment: &excelize.Alignment{Horizontal: "center"}})
+	styleATNote, _ := f.NewStyle(&excelize.Style{Border: noteBorder, Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"FFEB9C"}}, Alignment: &excelize.Alignment{Horizontal: "center"}})
+	styleJNote, _ := f.NewStyle(&excelize.Style{Border: noteBorder, Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"C6EFCE"}}, Alignment: &excelize.Alignment{Horizontal: "center"}})
+
 	if err := escribirNomina(f, base, cd.roster); err != nil {
 		f.Close()
 		os.Remove(tempPath)
@@ -736,16 +811,7 @@ outerBorder:
 			displayType = "J"
 		}
 		cellRef, _ := excelize.CoordinatesToCellName(col, row)
-		f.SetCellValue(base, cellRef, displayType)
-		switch displayType {
-		case "F":
-			f.SetCellStyle(base, cellRef, cellRef, styleF)
-		case "AT":
-			f.SetCellStyle(base, cellRef, cellRef, styleAT)
-		case "J":
-			f.SetCellStyle(base, cellRef, cellRef, styleJ)
-		}
-		marcadas[[2]int{row, col}] = true
+		f.SetCellValue(base, cellRef, displayType) // unconditional, same as today — R9
 
 		var parts []string
 		if reg.notes != "" {
@@ -754,11 +820,39 @@ outerBorder:
 		if reg.justificationReason != nil && *reg.justificationReason != "" {
 			parts = append(parts, "Justificación: "+*reg.justificationReason)
 		}
-		if len(parts) > 0 {
+		hasNote := len(parts) > 0
+
+		switch displayType {
+		case "F":
+			if hasNote {
+				f.SetCellStyle(base, cellRef, cellRef, styleFNote)
+			} else {
+				f.SetCellStyle(base, cellRef, cellRef, styleF)
+			}
+		case "AT":
+			if hasNote {
+				f.SetCellStyle(base, cellRef, cellRef, styleATNote)
+			} else {
+				f.SetCellStyle(base, cellRef, cellRef, styleAT)
+			}
+		case "J":
+			if hasNote {
+				f.SetCellStyle(base, cellRef, cellRef, styleJNote)
+			} else {
+				f.SetCellStyle(base, cellRef, cellRef, styleJ)
+			}
+		}
+		marcadas[[2]int{row, col}] = true
+
+		if hasNote {
+			text := strings.Join(parts, "\n")
+			width, height := commentBoxSize(text)
 			f.AddComment(base, excelize.Comment{
 				Cell:      cellRef,
 				Author:    "Sistema",
-				Paragraph: []excelize.RichTextRun{{Text: strings.Join(parts, "\n")}},
+				Width:     width,
+				Height:    height,
+				Paragraph: []excelize.RichTextRun{{Text: text}},
 			})
 		}
 	}
