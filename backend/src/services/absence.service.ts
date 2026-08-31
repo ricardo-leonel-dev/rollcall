@@ -107,7 +107,11 @@ function businessDaysInRange(dateFrom: string, dateTo: string): string[] {
 
 export async function createRange(institutionId: number, courseIds: number[] | null, data: {
   enrollmentId: number; type: 'F' | 'AT'; dateFrom: string; dateTo: string; notes?: string;
-}, createdByUserId: number | null = null): Promise<{ created: number; skipped: number }> {
+}, createdByUserId: number | null = null): Promise<{
+  created: number;
+  skipped: number;
+  skippedDetails: Array<{ date: string; existingType: 'F' | 'AT'; conflict: boolean }>;
+}> {
   if (!['F', 'AT'].includes(data.type)) {
     throw Object.assign(new Error('Invalid type. Only F or AT'), { status: 400 });
   }
@@ -122,11 +126,20 @@ export async function createRange(institutionId: number, courseIds: number[] | n
   }
 
   const existingRows = await AppDataSource.query(
-    `SELECT date::text AS date FROM absences WHERE enrollment_id = $1 AND date = ANY($2) AND deleted_at IS NULL`,
+    `SELECT date::text AS date, type FROM absences WHERE enrollment_id = $1 AND date = ANY($2) AND deleted_at IS NULL`,
     [data.enrollmentId, days]
   );
-  const existingDates = new Set(existingRows.map((r: { date: string }) => r.date));
+  const existingTypeByDate = new Map<string, 'F' | 'AT'>(
+    existingRows.map((r: { date: string; type: 'F' | 'AT' }) => [r.date, r.type])
+  );
+  const existingDates = new Set(existingTypeByDate.keys());
   const toCreate = days.filter(d => !existingDates.has(d));
+  const skippedDetails = days
+    .filter(d => existingDates.has(d))
+    .map(date => {
+      const existingType = existingTypeByDate.get(date)!;
+      return { date, existingType, conflict: existingType !== data.type };
+    });
 
   // Separate toCreate into: rows that were soft-deleted (restore them) vs truly new (insert).
   // Without this, the unconditional UNIQUE(enrollment_id, date) constraint would reject the
@@ -170,7 +183,11 @@ export async function createRange(institutionId: number, courseIds: number[] | n
     });
   }
 
-  return { created: toCreate.length, skipped: days.length - toCreate.length };
+  return {
+    created: toCreate.length,
+    skipped: days.length - toCreate.length,
+    skippedDetails,
+  };
 }
 
 export async function update(institutionId: number, courseIds: number[] | null, id: number, data: Partial<{
