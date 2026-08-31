@@ -476,8 +476,16 @@ export class JustificationsComponent implements OnInit {
     this.selectedIds.set(new Set());
     this.unjustified.set([]);
     if (!this.selStudentCreate) return;
+    const params: string[] = [
+      `enrollment_id=${this.selStudentCreate}`,
+      `is_justified=false`,
+    ];
+    if (this.selQuarterStart && this.selQuarterEnd) {
+      params.push(`date_from=${dateToDateString(this.selQuarterStart)}`);
+      params.push(`date_to=${dateToDateString(this.selQuarterEnd)}`);
+    }
     const data = await firstValueFrom(
-      this.http.get<Absence[]>(`/api/absences?enrollment_id=${this.selStudentCreate}&is_justified=false`)
+      this.http.get<Absence[]>(`/api/absences?${params.join('&')}`)
     );
     this.unjustified.set(data);
   }

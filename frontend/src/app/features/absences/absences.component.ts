@@ -25,6 +25,7 @@ import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/wha
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AbsenceRangeDialogComponent, AbsenceRangeDialogResult } from './absence-range-dialog.component';
 import { AbsenceDialogComponent } from './absence-dialog.component';
+import { AbsenceSaveResultDialogComponent } from './absence-save-result-dialog.component';
 
 interface VoiceLog {
   id: number;
@@ -39,6 +40,22 @@ interface VoiceLog {
   error_reason: string | null;
   processing_ms: number | null;
   created_at: string;
+}
+
+interface AbsenceSaveResponse {
+  created: number;
+  skipped: number;
+  skippedDetails: Array<{ date: string; existingType: 'F' | 'AT'; conflict: boolean }>;
+}
+
+interface PartitionedSkip {
+  conflicts: Array<{ date: string; existingType: 'F' | 'AT' }>;
+  idempotents: number;
+}
+
+interface PendingHighlight {
+  enrollmentId: number;
+  dates: string[];
 }
 
 @Component({
@@ -99,6 +116,22 @@ interface VoiceLog {
       padding: 0; background: none; border: none; color: var(--muted); line-height: 1;
     }
     .manual-search .ms-clear:hover { color: var(--ink-soft); }
+    @keyframes flash-conflict-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+      50%      { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.45); }
+    }
+    :host ::ng-deep tr.flash-conflict > td {
+      animation: flash-conflict-pulse 1s ease-in-out 2;
+      border-top: 2px solid #f59e0b !important;
+      border-bottom: 2px solid #f59e0b !important;
+      background: #fef3c7;
+    }
+    :host ::ng-deep tr.flash-conflict > td:first-child {
+      border-left: 2px solid #f59e0b !important;
+    }
+    :host ::ng-deep tr.flash-conflict > td:last-child {
+      border-right: 2px solid #f59e0b !important;
+    }
   `],
   template: `
     <div class="page-header">
@@ -519,7 +552,7 @@ interface VoiceLog {
                 </thead>
                 <tbody>
                   @for (a of filteredAbsences(); track a.id) {
-                    <tr>
+                    <tr [attr.data-enrollment-id]="a.enrollmentId" [attr.data-absence-date]="a.date">
                       <td style="font-weight:500">{{a.studentName}}</td>
                       <td style="color:var(--muted-strong);white-space:nowrap">{{a.date}}</td>
                       <td><span [class]="'badge-' + a.type">{{typeLabel(a.type)}}</span></td>
@@ -679,6 +712,8 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   readonly voiceLogs = signal<VoiceLog[]>([]);
   readonly voiceLogsLoading = signal(false);
 
+  private readonly _pendingHighlight = signal<PendingHighlight | null>(null);
+
   selectedTabIndex = 0;
   private currentVoiceJobId: string | null = null;
   private photoPollingActive = false;
@@ -740,10 +775,13 @@ export class AbsencesComponent implements OnInit, OnDestroy {
 
   async loadTodayAbsences(): Promise<void> {
     if (!this.selCourse) { this.todayAbsences.set([]); return; }
-    const from = dateToDateString(this.dateFrom);
-    const to = dateToDateString(this.dateTo);
+    // Los badges 'Falta hoy' / 'Atraso hoy' del Manual deben reflejar SOLO la fecha
+    // local de hoy, ignorando this.dateFrom/this.dateTo (que están atados al rango del
+    // trimestre seleccionado en la pestaña Listado). dateToDateString(new Date()) usa
+    // los componentes locales del navegador, no UTC.
+    const today = dateToDateString(new Date());
     const data = await firstValueFrom(
-      this.http.get<Absence[]>(`/api/absences?course_id=${this.selCourse}&date_from=${from}&date_to=${to}`)
+      this.http.get<Absence[]>(`/api/absences?course_id=${this.selCourse}&date_from=${today}&date_to=${today}`)
     );
     this.todayAbsences.set(data);
   }
@@ -871,9 +909,12 @@ export class AbsencesComponent implements OnInit, OnDestroy {
     if (!toConfirm.length) { this.notify.warning('Selecciona al menos una inasistencia'); return; }
     try {
       let created = 0, skipped = 0;
+      const conflicts: Array<{ date: string; existingType: 'F' | 'AT'; enrollmentId: number; studentName: string }> = [];
+      let idempotents = 0;
+      const createdDates: string[] = [];
       for (const item of toConfirm) {
         const r = await firstValueFrom(
-          this.http.post<{ created: number; skipped: number }>('/api/absences', {
+          this.http.post<AbsenceSaveResponse>('/api/absences', {
             enrollmentId: item.enrollmentId,
             type: item.type,
             dateFrom: item.date,
@@ -882,11 +923,59 @@ export class AbsencesComponent implements OnInit, OnDestroy {
         );
         created += r.created;
         skipped += r.skipped;
+        const partition = this.partitionSkipped(r);
+        for (const c of partition.conflicts) {
+          conflicts.push({ ...c, enrollmentId: item.enrollmentId, studentName: item.studentName });
+        }
+        idempotents += partition.idempotents;
+        const skippedSet = new Set((r.skippedDetails ?? []).map(s => s.date));
+        const dates = this.businessDaysBetween(item.date, item.date).filter(d => !skippedSet.has(d));
+        createdDates.push(...dates);
       }
-      const msg = skipped > 0
-        ? `${created} registro(s) creado(s), ${skipped} ya existían`
-        : `${created} registro(s) creado(s)`;
-      this.notify.success(msg);
+      if (conflicts.length === 0) {
+        const msg = skipped > 0
+          ? `${created} registro(s) creado(s), ${skipped} ya existían`
+          : `${created} registro(s) creado(s)`;
+        this.notify.success(msg);
+      } else {
+        const first = toConfirm[0];
+        const whatsappLink: string | null = null;
+        const fullName = first.studentName;
+        const course = '';
+        const type = first.type;
+        const dateLabel = (() => {
+          if (!createdDates.length) return '';
+          const lo = createdDates[0];
+          const hi = createdDates[createdDates.length - 1];
+          return lo === hi ? lo : `${lo} al ${hi}`;
+        })();
+        const dialogRef = this.dialog.open(AbsenceSaveResultDialogComponent, {
+          width: '480px',
+          data: {
+            created,
+            createdDates,
+            conflicts: conflicts.map(({ date, existingType }) => ({ date, existingType })),
+            idempotents,
+            whatsappLink,
+            fullName,
+            dateLabel,
+            type,
+            course,
+            onWhatsapp: () => {
+              dialogRef.close();
+            },
+          },
+        });
+        const grouped = new Map<number, string[]>();
+        for (const c of conflicts) {
+          const arr = grouped.get(c.enrollmentId) ?? [];
+          arr.push(c.date);
+          grouped.set(c.enrollmentId, arr);
+        }
+        const [firstEnrollmentId, firstDates] = grouped.entries().next().value as [number, string[]];
+        this._pendingHighlight.set({ enrollmentId: firstEnrollmentId, dates: firstDates });
+        dialogRef.afterClosed().subscribe(() => { this.applyHighlight(); });
+      }
       this.photoState.set('idle');
       this.photoPreview.set(null);
       await Promise.all([this.loadTodayAbsences(), this.loadAbsences()]);
@@ -916,21 +1005,46 @@ export class AbsencesComponent implements OnInit, OnDestroy {
 
   private async saveAbsenceRange(enrollment: Enrollment, type: 'F' | 'AT', f: AbsenceRangeDialogResult): Promise<void> {
     try {
-      const result = await firstValueFrom(this.http.post<{ created: number; skipped: number }>('/api/absences', {
+      const result = await firstValueFrom(this.http.post<AbsenceSaveResponse>('/api/absences', {
         enrollmentId: enrollment.enrollmentId, type, dateFrom: f.dateFrom, dateTo: f.dateTo,
         notes: f.notes || undefined,
       }));
-      const msg = result.skipped > 0
-        ? `${result.created} registro(s) creado(s), ${result.skipped} ya existían`
-        : `${result.created} registro(s) creado(s)`;
       const link = enrollment.whatsappLink;
       const dateLabel = f.dateFrom === f.dateTo ? f.dateFrom : `${f.dateFrom} al ${f.dateTo}`;
-      this.notify.success(msg, {
-        duration: 10000,
-        actionLabel: link ? 'Enviar WhatsApp' : undefined,
-        actionIcon: 'whatsapp',
-        onAction: link ? () => this.notifyGuardian(link, enrollment.fullName, dateLabel, type, enrollment.course) : undefined,
-      });
+      const partition = this.partitionSkipped(result);
+      if (partition.conflicts.length === 0) {
+        const msg = result.skipped > 0
+          ? `${result.created} registro(s) creado(s), ${result.skipped} ya existían`
+          : `${result.created} registro(s) creado(s)`;
+        this.notify.success(msg, {
+          duration: 10000,
+          actionLabel: link ? 'Enviar WhatsApp' : undefined,
+          actionIcon: 'whatsapp',
+          onAction: link ? () => this.notifyGuardian(link, enrollment.fullName, dateLabel, type, enrollment.course) : undefined,
+        });
+      } else {
+        const skippedDateSet = new Set((result.skippedDetails ?? []).map(s => s.date));
+        const createdDates = this.businessDaysBetween(f.dateFrom, f.dateTo).filter(d => !skippedDateSet.has(d));
+        const dialogRef = this.dialog.open(AbsenceSaveResultDialogComponent, {
+          width: '480px',
+          data: {
+            created: result.created,
+            createdDates,
+            conflicts: partition.conflicts,
+            idempotents: partition.idempotents,
+            whatsappLink: link,
+            fullName: enrollment.fullName,
+            dateLabel,
+            type,
+            course: enrollment.course,
+            onWhatsapp: () => {
+              if (link) this.notifyGuardian(link, enrollment.fullName, dateLabel, type, enrollment.course);
+            },
+          },
+        });
+        this._pendingHighlight.set({ enrollmentId: enrollment.enrollmentId, dates: partition.conflicts.map(c => c.date) });
+        dialogRef.afterClosed().subscribe(() => { this.applyHighlight(); });
+      }
       await Promise.all([this.loadTodayAbsences(), this.loadAbsences()]);
     } catch (err: any) {
       this.notify.error(err?.error?.error ?? 'No se pudo guardar');
@@ -1063,17 +1177,41 @@ export class AbsencesComponent implements OnInit, OnDestroy {
     if (!r) return;
     try {
       const result = await firstValueFrom(
-        this.http.post<{ created: number; skipped: number }>('/api/absences', {
+        this.http.post<AbsenceSaveResponse>('/api/absences', {
           enrollmentId: r.enrollmentId,
           type:         r.type,
           dateFrom:     r.dateFrom,
           dateTo:       r.dateTo,
         })
       );
-      const msg = result.skipped > 0
-        ? `${result.created} registro(s) creado(s), ${result.skipped} ya existían`
-        : `${result.created} registro(s) creado(s)`;
-      this.notify.success(msg);
+      const partition = this.partitionSkipped(result);
+      if (partition.conflicts.length === 0) {
+        const msg = result.skipped > 0
+          ? `${result.created} registro(s) creado(s), ${result.skipped} ya existían`
+          : `${result.created} registro(s) creado(s)`;
+        this.notify.success(msg);
+      } else {
+        const skippedDateSet = new Set((result.skippedDetails ?? []).map(s => s.date));
+        const createdDates = this.businessDaysBetween(r.dateFrom, r.dateTo).filter(d => !skippedDateSet.has(d));
+        const dateLabel = r.dateFrom === r.dateTo ? r.dateFrom : `${r.dateFrom} al ${r.dateTo}`;
+        const dialogRef = this.dialog.open(AbsenceSaveResultDialogComponent, {
+          width: '480px',
+          data: {
+            created: result.created,
+            createdDates,
+            conflicts: partition.conflicts,
+            idempotents: partition.idempotents,
+            whatsappLink: null,
+            fullName: r.studentName,
+            dateLabel,
+            type: r.type,
+            course: '',
+            onWhatsapp: () => { dialogRef.close(); },
+          },
+        });
+        this._pendingHighlight.set({ enrollmentId: r.enrollmentId, dates: partition.conflicts.map(c => c.date) });
+        dialogRef.afterClosed().subscribe(() => { this.applyHighlight(); });
+      }
       if (this.currentVoiceJobId) {
         this.http.patch(`/api/jobs/${this.currentVoiceJobId}/confirm`, { confirmed: true }).subscribe();
         this.currentVoiceJobId = null;
@@ -1108,6 +1246,53 @@ export class AbsencesComponent implements OnInit, OnDestroy {
       next: r => { this.voiceLogs.set(r.data); this.voiceLogsLoaded = true; },
       error: () => {},
       complete: () => this.voiceLogsLoading.set(false),
+    });
+  }
+
+  private partitionSkipped(response: AbsenceSaveResponse): PartitionedSkip {
+    const conflicts: Array<{ date: string; existingType: 'F' | 'AT' }> = [];
+    let idempotents = 0;
+    for (const entry of response.skippedDetails ?? []) {
+      if (entry.conflict) conflicts.push({ date: entry.date, existingType: entry.existingType });
+      else idempotents++;
+    }
+    return { conflicts, idempotents };
+  }
+
+  // Mirrors backend/src/services/absence.service.ts:businessDaysInRange —
+  // Monday–Friday inclusive between dateFrom/dateTo (UTC).
+  private businessDaysBetween(dateFrom: string, dateTo: string): string[] {
+    const [fy, fm, fd] = dateFrom.split('-').map(Number);
+    const [ty, tm, td] = dateTo.split('-').map(Number);
+    const start = Date.UTC(fy, fm - 1, fd);
+    const end = Date.UTC(ty, tm - 1, td);
+    const days: string[] = [];
+    for (let t = start; t <= end; t += 86400000) {
+      const d = new Date(t);
+      if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6) days.push(d.toISOString().split('T')[0]);
+    }
+    return days;
+  }
+
+  private async applyHighlight(): Promise<void> {
+    const target = this._pendingHighlight();
+    if (!target) return;
+    this._pendingHighlight.set(null);
+    this.selectedTabIndex = 3;
+    await this.loadAbsences();
+    const dates = new Set(target.dates);
+    const rows = document.querySelectorAll<HTMLElement>('tr[data-enrollment-id]');
+    rows.forEach(row => {
+      if (Number(row.dataset['enrollmentId']) !== target.enrollmentId) return;
+      if (!dates.has(row.dataset['absenceDate'] ?? '')) return;
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.add('flash-conflict');
+      const cleanup = () => {
+        row.classList.remove('flash-conflict');
+        row.removeEventListener('animationend', cleanup);
+      };
+      row.addEventListener('animationend', cleanup);
+      setTimeout(cleanup, 2200);
     });
   }
 
