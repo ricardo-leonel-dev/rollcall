@@ -533,6 +533,48 @@ func stripExternalLinks(zipPath string) error {
 	return writeZipEntries(zipPath, cleaned)
 }
 
+// ── dedupeCommentShapeIDs ─────────────────────────────────────────────────────
+
+// reVMLShapeID matches the id attribute of <v:shape> elements in a VML drawing
+// part. The _x0000_s prefix is specific to <v:shape>; the sheet's single,
+// shared <v:shapetype id="_x0000_t202"> uses a different prefix (_x0000_t) and
+// must not be renumbered.
+var reVMLShapeID = regexp.MustCompile(`id="_x0000_s\d+"`)
+
+// dedupeCommentShapeIDs rewrites the id attribute of every <v:shape> found in
+// zipPath's xl/drawings/vmlDrawing*.vml parts so each comment shape on a given
+// sheet gets a unique, sequential id starting at 1025 (matching the id Excel
+// itself uses for the first manually-added comment on a sheet). excelize's
+// AddComment hardcodes id="_x0000_s1025" for every shape it appends (see
+// addDrawingVML in the vendored excelize v2.10.1's vml.go), so any sheet with
+// 2+ comments ends up with duplicate ids, which real Excel's VML/legacy-drawing
+// object model does not tolerate (R4). No-ops (returns nil without rewriting
+// the zip) if the file has no vmlDrawing part, i.e. the course had zero
+// comments.
+func dedupeCommentShapeIDs(zipPath string) error {
+	entries, err := readZipEntries(zipPath)
+	if err != nil {
+		return err
+	}
+	changed := false
+	for i, e := range entries {
+		if !strings.HasPrefix(e.name, "xl/drawings/vmlDrawing") || !strings.HasSuffix(e.name, ".vml") {
+			continue
+		}
+		next := 1025
+		entries[i].content = reVMLShapeID.ReplaceAllFunc(e.content, func([]byte) []byte {
+			id := fmt.Sprintf(`id="_x0000_s%d"`, next)
+			next++
+			return []byte(id)
+		})
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	return writeZipEntries(zipPath, entries)
+}
+
 // ── processCourse ─────────────────────────────────────────────────────────────
 
 const trimesterSheetCount = 3
@@ -758,6 +800,10 @@ outerBorder:
 		return "", err
 	}
 	f.Close()
+	if err := dedupeCommentShapeIDs(tempPath); err != nil {
+		os.Remove(tempPath)
+		return "", err
+	}
 	return tempPath, nil
 }
 
