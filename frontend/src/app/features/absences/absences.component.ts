@@ -740,10 +740,13 @@ export class AbsencesComponent implements OnInit, OnDestroy {
 
   async loadTodayAbsences(): Promise<void> {
     if (!this.selCourse) { this.todayAbsences.set([]); return; }
-    const from = dateToDateString(this.dateFrom);
-    const to = dateToDateString(this.dateTo);
+    // Los badges 'Falta hoy' / 'Atraso hoy' del Manual deben reflejar SOLO la fecha
+    // local de hoy, ignorando this.dateFrom/this.dateTo (que están atados al rango del
+    // trimestre seleccionado en la pestaña Listado). dateToDateString(new Date()) usa
+    // los componentes locales del navegador, no UTC.
+    const today = dateToDateString(new Date());
     const data = await firstValueFrom(
-      this.http.get<Absence[]>(`/api/absences?course_id=${this.selCourse}&date_from=${from}&date_to=${to}`)
+      this.http.get<Absence[]>(`/api/absences?course_id=${this.selCourse}&date_from=${today}&date_to=${today}`)
     );
     this.todayAbsences.set(data);
   }
