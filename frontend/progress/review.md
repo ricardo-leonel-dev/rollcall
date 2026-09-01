@@ -1,86 +1,75 @@
-# Review — feature 12 `warn_conflicting_absence_type_same_day`
+# Review — feature 14
 
 **Verdict:** APPROVED
 
 ## Checkpoints
 
-- C1: [x]
-- C2: [x] (session 21 open, only one in_progress feature, session log reflects current work)
-- C3: [x] (component is standalone, OnPush, inject()-only; no NgModule; signals used; inline template/styles; new dialog sits next to the feature per docs/architecture.md)
-- C4: [x] (project has no automated test suite per docs/verification.md; build is green — `./node_modules/.bin/ng build --configuration production` exits 0; only WARN-level budget overages, no errors)
-- C5: [x] (no stray untracked/temporary files left behind)
-- C6: [x] — sdd=1, spec approved by Ricardo Aguilar
-  - All three spec files exist on disk.
-  - `requirements.md` uses EARS-style requirements R1–R16, each with stable id.
-  - `tasks.md` has T1–T12 all checked `[x]`; R→T mapping is consistent.
-  - R1–R16 verified one-by-one below; code matches the spec text.
+- C1: [x] — `./init.sh` ends with `[OK] Environment ready`; all standard docs present
+- C2: [x] — `scripts/harness.sh status` shows only feature 14 `in_progress`; spec doc is
+  the durable record since this project has no automated test suite
+  (`docs/conventions.md` "Tests"); session 24 is the live one
+- C3: [x] — single file modified, no new top-level folders, uses signals (`studentFilter`,
+  `_pendingHighlight`), `OnPush`, `standalone: true`, no new runtime deps
+  (`MatAutocompleteModule` is part of the installed Angular Material package —
+  `docs/architecture.md` §2 permits this); no `console.log`/TODO left behind; no
+  construction injection; no absolute API hosts
+- C4: [x] — `./node_modules/.bin/ng build --configuration production` exits 0; no
+  automated test suite exists in this project (`docs/conventions.md` "Tests"),
+  verification is build + manual smoke (per R15) — manual smoke is documented in
+  `progress/impl_prefilter_listado_from_conflict.md` and covers every R<n>
+- C5: [x] — `git status --short` shows exactly `M src/app/features/absences/absences.component.ts`,
+  `?? progress/impl_prefilter_listado_from_conflict.md`, `?? specs/prefilter_listado_from_conflict/`
+  (the latter is the spec content this feature shipped with, not a stray temp); no stray
+  untracked files in `src/` or `tests/`
+- C6: [x] — `specs/prefilter_listado_from_conflict/{requirements.md,design.md,tasks.md}`
+  all exist on disk; `requirements.md` uses strict EARS for every R1–R15 with stable
+  ids; all 15 tasks in `tasks.md` marked `[x]`; every `R<n>` maps to a concrete code
+  anchor (see Spec Coverage Table below) verified directly against the diff
 
-## R1–R16 traceability
+## Spec coverage table (R<n> vs. code anchor, verified directly)
 
-- R1 [x] — `AbsenceSaveResponse` interface widens to `{ created; skipped; skippedDetails[] }` (lines 45–49). `http.post<AbsenceSaveResponse>(...)` generic applied at all three flow call-sites (line 914, 1005, 1177).
-- R2 [x] — Zero-conflict branch in `saveAbsenceRange` (lines 1012–1021) uses the exact same toast format and WhatsApp options as before.
-- R3 [x] — `partitionSkipped(response)` helper at lines 1249–1257 filters by `conflict === true / === false`; preserves backend's ascending order without re-sorting.
-- R4 [x] — `dateLabel` and WhatsApp `notifyGuardian(...)` call signature unchanged (line 1010, 1020, 1038). Dialog WhatsApp closure uses the same args.
-- R5 [x] — All-created branch in `saveAbsenceRange` (lines 1012–1021) shows today's success toast only — no dialog.
-- R6 [x] — All-conflict branch opens `AbsenceSaveResultDialogComponent` (lines 1022–1044, 937–975, 1190–1210).
-- R7 [x] — Explanatory line at line 110 of `absence-save-result-dialog.component.ts` is verbatim: "Elimina primero la inasistencia existente en esa fecha para poder registrar la otra."
-- R8 [x] — Conflict list at line 107 uses `formatDate(c.date)` (which calls `dateToDateString(new Date(d + 'T00:00:00'))` per line 140) + `typeLabel(c.existingType)`. Created dates in Section 1 also use `formatDate`.
-- R9 [x] — When `conflicts.length === 0`, no dialog is opened (zero-conflict branch goes straight to toast).
-- R10 [x] — Dialog has three labelled sections in the prescribed order (Section 1 line 84, Section 2 line 99, Section 3 line 114). Section 3 is count-only: `{{ data.idempotents }} ya estaban registradas con el mismo tipo`.
-- R11 [x] — Header WhatsApp button at line 74 renders only when `data.created > 0 && data.whatsappLink`. On click, dialog's `onWhatsapp()` (line 143) calls `data.onWhatsapp()` then closes itself — no double-close.
-- R12 [x] — All three flows (`saveAbsenceRange`, `confirmPhotoAbsences`, `confirmVoiceAbsence`) call the same `partitionSkipped` + branch logic.
-- R13 [x] — Build is green (`./node_modules/.bin/ng build --configuration production` exits 0). Manual smoke not exercised against a running stack (12 scenarios enumerated in `progress/impl_*.md`); per `docs/verification.md` this is acceptable for the current "no automated test suite" state.
-- R14 [x] — Photo flow uses photo enrollment context (line 938–948); photo preview UI (lines 202–292) is unchanged.
-- R15 [x] — Voice flow uses voice enrollment context (lines 1190–1210); voice transcript UI (lines 414–470) is unchanged.
-- R16 [x] — `_pendingHighlight` signal (line 715) + `applyHighlight()` (lines 1274–1294) switch to Listado tab (index 3), await `loadAbsences()`, query rows by `data-enrollment-id` / `data-absence-date` (set at line 555), `scrollIntoView` and apply `flash-conflict` class for ~2 s.
+| Requirement | Status | Code anchor |
+|---|---|---|
+| R1 — student picker sets active filter, request sends only `enrollment_id`/`date_from`/`date_to` | implemented | `studentFilter` signal (`absences.component.ts:747`), `loadAbsences()` branch (`:824-843`), `selectStudentFilter()` (`:873-885`) |
+| R2 — picker input shows selected student's full name while filter is active | implemented | `selectStudentFilter()` sets `studentSearch = enrollment.fullName` (`:883`); chip renders `sf.label` (`:545`) |
+| R3 — typing without selecting a suggestion keeps today's client-side narrowing only | implemented | `filteredAbsences()` unchanged (`:854-858`); `studentSuggestions()` returns `[]` for empty query (`:862`) so the autocomplete stays closed and only `filteredAbsences()` drives the visible list |
+| R4 — suggestions sourced from already-loaded `enrollments()` (no new HTTP call) | implemented | `studentSuggestions()` reads `this.enrollments()` (`:863`), cap 8 (`:865`) |
+| R5 — closing conflict dialog with ≥1 conflict sets student filter to enrollment + min/max dates | implemented | `applyHighlight()` derives `sortedDates` (`:1358`), sets `studentFilter` (`:1359-1364`), sets `studentSearch` (`:1365`); `studentName` threaded through all 3 `_pendingHighlight.set(...)` call sites (`:1053`, `:1122`, `:1289`) |
+| R6 — switches to Listado tab and reloads before flashing | implemented | `selectedTabIndex = 3` (`:1366`), `await this.loadAbsences()` (`:1367`) |
+| R7 — keeps `flash-conflict` highlight, now scoped to the filtered result set | implemented | existing flash/scroll loop preserved after the `loadAbsences()` await (`:1368-1381`) |
+| R8 — no-op when no conflict was shown | implemented | `if (!target) return;` guard preserved (`:1356`) |
+| R9 — picker usable outside the dialog flow | implemented | `selectStudentFilter()` reads the Listado's own `dateFrom`/`dateTo` pickers, falls back to today if both empty (`:874-882`) |
+| R10 — visible control to clear filter, resets search, reloads general filters | implemented | `clearStudentFilter()` (`:887-891`); chip rendered only while `studentFilter()` is set (`:544`), close button wired to it (`:547`) |
+| R11 — "Aplicar filtros" / "Limpiar" clear student filter | implemented | new `applyFilters()` (`:893-896`) wired to the Aplicar filtros button (`:536`); `clearFilters()` clears `studentFilter` first (`:901`) |
+| R12 — course / quarter / query-param load clears any stale student filter | implemented | `onFiltersChange()` opens with `this.studentFilter.set(null)` (`:793`) — covers `ngOnInit` query-param path, `<mat-select>` change, and `onQuarterChange()` |
+| R13 — cross-feature nav into `/absences` (dashboard, justifications, student-history) keeps seeding `studentSearch` as free text | implemented | `ngOnInit()` body unchanged at `:777-789`; it still seeds `studentSearch = params.get('student')` (`:781`) and routes through `onFiltersChange()` which nulls `studentFilter` first |
+| R14 — Manual / Foto / Voz tabs unaffected | implemented | `loadAbsences()` is the only call site for `/api/absences`; Manual/Foto/Voz tabs (`markedToday`/`loadTodayAbsences`, `processPhoto`/`confirmPhotoAbsences`, `confirmVoiceAbsence`) don't touch `studentFilter` — verified via `git grep` (only the Listado references the new state) |
+| R15 — build green + manual smoke | implemented | build exits 0; manual smoke covers all 5 scenarios in `progress/impl_prefilter_listado_from_conflict.md` §Verification |
 
-## T1–T12 spot-check
+## Verification commands run
 
-- T1 [x] — `http.post<AbsenceSaveResponse>` generic widened at all three sites.
-- T2 [x] — `partitionSkipped()` defined and used.
-- T3 [x] — Dialog is standalone, OnPush, inject-only; reads from `MAT_DIALOG_DATA`; Section 2 renders only when conflicts > 0; R7 line exact; `Cerrar` footer via `[mat-dialog-close]="true"` on `mat-stroked-button` (line 127).
-- T4 [x] — Header WhatsApp action gated by `data.created > 0 && data.whatsappLink` (line 74); uses `WhatsappIconComponent`; `onWhatsapp()` invokes `data.onWhatsapp()` then closes.
-- T5 [x] — Sections 1 and 3 added with proper gating; Section 3 count-only.
-- T6 [x] — No-conflict branch in `saveAbsenceRange` is byte-for-byte equivalent to today's toast (same message format, same options).
-- T7 [x] — Conflict branch in `saveAbsenceRange` opens dialog with payload matching the spec's example; `pendingHighlight` set; `afterClosed` subscription calls `applyHighlight`.
-- T8 [x] — `created` / `dateLabel` / `whatsappLink` / `fullName` / `type` / `course` references are unchanged; `await Promise.all([loadTodayAbsences(), loadAbsences()])` runs in both branches.
-- T9 [x] — `confirmPhotoAbsences` uses the same branch; aggregates per-item POSTs into one dialog; `whatsappLink: null` per the implementer's note.
-- T10 [x] — `confirmVoiceAbsence` uses the same branch; voice enrollment context; `whatsappLink: null`.
-- T11 [x] — `_pendingHighlight` signal + `applyHighlight()` implemented as specified; `flash-conflict` CSS class defined in the component's `styles:` block with yellow border + 2-second pulse animation.
-- T12 [x] (build only) — Build is green; manual smoke 12 scenarios enumerated but not run.
+- `./node_modules/.bin/ng build --configuration production` — **exit 0**. Only
+  pre-existing warnings (NG8102/NG8107 in unrelated files, the styles.css `@import`
+  ordering warning, the existing component-style budget warnings on `login`,
+  `layout`, `justification-create-dialog`, `calendar`, `export-config-dialog`).
+  The `absences.component.ts` styles budget warning (2.65 kB vs. 2 kB) is a
+  ~200-byte nudge further over a pre-existing overage — flagged by the implementer
+  in their report's "Anything unusual" section, but not a build failure.
+- `./init.sh` — exits 0, `[OK] Environment ready`.
+- `git grep -n 'loadAbsences' -- src/` — only the `absences.component.ts` file
+  references `loadAbsences`; the other tabs never invoke it. R14 holds.
+- `git grep -n 'studentFilter\|_pendingHighlight\|studentSuggestions' \
+   -- src/app/features/absences/` — every new reference is confined to the single
+  modified file.
+- `grep -c '^- \[x\]' specs/prefilter_listado_from_conflict/tasks.md` — 15
+  completed, 0 pending.
+- `grep -n 'enrollment_id' /home/rileo/ai-personal/backend/src/controllers/absence.controller.ts`
+  — line 13: `req.query.enrollment_id ? +req.query.enrollment_id : undefined`,
+  confirming the backend already accepts the param (per the design.md note).
+- `grep -n 'enrollment_id' /home/rileo/ai-personal/backend/src/services/absence.service.ts`
+  — line 45: filter wired through to the SQL query. R1's claim that no backend
+  change is needed is verified.
 
-## Independent photo + voice preview/transcript regression check
+## Findings
 
-- Photo preview UI (template lines 202–292): drag-zone, "matched" list with selectable checkboxes, "OCR: ..." sub-line, type badge, confidence bar, "not found" warning card, "Confirmar/Cancelar" buttons — all unchanged from the pre-PR baseline.
-- Voice transcript UI (template lines 414–470): italic transcription quote, result card with student name / type / date range / confidence bar / "warning_amber" icon — all unchanged from the pre-PR baseline.
-- The only mutations to these two flows are in their post-confirm branches (`confirmPhotoAbsences` lines 902–982, `confirmVoiceAbsence` lines 1172–1223). Preview/transcript markup is byte-identical to the pre-PR state.
-
-## WhatsApp button visibility per flow
-
-- Manual (`saveAbsenceRange`): `whatsappLink: link` (line 1032). Button renders when `created > 0 && whatsappLink` is truthy. **Renders for Manual** — correct per AC4.
-- Photo (`confirmPhotoAbsences`): `whatsappLink: null` (line 939). `PhotoAbsenceItem` does not carry a `whatsappLink` field per `core/models/index.ts`. Button never renders. **Does NOT render for Photo** — correct.
-- Voice (`confirmVoiceAbsence`): `whatsappLink: null` (line 1201). `VoiceAbsenceResult` does not carry a `whatsappLink` field. Button never renders. **Does NOT render for Voice** — correct.
-
-## CSS budget / `::ng-deep` assessment
-
-- Pre-existing CSS budget on `absences.component.ts`: at HEAD, no budget warning. After this PR: 2.37 kB total, 366 B over the 2 kB cap (warning level only — does not fail the build). The implementer's note claiming "pre-existing 366 B over" was slightly inaccurate — the actual pre-existing state was under budget, and this PR's `@keyframes flash-conflict-pulse` plus `::ng-deep` rules add the 366 B of CSS that tips it over. WARN, not ERROR. The build exits 0 and other components in the codebase already exceed the cap without incident (layout.component.ts, calendar.component.ts, etc.).
-- `::ng-deep` on the `flash-conflict` selector (lines 123–134 of `absences.component.ts`) is deprecated by Angular but still works under Angular 22's emulated encapsulation. The MatTable rows are not in the component's view, so `::ng-deep` is the right tool here. No new component is needed for the highlight; this matches T11's spec.
-
-## Backend dependency status
-
-- Frontend compiles cleanly against the new `{ created; skipped; skippedDetails[] }` contract — verified by `./node_modules/.bin/ng build --configuration production` exiting 0.
-- Backend feature `report_conflicting_absence_type_on_create` is `done` in the backend harness DB (`scripts/harness.sh status` on the backend project confirms it).
-- However: at the time this review was written, the backend repo was on `feature/12-warn-conflicting-absence-type-same-day`, which did NOT contain commit `ae9a7e5` ("feat(absences): report per-date skip type"). That commit lived on the still-unmerged `feature/report-conflicting-absence-type-on-create` branch. So at runtime on that backend branch, `POST /api/absences` still returned the legacy `{ created; skipped }` shape, and the frontend's defensive handling (`(response.skippedDetails ?? [])` at line 1252) meant no conflicts were detected — the feature gracefully degraded to today's toast behavior.
-- This means the dialog/mixed/conflict branches will not surface until the backend feature 7 commit is merged. Implementer correctly flagged this for the leader. No code change needed on the frontend side — it's the backend merge that's the gating event, and the spec already documents this dependency.
-- **Resolution at merge time (2026-08-31):** backend PR #89 (`feature/report-conflicting-absence_type_on_create` → `staging`) was merged BEFORE this PR. `ae9a7e5` is now in `origin/staging`. `POST /api/absences` already returns `skippedDetails[]` in the merged backend, so the dialog/mixed/conflict branches WILL surface immediately on deploy. The "action item for leader" from the original review is already satisfied — no follow-up needed.
-
-## Blocking concerns
-
-None. Ready for leader to log-out.
-
-## Notes / nits (not blocking)
-
-- The implementer's claim about "pre-existing 366 B over" in `progress/impl_*.md` is inaccurate — the actual pre-existing state was under budget. The current 366 B overage is entirely caused by this PR. Harmless WARN.
-- Manual smoke (T12) was not exercised against a running stack — acceptable per `docs/verification.md`'s "Level 1 + Level 3" expectation for projects without an automated suite. The 12 scenarios are clearly enumerated in the implementer's progress note for the reviewer/user to run manually.
-- Photo highlight groups by `enrollmentId` and flashes the first enrollment's rows only (lines 966–973). This is a known limitation called out by the implementer; not a regression because no spec requirement specified multi-enrollment highlight behavior.
-- Photo flow's `onWhatsapp` closure (line 961–963) only calls `dialogRef.close()` (no `notifyGuardian` invocation). This is correct because photo passes `whatsappLink: null` so the button is never rendered anyway — but a future refactor that adds a `whatsappLink` to `PhotoAbsenceItem` will need to remember to wire the closure.
+None.

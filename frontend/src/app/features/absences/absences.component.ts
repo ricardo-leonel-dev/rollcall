@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, signal, inject, OnInit, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, Params } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -12,6 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { DecimalPipe, DatePipe, SlicePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { Course, Enrollment, Absence, VoiceAbsenceResult, PhotoAbsencePreview, PhotoAbsenceItem, Quarter } from '../../core/models/index';
@@ -55,7 +56,15 @@ interface PartitionedSkip {
 
 interface PendingHighlight {
   enrollmentId: number;
+  studentName: string;
   dates: string[];
+}
+
+interface StudentFilter {
+  enrollmentId: number;
+  label: string;
+  dateFrom: string;
+  dateTo: string;
 }
 
 @Component({
@@ -63,6 +72,7 @@ interface PendingHighlight {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule,
             MatButtonModule, MatIconModule, MatTooltipModule, MatMenuModule, MatDatepickerModule,
+            MatAutocompleteModule,
             WhatsappIconComponent, QuarterSelectorComponent, DecimalPipe, DatePipe, SlicePipe],
   styles: [`
     .tab-content { padding: 20px 0; }
@@ -132,6 +142,13 @@ interface PendingHighlight {
     :host ::ng-deep tr.flash-conflict > td:last-child {
       border-right: 2px solid #f59e0b !important;
     }
+    .student-filter-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 10px 6px 14px; margin-top: 10px;
+      background: var(--paper-deep); border: 1px solid var(--border);
+      border-radius: 999px; font-size: 13px; color: var(--ink-soft);
+    }
+    .student-filter-chip strong { color: var(--ink); font-weight: 600; }
   `],
   template: `
     <div class="page-header">
@@ -507,10 +524,16 @@ interface PendingHighlight {
               <mat-form-field appearance="outline" subscriptSizing="dynamic" class="md:flex-1" style="min-width:160px">
                 <mat-label>Buscar estudiante</mat-label>
                 <mat-icon matPrefix style="color:var(--muted)">search</mat-icon>
-                <input matInput [(ngModel)]="studentSearch" placeholder="Ej: ANDRADE">
+                <input matInput [(ngModel)]="studentSearch" [matAutocomplete]="studentAuto" placeholder="Ej: ANDRADE">
               </mat-form-field>
+              <mat-autocomplete #studentAuto="matAutocomplete" [displayWith]="displayEnrollment"
+                                 (optionSelected)="selectStudentFilter($event.option.value)">
+                @for (e of studentSuggestions(); track e.enrollmentId) {
+                  <mat-option [value]="e">{{ e.fullName }}</mat-option>
+                }
+              </mat-autocomplete>
               <div class="flex gap-2 shrink-0">
-                <button mat-flat-button color="primary" (click)="loadAbsences()" style="white-space:nowrap">
+                <button mat-flat-button color="primary" (click)="applyFilters()" style="white-space:nowrap">
                   <mat-icon>filter_alt</mat-icon> Aplicar filtros
                 </button>
                 <button mat-stroked-button (click)="clearFilters()" style="white-space:nowrap">
@@ -518,6 +541,14 @@ interface PendingHighlight {
                 </button>
               </div>
             </div>
+            @if (studentFilter(); as sf) {
+              <div class="student-filter-chip">
+                Filtrando por <strong>{{ sf.label }}</strong> · {{ sf.dateFrom }} – {{ sf.dateTo }}
+                <button mat-icon-button (click)="clearStudentFilter()" matTooltip="Quitar filtro" style="width:28px;height:28px;line-height:28px;color:var(--muted)">
+                  <mat-icon style="font-size:18px;width:18px;height:18px;line-height:18px">close</mat-icon>
+                </button>
+              </div>
+            }
             @if (studentSearch) {
               <span style="color:var(--muted);font-size:12px;margin-top:8px">{{filteredAbsences().length}} de {{absences().length}}</span>
             }
@@ -713,6 +744,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   readonly voiceLogsLoading = signal(false);
 
   private readonly _pendingHighlight = signal<PendingHighlight | null>(null);
+  readonly studentFilter = signal<StudentFilter | null>(null);
 
   selectedTabIndex = 0;
   private currentVoiceJobId: string | null = null;
@@ -733,7 +765,10 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   private voiceTimer: ReturnType<typeof setInterval> | null = null;
 
   async ngOnInit(): Promise<void> {
-    this.applyDefaultQuarter();
+    const params = this.route.snapshot.queryParamMap;
+    const hasUrlDates = params.has('dateFrom') || params.has('dateTo');
+    if (!hasUrlDates) this.applyDefaultQuarter();
+
     const [courses, me] = await Promise.all([
       firstValueFrom(this.http.get<Course[]>('/api/courses')),
       firstValueFrom(this.http.get<{ notificationTemplate: string | null }>('/api/auth/me')),
@@ -742,24 +777,69 @@ export class AbsencesComponent implements OnInit, OnDestroy {
     this.selYear = this.academicYearContext.selected()?.id ?? null;
     if (me.notificationTemplate) this.notificationTemplate = me.notificationTemplate;
 
-    const params = this.route.snapshot.queryParamMap;
-    const courseParam = params.get('course');
-    if (courseParam) {
-      this.selCourse = Number(courseParam);
+    // Round-trip restore: si la URL trae cualquier filtro preservable, rehidratar
+    // el estado desde los params en vez de aplicar el comportamiento legacy.
+    if (
+      params.has('tab') || params.has('course') || params.has('student') ||
+      params.has('dateFrom') || params.has('dateTo') || params.has('filterType') ||
+      params.has('manualSearch') || params.has('photoDate') ||
+      params.has('studentId')
+    ) {
+      const tab = Number(params.get('tab') ?? '1');
+      this.selectedTabIndex = (tab >= 0 && tab <= 4) ? tab : 1;
+      const course = params.get('course');
+      if (course) this.selCourse = Number(course);
       this.studentSearch = params.get('student') ?? '';
-      const dateFromParam = params.get('dateFrom');
-      const dateToParam = params.get('dateTo');
-      if (dateFromParam) this.dateFrom = new Date(dateFromParam + 'T00:00:00');
-      if (dateToParam) this.dateTo = new Date(dateToParam + 'T00:00:00');
-      this.selectedTabIndex = 3; // Listado
+      const dateFrom = params.get('dateFrom');
+      const dateTo = params.get('dateTo');
+      if (dateFrom) this.dateFrom = new Date(dateFrom + 'T00:00:00');
+      if (dateTo) this.dateTo = new Date(dateTo + 'T00:00:00');
+      this.filterType = params.get('filterType') ?? '';
+      const photoDate = params.get('photoDate');
+      if (photoDate) this.photoDate = new Date(photoDate + 'T00:00:00');
+
       await this.onFiltersChange();
-      this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+
+      this.manualSearch = params.get('manualSearch') ?? '';
+      const studentId = params.get('studentId');
+      const studentFrom = params.get('studentFrom');
+      const studentTo = params.get('studentTo');
+      if (studentId && studentFrom && studentTo) {
+        const enrollment = this.enrollments().find(e => e.enrollmentId === Number(studentId));
+        const label = enrollment?.fullName ?? `Student #${studentId}`;
+        this.studentFilter.set({
+          enrollmentId: Number(studentId),
+          label,
+          dateFrom: studentFrom,
+          dateTo: studentTo,
+        });
+      }
+    } else {
+      this.applyDefaultQuarter();
     }
   }
 
-  private todayStr(): string { return new Date().toISOString().split('T')[0]; }
+  private serializeFiltersToQueryParams(): Params {
+    const p: Params = {};
+    if (this.selectedTabIndex !== 0) p['tab'] = this.selectedTabIndex;
+    if (this.selCourse !== null) p['course'] = this.selCourse;
+    if (this.studentSearch) p['student'] = this.studentSearch;
+    if (this.dateFrom) p['dateFrom'] = dateToDateString(this.dateFrom);
+    if (this.dateTo) p['dateTo'] = dateToDateString(this.dateTo);
+    if (this.filterType) p['filterType'] = this.filterType;
+    if (this.manualSearch) p['manualSearch'] = this.manualSearch;
+    if (this.photoDate) p['photoDate'] = dateToDateString(this.photoDate);
+    const sf = this.studentFilter();
+    if (sf) {
+      p['studentId'] = sf.enrollmentId;
+      p['studentFrom'] = sf.dateFrom;
+      p['studentTo'] = sf.dateTo;
+    }
+    return p;
+  }
 
   async onFiltersChange(): Promise<void> {
+    this.studentFilter.set(null);
     this.manualSearch = '';
     if (this.selCourse && this.selYear) {
       this.enrollLoading.set(true);
@@ -792,11 +872,18 @@ export class AbsencesComponent implements OnInit, OnDestroy {
 
   async loadAbsences(): Promise<void> {
     const params: string[] = [];
-    if (this.selCourse)  params.push(`course_id=${this.selCourse}`);
-    if (this.selYear)    params.push(`academic_year_id=${this.selYear}`);
-    if (this.dateFrom)   params.push(`date_from=${dateToDateString(this.dateFrom)}`);
-    if (this.dateTo)     params.push(`date_to=${dateToDateString(this.dateTo)}`);
-    if (this.filterType) params.push(`type=${this.filterType}`);
+    const filter = this.studentFilter();
+    if (filter) {
+      params.push(`enrollment_id=${filter.enrollmentId}`);
+      params.push(`date_from=${filter.dateFrom}`);
+      params.push(`date_to=${filter.dateTo}`);
+    } else {
+      if (this.selCourse)  params.push(`course_id=${this.selCourse}`);
+      if (this.selYear)    params.push(`academic_year_id=${this.selYear}`);
+      if (this.dateFrom)   params.push(`date_from=${dateToDateString(this.dateFrom)}`);
+      if (this.dateTo)     params.push(`date_to=${dateToDateString(this.dateTo)}`);
+      if (this.filterType) params.push(`type=${this.filterType}`);
+    }
     this.absLoading.set(true);
     try {
       const data = await firstValueFrom(this.http.get<Absence[]>(`/api/absences?${params.join('&')}`));
@@ -819,9 +906,48 @@ export class AbsencesComponent implements OnInit, OnDestroy {
     return this.absences().filter(a => a.studentName.toLowerCase().includes(q));
   }
 
+  studentSuggestions(): Enrollment[] {
+    const q = this.studentSearch.trim().toLowerCase();
+    if (!q) return [];
+    return this.enrollments()
+      .filter(e => e.fullName.toLowerCase().includes(q))
+      .slice(0, 8);
+  }
+
+  displayEnrollment(e: Enrollment | string): string {
+    if (typeof e === 'string') return e;
+    return e.fullName;
+  }
+
+  selectStudentFilter(enrollment: Enrollment): void {
+    const today = dateToDateString(new Date());
+    const dateFrom = this.dateFrom ? dateToDateString(this.dateFrom) : today;
+    const dateTo = this.dateTo ? dateToDateString(this.dateTo) : today;
+    this.studentFilter.set({
+      enrollmentId: enrollment.enrollmentId,
+      label: enrollment.fullName,
+      dateFrom,
+      dateTo,
+    });
+    this.studentSearch = enrollment.fullName;
+    this.loadAbsences();
+  }
+
+  clearStudentFilter(): void {
+    this.studentFilter.set(null);
+    this.studentSearch = '';
+    this.loadAbsences();
+  }
+
+  applyFilters(): void {
+    this.studentFilter.set(null);
+    this.loadAbsences();
+  }
+
   clearFilters(): void {
     // 'Limpiar' es local a los sub-filtros del Listado — el dropdown de período
     // (R11) se preserva; el usuario puede re-aplicar re-seleccionando un período.
+    this.studentFilter.set(null);
     this.dateFrom = null;
     this.dateTo = null;
     this.filterType = '';
@@ -949,31 +1075,38 @@ export class AbsencesComponent implements OnInit, OnDestroy {
           const hi = createdDates[createdDates.length - 1];
           return lo === hi ? lo : `${lo} al ${hi}`;
         })();
+        await this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: this.serializeFiltersToQueryParams(),
+          replaceUrl: true,
+        });
+        const returnTo = this.router.url;
         const dialogRef = this.dialog.open(AbsenceSaveResultDialogComponent, {
           width: '480px',
           data: {
             created,
             createdDates,
-            conflicts: conflicts.map(({ date, existingType }) => ({ date, existingType })),
+            conflicts: conflicts.map(({ date, existingType, enrollmentId }) => ({ date, existingType, enrollmentId })),
             idempotents,
             whatsappLink,
             fullName,
             dateLabel,
             type,
             course,
+            returnTo,
             onWhatsapp: () => {
               dialogRef.close();
             },
           },
         });
-        const grouped = new Map<number, string[]>();
+        const grouped = new Map<number, { dates: string[]; studentName: string }>();
         for (const c of conflicts) {
-          const arr = grouped.get(c.enrollmentId) ?? [];
-          arr.push(c.date);
-          grouped.set(c.enrollmentId, arr);
+          const entry = grouped.get(c.enrollmentId) ?? { dates: [], studentName: c.studentName };
+          entry.dates.push(c.date);
+          grouped.set(c.enrollmentId, entry);
         }
-        const [firstEnrollmentId, firstDates] = grouped.entries().next().value as [number, string[]];
-        this._pendingHighlight.set({ enrollmentId: firstEnrollmentId, dates: firstDates });
+        const [firstEnrollmentId, firstEntry] = grouped.entries().next().value as [number, { dates: string[]; studentName: string }];
+        this._pendingHighlight.set({ enrollmentId: firstEnrollmentId, studentName: firstEntry.studentName, dates: firstEntry.dates });
         dialogRef.afterClosed().subscribe(() => { this.applyHighlight(); });
       }
       this.photoState.set('idle');
@@ -1025,24 +1158,31 @@ export class AbsencesComponent implements OnInit, OnDestroy {
       } else {
         const skippedDateSet = new Set((result.skippedDetails ?? []).map(s => s.date));
         const createdDates = this.businessDaysBetween(f.dateFrom, f.dateTo).filter(d => !skippedDateSet.has(d));
+        await this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: this.serializeFiltersToQueryParams(),
+          replaceUrl: true,
+        });
+        const returnTo = this.router.url;
         const dialogRef = this.dialog.open(AbsenceSaveResultDialogComponent, {
           width: '480px',
           data: {
             created: result.created,
             createdDates,
-            conflicts: partition.conflicts,
+            conflicts: partition.conflicts.map(c => ({ ...c, enrollmentId: enrollment.enrollmentId })),
             idempotents: partition.idempotents,
             whatsappLink: link,
             fullName: enrollment.fullName,
             dateLabel,
             type,
             course: enrollment.course,
+            returnTo,
             onWhatsapp: () => {
               if (link) this.notifyGuardian(link, enrollment.fullName, dateLabel, type, enrollment.course);
             },
           },
         });
-        this._pendingHighlight.set({ enrollmentId: enrollment.enrollmentId, dates: partition.conflicts.map(c => c.date) });
+        this._pendingHighlight.set({ enrollmentId: enrollment.enrollmentId, studentName: enrollment.fullName, dates: partition.conflicts.map(c => c.date) });
         dialogRef.afterClosed().subscribe(() => { this.applyHighlight(); });
       }
       await Promise.all([this.loadTodayAbsences(), this.loadAbsences()]);
@@ -1194,22 +1334,29 @@ export class AbsencesComponent implements OnInit, OnDestroy {
         const skippedDateSet = new Set((result.skippedDetails ?? []).map(s => s.date));
         const createdDates = this.businessDaysBetween(r.dateFrom, r.dateTo).filter(d => !skippedDateSet.has(d));
         const dateLabel = r.dateFrom === r.dateTo ? r.dateFrom : `${r.dateFrom} al ${r.dateTo}`;
+        await this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: this.serializeFiltersToQueryParams(),
+          replaceUrl: true,
+        });
+        const returnTo = this.router.url;
         const dialogRef = this.dialog.open(AbsenceSaveResultDialogComponent, {
           width: '480px',
           data: {
             created: result.created,
             createdDates,
-            conflicts: partition.conflicts,
+            conflicts: partition.conflicts.map(c => ({ ...c, enrollmentId: r.enrollmentId })),
             idempotents: partition.idempotents,
             whatsappLink: null,
             fullName: r.studentName,
             dateLabel,
             type: r.type,
             course: '',
+            returnTo,
             onWhatsapp: () => { dialogRef.close(); },
           },
         });
-        this._pendingHighlight.set({ enrollmentId: r.enrollmentId, dates: partition.conflicts.map(c => c.date) });
+        this._pendingHighlight.set({ enrollmentId: r.enrollmentId, studentName: r.studentName, dates: partition.conflicts.map(c => c.date) });
         dialogRef.afterClosed().subscribe(() => { this.applyHighlight(); });
       }
       if (this.currentVoiceJobId) {
@@ -1278,6 +1425,14 @@ export class AbsencesComponent implements OnInit, OnDestroy {
     const target = this._pendingHighlight();
     if (!target) return;
     this._pendingHighlight.set(null);
+    const sortedDates = [...target.dates].sort();
+    this.studentFilter.set({
+      enrollmentId: target.enrollmentId,
+      label: target.studentName,
+      dateFrom: sortedDates[0],
+      dateTo: sortedDates[sortedDates.length - 1],
+    });
+    this.studentSearch = target.studentName;
     this.selectedTabIndex = 3;
     await this.loadAbsences();
     const dates = new Set(target.dates);

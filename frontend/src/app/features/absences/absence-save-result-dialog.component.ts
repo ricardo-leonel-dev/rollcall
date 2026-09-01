@@ -1,13 +1,19 @@
-import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { dateToDateString } from '../../shared/utils/date.util';
+import { Absence } from '../../core/models/index';
+import { NotificationService } from '../../core/services/notification.service';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 
 export interface AbsenceSaveResultConflict {
   date: string;
   existingType: 'F' | 'AT';
+  enrollmentId: number;
 }
 
 export interface AbsenceSaveResultDialogData {
@@ -20,6 +26,7 @@ export interface AbsenceSaveResultDialogData {
   dateLabel: string;
   type: 'F' | 'AT';
   course: string;
+  returnTo: string;
   onWhatsapp: () => void;
 }
 
@@ -58,6 +65,14 @@ export interface AbsenceSaveResultDialogData {
     .section-meta { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
     .date-list { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink-soft); }
     .date-list li { padding: 2px 0; }
+    .conflict-row {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .conflict-text { flex: 1; min-width: 0; }
+    .conflict-edit {
+      flex-shrink: 0; font-size: 12px; padding: 4px 10px;
+    }
+    .conflict-edit mat-icon { font-size: 15px; width: 15px; height: 15px; }
     .idempotent-line { font-size: 13px; color: var(--ink-soft); margin: 0; }
     .explanatory {
       font-size: 12px; color: var(--muted-strong); margin: 8px 0 0;
@@ -104,7 +119,21 @@ export interface AbsenceSaveResultDialogData {
           </div>
           <ul class="date-list">
             @for (c of data.conflicts; track c.date) {
-              <li>{{ formatDate(c.date) }} — ya registrado como {{ typeLabel(c.existingType) }}</li>
+              <li>
+                <div class="conflict-row">
+                  <span class="conflict-text">{{ formatDate(c.date) }} — ya registrado como {{ typeLabel(c.existingType) }}</span>
+                  <button mat-stroked-button class="conflict-edit"
+                          [disabled]="resolving() === c.date"
+                          (click)="editConflict(c)">
+                    @if (resolving() === c.date) {
+                      <mat-icon>hourglass_top</mat-icon>
+                    } @else {
+                      <mat-icon>edit</mat-icon>
+                    }
+                    Editar inasistencia
+                  </button>
+                </div>
+              </li>
             }
           </ul>
           <p class="explanatory">Elimina primero la inasistencia existente en esa fecha para poder registrar la otra.</p>
@@ -131,6 +160,11 @@ export interface AbsenceSaveResultDialogData {
 export class AbsenceSaveResultDialogComponent {
   private readonly dialogRef = inject(MatDialogRef<AbsenceSaveResultDialogComponent>);
   readonly data: AbsenceSaveResultDialogData = inject(MAT_DIALOG_DATA);
+  private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
+  private readonly notify = inject(NotificationService);
+
+  readonly resolving = signal<string | null>(null);
 
   typeLabel(type: 'F' | 'AT'): string {
     return type === 'F' ? 'Falta' : 'Atrasado';
@@ -143,5 +177,26 @@ export class AbsenceSaveResultDialogComponent {
   onWhatsapp(): void {
     this.data.onWhatsapp();
     this.dialogRef.close();
+  }
+
+  async editConflict(c: AbsenceSaveResultConflict): Promise<void> {
+    this.resolving.set(c.date);
+    try {
+      const matches = await firstValueFrom(this.http.get<Absence[]>(
+        `/api/absences?enrollment_id=${c.enrollmentId}&date_from=${c.date}&date_to=${c.date}`
+      ));
+      if (matches.length !== 1) {
+        this.notify.error('No se pudo encontrar la inasistencia existente');
+        return;
+      }
+      this.dialogRef.close();
+      await this.router.navigate(['/inspectors/absences/edit', matches[0].id], {
+        queryParams: { enrollmentId: c.enrollmentId, date: c.date, returnTo: this.data.returnTo },
+      });
+    } catch {
+      this.notify.error('No se pudo buscar la inasistencia existente');
+    } finally {
+      this.resolving.set(null);
+    }
   }
 }

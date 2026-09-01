@@ -36,6 +36,7 @@ export const routes: Routes = [
         children: [
           { path: 'dashboard',      loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent), canActivate: [moduleGuard], data: { module: 'dashboard' } },
           { path: 'absences',       loadComponent: () => import('./features/absences/absences.component').then(m => m.AbsencesComponent), canActivate: [moduleGuard], data: { module: 'absences' } },
+          { path: 'absences/edit/:id', loadComponent: () => import('./features/absences/absence-edit.component').then(m => m.AbsenceEditComponent), canActivate: [moduleGuard], data: { module: 'absences' } },
           { path: 'justifications', loadComponent: () => import('./features/justifications/justifications.component').then(m => m.JustificationsComponent), canActivate: [moduleGuard], data: { module: 'justifications' } },
           { path: 'student-report', loadComponent: () => import('./features/student-report/student-report.component').then(m => m.StudentReportComponent), canActivate: [moduleGuard], data: { module: 'student-report' } },
           { path: 'citations',      ...placeholder('Administración de citaciones') },
