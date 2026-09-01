@@ -757,8 +757,6 @@ export class AbsencesComponent implements OnInit, OnDestroy {
     }
   }
 
-  private todayStr(): string { return new Date().toISOString().split('T')[0]; }
-
   async onFiltersChange(): Promise<void> {
     this.manualSearch = '';
     if (this.selCourse && this.selYear) {
