@@ -1031,7 +1031,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
           data: {
             created,
             createdDates,
-            conflicts: conflicts.map(({ date, existingType }) => ({ date, existingType })),
+            conflicts: conflicts.map(({ date, existingType, enrollmentId }) => ({ date, existingType, enrollmentId })),
             idempotents,
             whatsappLink,
             fullName,
@@ -1107,7 +1107,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
           data: {
             created: result.created,
             createdDates,
-            conflicts: partition.conflicts,
+            conflicts: partition.conflicts.map(c => ({ ...c, enrollmentId: enrollment.enrollmentId })),
             idempotents: partition.idempotents,
             whatsappLink: link,
             fullName: enrollment.fullName,
@@ -1276,7 +1276,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
           data: {
             created: result.created,
             createdDates,
-            conflicts: partition.conflicts,
+            conflicts: partition.conflicts.map(c => ({ ...c, enrollmentId: r.enrollmentId })),
             idempotents: partition.idempotents,
             whatsappLink: null,
             fullName: r.studentName,
