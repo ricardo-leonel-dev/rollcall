@@ -26,6 +26,7 @@ export interface AbsenceSaveResultDialogData {
   dateLabel: string;
   type: 'F' | 'AT';
   course: string;
+  returnTo: string;
   onWhatsapp: () => void;
 }
 
@@ -190,7 +191,7 @@ export class AbsenceSaveResultDialogComponent {
       }
       this.dialogRef.close();
       await this.router.navigate(['/inspectors/absences/edit', matches[0].id], {
-        queryParams: { enrollmentId: c.enrollmentId, date: c.date },
+        queryParams: { enrollmentId: c.enrollmentId, date: c.date, returnTo: this.data.returnTo },
       });
     } catch {
       this.notify.error('No se pudo buscar la inasistencia existente');

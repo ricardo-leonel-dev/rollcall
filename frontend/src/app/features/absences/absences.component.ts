@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, signal, inject, OnInit, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, Params } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -765,7 +765,10 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   private voiceTimer: ReturnType<typeof setInterval> | null = null;
 
   async ngOnInit(): Promise<void> {
-    this.applyDefaultQuarter();
+    const params = this.route.snapshot.queryParamMap;
+    const hasUrlDates = params.has('dateFrom') || params.has('dateTo');
+    if (!hasUrlDates) this.applyDefaultQuarter();
+
     const [courses, me] = await Promise.all([
       firstValueFrom(this.http.get<Course[]>('/api/courses')),
       firstValueFrom(this.http.get<{ notificationTemplate: string | null }>('/api/auth/me')),
@@ -774,19 +777,65 @@ export class AbsencesComponent implements OnInit, OnDestroy {
     this.selYear = this.academicYearContext.selected()?.id ?? null;
     if (me.notificationTemplate) this.notificationTemplate = me.notificationTemplate;
 
-    const params = this.route.snapshot.queryParamMap;
-    const courseParam = params.get('course');
-    if (courseParam) {
-      this.selCourse = Number(courseParam);
+    // Round-trip restore: si la URL trae cualquier filtro preservable, rehidratar
+    // el estado desde los params en vez de aplicar el comportamiento legacy.
+    if (
+      params.has('tab') || params.has('course') || params.has('student') ||
+      params.has('dateFrom') || params.has('dateTo') || params.has('filterType') ||
+      params.has('manualSearch') || params.has('photoDate') ||
+      params.has('studentId')
+    ) {
+      const tab = Number(params.get('tab') ?? '1');
+      this.selectedTabIndex = (tab >= 0 && tab <= 4) ? tab : 1;
+      const course = params.get('course');
+      if (course) this.selCourse = Number(course);
       this.studentSearch = params.get('student') ?? '';
-      const dateFromParam = params.get('dateFrom');
-      const dateToParam = params.get('dateTo');
-      if (dateFromParam) this.dateFrom = new Date(dateFromParam + 'T00:00:00');
-      if (dateToParam) this.dateTo = new Date(dateToParam + 'T00:00:00');
-      this.selectedTabIndex = 3; // Listado
+      const dateFrom = params.get('dateFrom');
+      const dateTo = params.get('dateTo');
+      if (dateFrom) this.dateFrom = new Date(dateFrom + 'T00:00:00');
+      if (dateTo) this.dateTo = new Date(dateTo + 'T00:00:00');
+      this.filterType = params.get('filterType') ?? '';
+      const photoDate = params.get('photoDate');
+      if (photoDate) this.photoDate = new Date(photoDate + 'T00:00:00');
+
       await this.onFiltersChange();
-      this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+
+      this.manualSearch = params.get('manualSearch') ?? '';
+      const studentId = params.get('studentId');
+      const studentFrom = params.get('studentFrom');
+      const studentTo = params.get('studentTo');
+      if (studentId && studentFrom && studentTo) {
+        const enrollment = this.enrollments().find(e => e.enrollmentId === Number(studentId));
+        const label = enrollment?.fullName ?? `Student #${studentId}`;
+        this.studentFilter.set({
+          enrollmentId: Number(studentId),
+          label,
+          dateFrom: studentFrom,
+          dateTo: studentTo,
+        });
+      }
+    } else {
+      this.applyDefaultQuarter();
     }
+  }
+
+  private serializeFiltersToQueryParams(): Params {
+    const p: Params = {};
+    if (this.selectedTabIndex !== 0) p['tab'] = this.selectedTabIndex;
+    if (this.selCourse !== null) p['course'] = this.selCourse;
+    if (this.studentSearch) p['student'] = this.studentSearch;
+    if (this.dateFrom) p['dateFrom'] = dateToDateString(this.dateFrom);
+    if (this.dateTo) p['dateTo'] = dateToDateString(this.dateTo);
+    if (this.filterType) p['filterType'] = this.filterType;
+    if (this.manualSearch) p['manualSearch'] = this.manualSearch;
+    if (this.photoDate) p['photoDate'] = dateToDateString(this.photoDate);
+    const sf = this.studentFilter();
+    if (sf) {
+      p['studentId'] = sf.enrollmentId;
+      p['studentFrom'] = sf.dateFrom;
+      p['studentTo'] = sf.dateTo;
+    }
+    return p;
   }
 
   async onFiltersChange(): Promise<void> {
@@ -1026,6 +1075,12 @@ export class AbsencesComponent implements OnInit, OnDestroy {
           const hi = createdDates[createdDates.length - 1];
           return lo === hi ? lo : `${lo} al ${hi}`;
         })();
+        await this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: this.serializeFiltersToQueryParams(),
+          replaceUrl: true,
+        });
+        const returnTo = this.router.url;
         const dialogRef = this.dialog.open(AbsenceSaveResultDialogComponent, {
           width: '480px',
           data: {
@@ -1038,6 +1093,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
             dateLabel,
             type,
             course,
+            returnTo,
             onWhatsapp: () => {
               dialogRef.close();
             },
@@ -1102,6 +1158,12 @@ export class AbsencesComponent implements OnInit, OnDestroy {
       } else {
         const skippedDateSet = new Set((result.skippedDetails ?? []).map(s => s.date));
         const createdDates = this.businessDaysBetween(f.dateFrom, f.dateTo).filter(d => !skippedDateSet.has(d));
+        await this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: this.serializeFiltersToQueryParams(),
+          replaceUrl: true,
+        });
+        const returnTo = this.router.url;
         const dialogRef = this.dialog.open(AbsenceSaveResultDialogComponent, {
           width: '480px',
           data: {
@@ -1114,6 +1176,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
             dateLabel,
             type,
             course: enrollment.course,
+            returnTo,
             onWhatsapp: () => {
               if (link) this.notifyGuardian(link, enrollment.fullName, dateLabel, type, enrollment.course);
             },
@@ -1271,6 +1334,12 @@ export class AbsencesComponent implements OnInit, OnDestroy {
         const skippedDateSet = new Set((result.skippedDetails ?? []).map(s => s.date));
         const createdDates = this.businessDaysBetween(r.dateFrom, r.dateTo).filter(d => !skippedDateSet.has(d));
         const dateLabel = r.dateFrom === r.dateTo ? r.dateFrom : `${r.dateFrom} al ${r.dateTo}`;
+        await this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: this.serializeFiltersToQueryParams(),
+          replaceUrl: true,
+        });
+        const returnTo = this.router.url;
         const dialogRef = this.dialog.open(AbsenceSaveResultDialogComponent, {
           width: '480px',
           data: {
@@ -1283,6 +1352,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
             dateLabel,
             type: r.type,
             course: '',
+            returnTo,
             onWhatsapp: () => { dialogRef.close(); },
           },
         });
