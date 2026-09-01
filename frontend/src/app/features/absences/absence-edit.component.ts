@@ -68,7 +68,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
         <div class="not-found-body" style="margin-top:6px">
           Puede que ya haya sido eliminada o que el enlace no sea válido.
         </div>
-        <a class="back-link" routerLink="/inspectors/absences" style="margin-top:18px">
+        <a class="back-link" [routerLink]="returnTo" style="margin-top:18px">
           <mat-icon style="font-size:16px;width:16px;height:16px">arrow_back</mat-icon>
           Volver al listado
         </a>
@@ -139,15 +139,27 @@ export class AbsenceEditComponent implements OnInit {
 
   readonly state = signal<'loading' | 'not-found' | 'ready'>('loading');
   readonly saving = signal(false);
+  returnTo = '/inspectors/absences';
   absence: Absence | null = null;
   date: Date | null = null;
   type: 'F' | 'AT' = 'F';
   notes = '';
 
+  private sanitizeSameOrigin(url: string): string {
+    try {
+      const parsed = new URL(url, window.location.origin);
+      return parsed.origin === window.location.origin ? url : '/inspectors/absences';
+    } catch {
+      return '/inspectors/absences';
+    }
+  }
+
   async ngOnInit(): Promise<void> {
     const id = Number(this.route.snapshot.paramMap.get('id'));
     const enrollmentId = this.route.snapshot.queryParamMap.get('enrollmentId');
     const dateParam = this.route.snapshot.queryParamMap.get('date');
+    const returnToParam = this.route.snapshot.queryParamMap.get('returnTo');
+    if (returnToParam) this.returnTo = this.sanitizeSameOrigin(returnToParam);
     if (!id || !enrollmentId || !dateParam) {
       this.state.set('not-found');
       return;
@@ -178,7 +190,7 @@ export class AbsenceEditComponent implements OnInit {
         notes: this.notes,
       }));
       this.notify.success('Inasistencia actualizada');
-      await this.router.navigateByUrl('/inspectors/absences');
+      await this.router.navigateByUrl(this.returnTo);
     } catch (err: any) {
       this.notify.error(err?.error?.error ?? 'No se pudo guardar');
     } finally {
@@ -201,7 +213,7 @@ export class AbsenceEditComponent implements OnInit {
       try {
         await firstValueFrom(this.http.delete(`/api/absences/${this.absence.id}`));
         this.notify.success('Inasistencia eliminada');
-        await this.router.navigateByUrl('/inspectors/absences');
+        await this.router.navigateByUrl(this.returnTo);
       } catch (err: any) {
         this.notify.error(err?.error?.error ?? 'No se pudo eliminar');
       } finally {
@@ -211,6 +223,6 @@ export class AbsenceEditComponent implements OnInit {
   }
 
   cancel(): void {
-    this.router.navigateByUrl('/inspectors/absences');
+    this.router.navigateByUrl(this.returnTo);
   }
 }
