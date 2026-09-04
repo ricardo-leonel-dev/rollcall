@@ -21,7 +21,7 @@ import { AcademicYearContextService } from '../../core/services/academic-year-co
 import { NotificationService } from '../../core/services/notification.service';
 import { QuarterContextService } from '../../core/services/quarter-context.service';
 import { QuarterSelectorComponent } from '../../shared/components/quarter-selector/quarter-selector.component';
-import { DEFAULT_NOTIFICATION_TEMPLATE } from '../../shared/components/profile-dialog/profile-dialog.component';
+import { NotificationTemplateService } from '../../core/services/notification-template.service';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AbsenceRangeDialogComponent, AbsenceRangeDialogResult } from './absence-range-dialog.component';
@@ -745,6 +745,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
 
   private readonly _pendingHighlight = signal<PendingHighlight | null>(null);
   readonly studentFilter = signal<StudentFilter | null>(null);
+  private readonly templateService = inject(NotificationTemplateService);
 
   selectedTabIndex = 0;
   private currentVoiceJobId: string | null = null;
@@ -759,7 +760,6 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   filterType = '';
   studentSearch = '';
   manualSearch = '';
-  private notificationTemplate = DEFAULT_NOTIFICATION_TEMPLATE;
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
   private voiceTimer: ReturnType<typeof setInterval> | null = null;
@@ -769,13 +769,12 @@ export class AbsencesComponent implements OnInit, OnDestroy {
     const hasUrlDates = params.has('dateFrom') || params.has('dateTo');
     if (!hasUrlDates) this.applyDefaultQuarter();
 
-    const [courses, me] = await Promise.all([
+    const [courses] = await Promise.all([
       firstValueFrom(this.http.get<Course[]>('/api/courses')),
-      firstValueFrom(this.http.get<{ notificationTemplate: string | null }>('/api/auth/me')),
+      this.templateService.load(),
     ]);
     this.courses.set(courses);
     this.selYear = this.academicYearContext.selected()?.id ?? null;
-    if (me.notificationTemplate) this.notificationTemplate = me.notificationTemplate;
 
     // Round-trip restore: si la URL trae cualquier filtro preservable, rehidratar
     // el estado desde los params en vez de aplicar el comportamiento legacy.
@@ -1199,7 +1198,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
       return;
     }
     const label = type === 'F' ? 'una falta' : 'un atraso';
-    const message = this.notificationTemplate
+    const message = this.templateService.getTemplate('absences')
       .replace(/\{\{nombre\}\}/g, studentName)
       .replace(/\{\{fecha\}\}/g, date)
       .replace(/\{\{tipo\}\}/g, label)
