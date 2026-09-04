@@ -295,3 +295,8 @@ export interface PhotoAbsencePreview {
   notFound: string[];
   total:    number;
 }
+
+export interface NotificationTemplate {
+  actionKey: string;
+  template:  string;
+}

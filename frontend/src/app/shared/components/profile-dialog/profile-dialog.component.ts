@@ -9,9 +9,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
-
-export const DEFAULT_NOTIFICATION_TEMPLATE =
-  'Estimado representante, le informamos que {{nombre}} registró {{tipo}} el día {{fecha}} en el curso {{curso}}. Por favor comuníquese con la institución para más información.';
+import { NotificationTemplateService } from '../../../core/services/notification-template.service';
 
 export interface AvatarPreset { id: string; icon: string; color: string; }
 
@@ -19,15 +17,15 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
   { id: 'indigo-school', icon: 'school',         color: '#6366f1' },
   { id: 'purple-star',   icon: 'star',           color: '#8b5cf6' },
   { id: 'green-leaf',    icon: 'eco',             color: '#16a34a' },
-  { id: 'amber-sun',     icon: 'wb_sunny',        color: '#f59e0b' },
-  { id: 'red-heart',     icon: 'favorite',        color: '#dc2626' },
-  { id: 'blue-wave',     icon: 'water',           color: '#0ea5e9' },
-  { id: 'pink-flower',   icon: 'local_florist',   color: '#ec4899' },
-  { id: 'teal-bolt',     icon: 'bolt',            color: '#0d9488' },
+  { id: 'amber-sun',    icon: 'wb_sunny',        color: '#f59e0b' },
+  { id: 'red-heart',    icon: 'favorite',        color: '#dc2626' },
+  { id: 'blue-wave',    icon: 'water',           color: '#0ea5e9' },
+  { id: 'pink-flower',  icon: 'local_florist',   color: '#ec4899' },
+  { id: 'teal-bolt',    icon: 'bolt',            color: '#0d9488' },
   { id: 'orange-rocket', icon: 'rocket_launch',   color: '#ea580c' },
-  { id: 'gray-cat',      icon: 'pets',            color: '#64748b' },
-  { id: 'violet-moon',   icon: 'dark_mode',       color: '#7c3aed' },
-  { id: 'lime-bug',      icon: 'bug_report',      color: '#65a30d' },
+  { id: 'gray-cat',     icon: 'pets',            color: '#64748b' },
+  { id: 'violet-moon',  icon: 'dark_mode',       color: '#7c3aed' },
+  { id: 'lime-bug',     icon: 'bug_report',      color: '#65a30d' },
 ];
 
 export function resolveAvatarPreset(avatarUrl: string | null | undefined): AvatarPreset | null {
@@ -39,11 +37,29 @@ export function resolveAvatarPreset(avatarUrl: string | null | undefined): Avata
 interface Me {
   fullName: string | null;
   email: string | null;
-  notificationTemplate: string | null;
   avatarUrl: string | null;
   title: string | null;
   signatureLabel: string | null;
 }
+
+interface NotificationTemplateSection {
+  actionKey: string;
+  label: string;
+  description: string;
+  placeholders: string[];
+  previewSample: Record<string, string>;
+}
+
+const NOTIFICATION_TEMPLATE_SECTIONS: NotificationTemplateSection[] = [
+  {
+    actionKey: 'absences',
+    label: 'Faltas y atrasos (WhatsApp)',
+    description:
+      'Se usa al notificar por WhatsApp a un representante sobre una falta o atraso. Es personal — solo aplica a tu cuenta.',
+    placeholders: ['{{nombre}}', '{{fecha}}', '{{tipo}}', '{{curso}}'],
+    previewSample: { nombre: 'JUAN PÉREZ', fecha: '2026-06-17', tipo: 'una falta', curso: 'OCTAVO "A"' },
+  },
+];
 
 @Component({
   standalone: true,
@@ -153,32 +169,32 @@ interface Me {
         </div>
       </div>
 
-      <div class="section">
-        <div class="section-title">Mensaje de notificación</div>
-        <p style="font-size:13px;color:var(--muted-strong);margin-top:0">
-          Se usa al notificar por WhatsApp a un representante sobre una falta o atraso. Es personal — solo aplica a tu cuenta.
-        </p>
-        <div class="placeholders">
-          @for (ph of placeholders; track ph) {
-            <button type="button" class="ph-chip" (click)="insert(ph)">{{ph}}</button>
-          }
-        </div>
-        <mat-form-field appearance="outline" style="width:100%">
-          <mat-label>Plantilla</mat-label>
-          <textarea matInput rows="4" [(ngModel)]="template"></textarea>
-        </mat-form-field>
-        @if (template().trim()) {
-          <div style="margin-top:12px">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px">Vista previa</div>
-            <div style="background:var(--paper-deep);border:1px solid var(--border-soft);border-radius:10px;padding:12px;font-size:13px;color:var(--ink-soft)">
-              {{preview()}}
-            </div>
+      @for (section of sections; track section.actionKey) {
+        <div class="section">
+          <div class="section-title">{{section.label}}</div>
+          <p style="font-size:13px;color:var(--muted-strong);margin-top:0">{{section.description}}</p>
+          <div class="placeholders">
+            @for (ph of section.placeholders; track ph) {
+              <button type="button" class="ph-chip" (click)="insert(section, ph)">{{ph}}</button>
+            }
           </div>
-        }
-        <div style="display:flex;justify-content:flex-end;margin-top:12px">
-          <button mat-flat-button color="primary" (click)="saveTemplate()" [disabled]="savingTemplate()">Guardar mensaje</button>
+          <mat-form-field appearance="outline" style="width:100%">
+            <mat-label>Plantilla</mat-label>
+            <textarea matInput rows="4" [(ngModel)]="values[section.actionKey]"></textarea>
+          </mat-form-field>
+          @if ((values[section.actionKey] ?? '').trim()) {
+            <div style="margin-top:12px">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px">Vista previa</div>
+              <div style="background:var(--paper-deep);border:1px solid var(--border-soft);border-radius:10px;padding:12px;font-size:13px;color:var(--ink-soft)">
+                {{preview(section)}}
+              </div>
+            </div>
+          }
+          <div style="display:flex;justify-content:flex-end;margin-top:12px">
+            <button mat-flat-button color="primary" (click)="saveTemplate(section)" [disabled]="savingActionKey() === section.actionKey">Guardar mensaje</button>
+          </div>
         </div>
-      </div>
+      }
 
     </mat-dialog-content>
     <mat-dialog-actions align="end">
@@ -191,19 +207,20 @@ export class ProfileDialogComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly notify = inject(NotificationService);
   private readonly auth = inject(AuthService);
+  private readonly templateService = inject(NotificationTemplateService);
 
   readonly presets = AVATAR_PRESETS;
-  readonly placeholders = ['{{nombre}}', '{{fecha}}', '{{tipo}}', '{{curso}}'];
+  readonly sections = NOTIFICATION_TEMPLATE_SECTIONS;
 
-  readonly template = signal('');
   readonly avatarUrl = signal<string | null>(null);
   readonly selectedPreset = signal<string | null>(null);
   readonly savingProfile = signal(false);
   readonly savingPassword = signal(false);
-  readonly savingTemplate = signal(false);
   readonly savingAvatar = signal(false);
   readonly savingSignature = signal(false);
+  readonly savingActionKey = signal<string | null>(null);
 
+  values: Record<string, string> = {};
   fullName = '';
   email = '';
   title = '';
@@ -212,25 +229,48 @@ export class ProfileDialogComponent implements OnInit {
   newPassword = '';
   confirmPassword = '';
 
-  readonly preview = () => this.template()
-    .replace(/\{\{nombre\}\}/g, 'JUAN PÉREZ')
-    .replace(/\{\{fecha\}\}/g, '2026-06-17')
-    .replace(/\{\{tipo\}\}/g, 'una falta')
-    .replace(/\{\{curso\}\}/g, 'OCTAVO "A"');
-
   async ngOnInit(): Promise<void> {
-    const me = await firstValueFrom(this.http.get<Me>('/api/auth/me'));
+    const [me] = await Promise.all([
+      firstValueFrom(this.http.get<Me>('/api/auth/me')),
+      this.templateService.load(),
+    ]);
     this.fullName = me.fullName ?? '';
     this.email = me.email ?? '';
     this.title = me.title ?? '';
     this.signatureLabel = me.signatureLabel ?? '';
-    this.template.set(me.notificationTemplate || DEFAULT_NOTIFICATION_TEMPLATE);
     this.avatarUrl.set(me.avatarUrl);
     this.selectedPreset.set(resolveAvatarPreset(me.avatarUrl)?.id ?? null);
+    for (const s of this.sections) {
+      this.values[s.actionKey] = this.templateService.getTemplate(s.actionKey);
+    }
   }
 
-  insert(placeholder: string): void {
-    this.template.update(t => t + (t.endsWith(' ') || !t ? '' : ' ') + placeholder);
+  preview(section: NotificationTemplateSection): string {
+    let out = this.values[section.actionKey] ?? '';
+    for (const [k, v] of Object.entries(section.previewSample)) out = out.replaceAll(`{{${k}}}`, v);
+    return out;
+  }
+
+  insert(section: NotificationTemplateSection, placeholder: string): void {
+    const current = this.values[section.actionKey] ?? '';
+    this.values[section.actionKey] = current + (current.endsWith(' ') || !current ? '' : ' ') + placeholder;
+  }
+
+  async saveTemplate(section: NotificationTemplateSection): Promise<void> {
+    const value = this.values[section.actionKey] ?? '';
+    if (!value.trim()) {
+      this.notify.warning('Escribe un mensaje antes de guardar');
+      return;
+    }
+    this.savingActionKey.set(section.actionKey);
+    try {
+      await this.templateService.saveTemplate(section.actionKey, value);
+      this.notify.success('Mensaje guardado');
+    } catch (err: any) {
+      this.notify.error(err?.error?.error ?? 'No se pudo guardar el mensaje');
+    } finally {
+      this.savingActionKey.set(null);
+    }
   }
 
   async saveProfile(): Promise<void> {
@@ -301,13 +341,5 @@ export class ProfileDialogComponent implements OnInit {
     } catch (err: any) {
       this.notify.error(err?.error?.error ?? 'No se pudo subir la foto');
     } finally { this.savingAvatar.set(false); }
-  }
-
-  async saveTemplate(): Promise<void> {
-    this.savingTemplate.set(true);
-    try {
-      await firstValueFrom(this.http.put('/api/auth/me', { notificationTemplate: this.template() }));
-      this.notify.success('Mensaje guardado');
-    } finally { this.savingTemplate.set(false); }
   }
 }
