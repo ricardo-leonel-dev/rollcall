@@ -23,6 +23,8 @@ export const MODULE_KEYS = [
   'student-report',
 ];
 
+export const NOTIFICATION_ACTION_KEYS = ['absences', 'citations'];
+
 async function assertRoleAssignable(roleId: number | undefined, isActorSuperAdmin: boolean) {
   if (!roleId) return;
   const role = await AppDataSource.getRepository(Role).findOne({ where: { id: roleId } });

@@ -18,6 +18,7 @@ import { JustificationAttachment } from './entities/JustificationAttachment';
 import { Institution } from './entities/Institution';
 import { UserCourse } from './entities/UserCourse';
 import { UserModule } from './entities/UserModule';
+import { UserMessageTemplate } from './entities/UserMessageTemplate';
 
 const dbSchema = process.env.DB_SCHEMA || 'attendance';
 
@@ -55,6 +56,7 @@ export const AppDataSource = new DataSource({
     Institution,
     UserCourse,
     UserModule,
+    UserMessageTemplate,
   ],
   migrations: [],
   subscribers: [],

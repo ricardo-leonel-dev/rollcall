@@ -32,9 +32,6 @@ export class User {
   @Column({ name: 'signature_label', nullable: true, type: 'varchar', length: 150 })
   signatureLabel!: string | null;
 
-  @Column({ name: 'notification_template', type: 'text', nullable: true })
-  notificationTemplate!: string | null;
-
   @Column({ name: 'avatar_url', nullable: true, type: 'varchar', length: 500 })
   avatarUrl!: string | null;
 
