@@ -91,7 +91,6 @@ export async function getMe(userId: number) {
     roleId: user.roleId,
     institutionId: user.institutionId,
     isActive: user.isActive,
-    notificationTemplate: user.notificationTemplate,
     avatarUrl: user.avatarUrl,
     title: user.title,
     signatureLabel: user.signatureLabel,
@@ -100,14 +99,13 @@ export async function getMe(userId: number) {
   };
 }
 
-export async function updateMe(userId: number, data: Partial<{ fullName: string; email: string; notificationTemplate: string; title: string; signatureLabel: string }>) {
+export async function updateMe(userId: number, data: Partial<{ fullName: string; email: string; title: string; signatureLabel: string }>) {
   const userRepo = AppDataSource.getRepository(User);
   const user = await userRepo.findOne({ where: { id: userId } });
   if (!user) throw Object.assign(new Error('Usuario no encontrado'), { status: 404 });
 
   if (data.fullName !== undefined)           user.fullName           = data.fullName;
   if (data.email !== undefined)              user.email              = data.email;
-  if (data.notificationTemplate !== undefined) user.notificationTemplate = data.notificationTemplate;
   if (data.title !== undefined)              user.title              = data.title;
   if (data.signatureLabel !== undefined)     user.signatureLabel     = data.signatureLabel;
   await userRepo.save(user);

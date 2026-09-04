@@ -22,6 +22,7 @@ import reportsRouter         from '../controllers/reports.controller';
 import institutionRouter     from '../controllers/institution.controller';
 import aiRouter              from '../controllers/ai.controller';
 import jobsRouter            from '../controllers/jobs.controller';
+import notificationTemplateRouter from '../controllers/notification-template.controller';
 
 const router = Router();
 
@@ -54,5 +55,6 @@ router.use('/reports',              reportsRouter);
 router.use('/institutions',         institutionRouter);
 router.use('/ai',                   aiRouter);
 router.use('/jobs',                 jobsRouter);
+router.use('/notification-templates', notificationTemplateRouter);
 
 export default router;
