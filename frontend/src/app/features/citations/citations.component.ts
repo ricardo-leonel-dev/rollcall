@@ -18,6 +18,7 @@ import { QuarterSelectorComponent } from '../../shared/components/quarter-select
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { CitationHistoryDialogComponent } from './citation-history-dialog.component';
+import { CitationDialogComponent } from './citation-dialog.component';
 
 @Component({
   standalone: true,
@@ -189,13 +190,6 @@ export class CitationsComponent implements OnInit {
   private scopeStart: string | null = null;
   private scopeEnd: string | null = null;
 
-  // Local WhatsApp template (R25). Deferred migration to NotificationTemplateService
-  // is intentionally bundled with feature #21's create/edit dialog (design.md,
-  // discarded alternative #1).
-  private readonly CITATION_WHATSAPP_TEMPLATE =
-    'Estimado apoderado, se ha registrado una citación para {{nombre}} el {{fecha}}. ' +
-    'Por favor confirmar asistencia.';
-
   async ngOnInit(): Promise<void> {
     this.applyDefaultQuarter();
     const [courses] = await Promise.all([
@@ -273,7 +267,7 @@ export class CitationsComponent implements OnInit {
     if (!row.whatsappLink || !target) return;
     if (target.status === 'closed') { window.open(row.whatsappLink, '_blank'); return; }
     const dateLabel = target.time ? `${target.dateFrom} a las ${target.time}` : target.dateFrom;
-    const message = this.CITATION_WHATSAPP_TEMPLATE
+    const message = this.templateService.getTemplate('citations')
       .replace(/\{\{nombre\}\}/g, row.studentName)
       .replace(/\{\{fecha\}\}/g, dateLabel);
     window.open(`${row.whatsappLink}?text=${encodeURIComponent(message)}`, '_blank');
@@ -315,7 +309,18 @@ export class CitationsComponent implements OnInit {
   }
 
   private openCitationEditor(row: CitationRosterRow, citation?: Citation): void {
-    // TODO(feature #21 citations_schedule_dialog): open the real create/edit dialog here.
-    this.notify.info('El editor de citaciones estará disponible próximamente.');
+    this.dialog.open(CitationDialogComponent, {
+      width: '560px',
+      data: {
+        enrollmentId: row.enrollmentId,
+        studentName: row.studentName,
+        whatsappLink: row.whatsappLink,
+        pendingCitations: citation ? [] : row.citations.filter(c => c.status === 'pending'),
+        citation,
+      },
+    }).afterClosed().subscribe(async saved => {
+      if (!saved) return;
+      await this.loadRoster();
+    });
   }
 }
