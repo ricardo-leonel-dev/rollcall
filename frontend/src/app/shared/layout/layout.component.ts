@@ -5,7 +5,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSelectModule } from '@angular/material/select';
-import { MatDialog } from '@angular/material/dialog';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
@@ -14,7 +13,7 @@ import { InstitutionContextService } from '../../core/services/institution-conte
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { QuarterContextService } from '../../core/services/quarter-context.service';
 import { ThemeService } from '../../core/services/theme.service';
-import { ProfileDialogComponent, resolveAvatarPreset } from '../components/profile-dialog/profile-dialog.component';
+import { resolveAvatarPreset } from '../../features/profile/profile.component';
 import { SECTIONS, SubNavItem } from '../../core/nav-items';
 
 @Component({
@@ -317,7 +316,6 @@ export class LayoutComponent implements OnInit {
   readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
   private readonly bp = inject(BreakpointObserver);
-  private readonly dialog = inject(MatDialog);
 
   // Superadmin requests need the X-Institution-Id header, which the auth
   // interceptor only attaches once institutionContext has picked one — gate
@@ -352,7 +350,7 @@ export class LayoutComponent implements OnInit {
   }
 
   openProfile(): void {
-    this.dialog.open(ProfileDialogComponent, { width: '520px' });
+    this.router.navigate(['/profile']);
   }
 
   readonly avatarPreset = () => resolveAvatarPreset(this.auth.currentUser()?.avatarUrl);

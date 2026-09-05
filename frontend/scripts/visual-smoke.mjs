@@ -150,8 +150,14 @@ const MOCK_CITATION_REASONS = [
 async function mockApi(context) {
   await context.route('**/api/**', async (route) => {
     const url = route.request().url();
-    if (url.includes('/api/auth/login') || url.includes('/api/auth/me')) {
+    if (url.includes('/api/auth/login')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: 'fake-visual-smoke-jwt', user: MOCK_USER }) });
+    }
+    if (url.includes('/api/auth/me')) {
+      // Matches the actual endpoint shape (Me payload, no envelope) so the
+      // ProfileComponent's `get<Me>('/api/auth/me')` renders with fullName,
+      // email, avatarUrl, etc. populated in the visual smoke.
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER) });
     }
     if (url.includes('/api/academic-years') && !url.includes('/api/academic-years/')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_YEARS) });
@@ -213,6 +219,14 @@ async function mockApi(context) {
     }
     if (url.includes('/api/institutions')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 1, name: 'Test Institution', primaryColor: '#6366f1', secondaryColor: '#8b5cf6' }]) });
+    }
+    if (url.includes('/api/notification-templates')) {
+      // ProfileComponent fetches this in ngOnInit to load the WhatsApp template.
+      // Returning an array (not `{}`) so the component's `.find()` doesn't throw.
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
+        { actionKey: 'absences', template: 'Estimado representante, le informamos que {{nombre}} registró {{tipo}} el día {{fecha}} en el curso {{curso}}. Por favor comuníquese con la institución para más información.' },
+        { actionKey: 'citations', template: 'Estimado apoderado, se ha registrado una citación para {{nombre}} el {{fecha}}. Por favor confirmar asistencia.' },
+      ]) });
     }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) });
   });
