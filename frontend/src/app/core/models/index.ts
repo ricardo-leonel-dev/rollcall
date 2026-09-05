@@ -29,6 +29,20 @@ export interface Course {
   isActive: boolean;
 }
 
+export type CitationReasonSeverity = 'low' | 'medium' | 'high';
+
+export interface CitationReason {
+  id: number;
+  institutionId: number;
+  name: string;
+  severity: CitationReasonSeverity;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
 export interface CourseAcademicYear {
   id: number;
   courseId: number;

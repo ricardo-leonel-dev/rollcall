@@ -11,17 +11,19 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { firstValueFrom, map } from 'rxjs';
-import { AcademicYear, Course, User, Role, RolePermission, Institution, Quarter } from '../../core/models/index';
+import { AcademicYear, Course, User, Role, RolePermission, Institution, Quarter, CitationReason } from '../../core/models/index';
 import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { QuarterService } from '../../core/services/quarter.service';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { CITATION_REASON_SEVERITY_OPTIONS, citationReasonSeverityBadgeClass } from '../../shared/utils/citation-reason.util';
 import { InstitutionDialogComponent } from './institution-dialog.component';
 import { AcademicYearDialogComponent, AcademicYearDialogResult } from './academic-year-dialog.component';
 import { QuartersDialogComponent, QuartersDialogResult } from './quarters-dialog.component';
 import { CourseDialogComponent } from './course-dialog.component';
+import { CitationReasonDialogComponent, CitationReasonDialogData } from './citation-reason-dialog.component';
 import { UserDialogComponent } from './user-dialog.component';
 import { UserPermissionsDialogComponent } from './user-permissions-dialog.component';
 import { RoleDialogComponent } from './role-dialog.component';
@@ -236,6 +238,50 @@ import { MODULE_KEYS } from '../../core/nav-items';
                 <div class="admin-row-actions">
                   <button mat-icon-button style="color:var(--muted-strong)" (click)="openCourseDialog(c)"><mat-icon>edit</mat-icon></button>
                   <button mat-icon-button style="color:#b91c1c" (click)="deleteCourse(c.id)"><mat-icon>delete_outline</mat-icon></button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- MOTIVOS DE CITACIÓN -->
+      @if (activeTab() === 'citation-reasons') {
+        <div class="tab-content">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+            <button mat-flat-button color="primary" (click)="openCitationReasonDialog()">
+              <mat-icon>add</mat-icon> Agregar motivo
+            </button>
+          </div>
+          <div class="data-table-wrap hidden md:block">
+            <table class="data-table">
+              <thead><tr><th>Nombre</th><th>Severidad</th><th>Descripción</th><th></th></tr></thead>
+              <tbody>
+                @for (r of citationReasons(); track r.id) {
+                  <tr>
+                    <td style="font-weight:500">{{r.name}}</td>
+                    <td><span [class]="severityBadgeClass(r.severity)">{{severityLabel(r.severity)}}</span></td>
+                    <td style="color:var(--muted-strong)">{{r.description || '—'}}</td>
+                    <td>
+                      <button mat-icon-button style="color:var(--muted-strong)" (click)="openCitationReasonDialog(r)"><mat-icon>edit</mat-icon></button>
+                      <button mat-icon-button style="color:#b91c1c" (click)="deleteCitationReason(r.id)"><mat-icon>delete_outline</mat-icon></button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="md:hidden">
+            @for (r of citationReasons(); track r.id) {
+              <div class="admin-row">
+                <div>
+                  <div style="font-weight:600">{{r.name}}</div>
+                  <span [class]="severityBadgeClass(r.severity)" style="margin-top:4px;display:inline-block">{{severityLabel(r.severity)}}</span>
+                  <div style="font-size:12px;color:var(--muted);margin-top:4px">{{r.description || '—'}}</div>
+                </div>
+                <div class="admin-row-actions">
+                  <button mat-icon-button style="color:var(--muted-strong)" (click)="openCitationReasonDialog(r)"><mat-icon>edit</mat-icon></button>
+                  <button mat-icon-button style="color:#b91c1c" (click)="deleteCitationReason(r.id)"><mat-icon>delete_outline</mat-icon></button>
                 </div>
               </div>
             }
@@ -459,6 +505,7 @@ export class AdminComponent implements OnInit {
 
   readonly years = this.academicYearContext.years;
   readonly courses = signal<Course[]>([]);
+  readonly citationReasons = signal<CitationReason[]>([]);
   readonly users = signal<User[]>([]);
   readonly roles = signal<Role[]>([]);
   readonly permissions = signal<RolePermission[]>([]);
@@ -526,13 +573,15 @@ export class AdminComponent implements OnInit {
     if (!noInstitutionYet) await this.academicYearContext.load();
     const yearId = this.academicYearContext.selectedId();
     const usersUrl = yearId ? `/api/users?academic_year_id=${yearId}` : '/api/users';
-    const [courses, users, roles, quarters] = await Promise.all([
+    const [courses, users, roles, quarters, citationReasons] = await Promise.all([
       noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<Course[]>('/api/courses')).catch(() => []),
       noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<User[]>(usersUrl)).catch(() => []),
       firstValueFrom(this.http.get<Role[]>('/api/roles')),
       noInstitutionYet ? Promise.resolve([] as Quarter[]) : this.quarterService.getAll().catch(() => [] as Quarter[]),
+      noInstitutionYet ? Promise.resolve([] as CitationReason[]) : firstValueFrom(this.http.get<CitationReason[]>('/api/citation-reasons')).catch(() => [] as CitationReason[]),
     ]);
     this.courses.set(courses);
+    this.citationReasons.set(citationReasons);
     this.users.set(users); this.roles.set(roles);
     if (!noInstitutionYet && yearId !== null) {
       this.setQuartersForYear(yearId, quarters);
@@ -691,6 +740,40 @@ export class AdminComponent implements OnInit {
       if (!ok) return;
       await firstValueFrom(this.http.delete(`/api/courses/${id}`));
       await this.loadAll();
+    });
+  }
+
+  severityBadgeClass(severity: string): string {
+    return citationReasonSeverityBadgeClass(severity);
+  }
+
+  severityLabel(severity: string): string {
+    return CITATION_REASON_SEVERITY_OPTIONS.find(o => o.value === severity)?.label ?? severity;
+  }
+
+  openCitationReasonDialog(reason?: CitationReason): void {
+    const data: CitationReasonDialogData = { mode: reason ? 'edit' : 'create', reason };
+    this.dialog.open(CitationReasonDialogComponent, {
+      width: '420px',
+      data,
+    }).afterClosed().subscribe(async ok => {
+      if (ok) await this.loadAll();
+    });
+  }
+
+  deleteCitationReason(id: number): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: { title: 'Eliminar motivo de citación', message: '¿Eliminar este motivo de citación? Esta acción no se puede deshacer.' },
+    }).afterClosed().subscribe(async ok => {
+      if (!ok) return;
+      try {
+        await firstValueFrom(this.http.delete(`/api/citation-reasons/${id}`));
+        this.notify.success('Motivo eliminado');
+        await this.loadAll();
+      } catch (err: any) {
+        this.notify.error(err?.error?.error ?? 'Error al eliminar');
+      }
     });
   }
 

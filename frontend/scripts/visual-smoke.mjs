@@ -141,6 +141,12 @@ const MOCK_QUARTERS = [
   { id: 3, academicYearId: 1, name: 'T3', sequenceNumber: 3, startDate: '2026-09-01', endDate: '2026-12-15', description: null },
 ];
 
+const MOCK_CITATION_REASONS = [
+  { id: 1, institutionId: 1, name: 'Atrasos reiterados', severity: 'low', description: 'Tres o más atrasos en el mismo trimestre.', isActive: true, createdAt: '2026-01-10T12:00:00.000Z', updatedAt: '2026-01-10T12:00:00.000Z', deletedAt: null },
+  { id: 2, institutionId: 1, name: 'Faltas injustificadas', severity: 'medium', description: null, isActive: true, createdAt: '2026-01-10T12:00:00.000Z', updatedAt: '2026-01-10T12:00:00.000Z', deletedAt: null },
+  { id: 3, institutionId: 1, name: 'Agresión a un compañero', severity: 'high', description: 'Requiere presencia del representante el mismo día.', isActive: true, createdAt: '2026-01-10T12:00:00.000Z', updatedAt: '2026-01-10T12:00:00.000Z', deletedAt: null },
+];
+
 async function mockApi(context) {
   await context.route('**/api/**', async (route) => {
     const url = route.request().url();
@@ -158,6 +164,9 @@ async function mockApi(context) {
     }
     if (url.includes('/api/roles')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+    }
+    if (url.includes('/api/citation-reasons')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_CITATION_REASONS) });
     }
     if (url.includes('/api/courses')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
@@ -251,11 +260,18 @@ async function main() {
     });
     // The admin page's activeTab is bound to ?tab= queryParam (default 'users').
 // Navigate directly to the years tab so we don't depend on the sidebar nav.
-await page.goto(`${BASE_URL}/admin?tab=years`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+await page.goto(`${BASE_URL}${process.env.VISUAL_PATH || '/admin?tab=years'}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
 // The admin page renders the years list. Wait for the row to be visible.
 await page.waitForSelector('.admin-row, .admin-row-quarters, .inline-quarters-summary', { timeout: 10000 }).catch(() => null);
 // Give the SPA another tick to render chips after the quarters fetch resolves.
 await wait(1500);
+// Optional: open a dialog (or any overlay) before shooting, so features whose
+// UI lives behind a click can be captured too. Unset by default — the shot is
+// byte-identical to before when VISUAL_CLICK isn't provided.
+if (process.env.VISUAL_CLICK) {
+  await page.click(process.env.VISUAL_CLICK, { timeout: 10000 });
+  await wait(1000);
+}
     const info = await extractDom(page);
     await page.screenshot({ path: SCREENSHOT_PATH, fullPage: false });
     writeFileSync(REPORT_PATH, JSON.stringify({ ...info, screenshot: SCREENSHOT_PATH, viewport: { width: Number(VW), height: Number(VH) } }, null, 2));
