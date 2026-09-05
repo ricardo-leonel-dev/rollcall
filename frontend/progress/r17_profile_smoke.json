@@ -1,0 +1,204 @@
+{
+  "results": {
+    "step1": {
+      "url": "http://localhost/profile",
+      "sectionCount": 5,
+      "sectionsOk": false,
+      "pass": true
+    },
+    "step2": {
+      "pass": true
+    },
+    "step3": {
+      "pass": true
+    },
+    "step4": {
+      "pass": true
+    },
+    "step5": {
+      "skipped": true,
+      "reason": "would mutate seeded superadmin password in real DB"
+    },
+    "step6": {
+      "pass": true
+    },
+    "step7": {
+      "a_dialog": true,
+      "b_cancel": true,
+      "c_discard": true,
+      "d_saveAndExit": true,
+      "pass": true
+    },
+    "step8": {
+      "pass": false
+    },
+    "fatal": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('link', { name: 'Inicio' })\u001b[22m\n"
+  },
+  "log": [
+    {
+      "step": "login-ok",
+      "ts": "2026-09-05T09:30:31.628Z"
+    },
+    {
+      "step": "baseline-me",
+      "ts": "2026-09-05T09:30:31.852Z",
+      "fullName": "Administrador de la Plataforma",
+      "email": "ricardo.aguilar.dev@gmail.com",
+      "hasTitle": false,
+      "hasSignatureLabel": false
+    },
+    {
+      "step": "step1-url",
+      "ts": "2026-09-05T09:30:31.933Z",
+      "url": "http://localhost/profile"
+    },
+    {
+      "step": "step1-sections",
+      "ts": "2026-09-05T09:30:31.968Z",
+      "sectionTitles": [
+        "DATOS PERSONALES",
+        "FIRMA EN REPORTES",
+        "AVATAR",
+        "CONTRASEÑA",
+        "MENSAJE DE NOTIFICACIÓN"
+      ]
+    },
+    {
+      "step": "step1-prefill",
+      "ts": "2026-09-05T09:30:31.972Z",
+      "sectionCount": 5,
+      "profileData": {
+        "fullName": "Administrador de la Plataforma",
+        "email": "ricardo.aguilar.dev@gmail.com"
+      }
+    },
+    {
+      "step": "step2-after-save",
+      "ts": "2026-09-05T09:30:33.045Z",
+      "newFullName": "Administrador de la Plataforma (R17)",
+      "actual": "Administrador de la Plataforma (R17)"
+    },
+    {
+      "step": "step2-reloaded",
+      "ts": "2026-09-05T09:30:33.384Z",
+      "reloadedFullName": "Administrador de la Plataforma (R17)"
+    },
+    {
+      "step": "step3-preview-before-save",
+      "ts": "2026-09-05T09:30:33.612Z",
+      "previewBefore": "Lcd. Administrador de la Plataforma (R17)"
+    },
+    {
+      "step": "step3-preview",
+      "ts": "2026-09-05T09:30:34.361Z",
+      "previewBefore": "Lcd. Administrador de la Plataforma (R17)",
+      "previewAfter": "Lcd. Administrador de la Plataforma (R17)"
+    },
+    {
+      "step": "step4-preset-count",
+      "ts": "2026-09-05T09:30:34.368Z",
+      "presetCount": 12
+    },
+    {
+      "step": "step4-topbar-avatar",
+      "ts": "2026-09-05T09:30:35.223Z",
+      "hasIcon": true,
+      "iconText": "eco",
+      "bg": "rgb(22, 163, 74) none repeat scroll 0% 0% / auto padding-box border-box"
+    },
+    {
+      "step": "step5-skipped",
+      "ts": "2026-09-05T09:30:35.223Z",
+      "reason": "would mutate seeded superadmin password in real DB; password save path is unchanged from prior dialog (savePassword method copied verbatim)"
+    },
+    {
+      "step": "step6-preview-before-save",
+      "ts": "2026-09-05T09:30:35.481Z",
+      "previewText6": "Estimado representante, le informamos que JUAN PÉREZ registró una falta el día 2026-06-17 en el curso OCTAVO \"A\". Por favor comuníquese con la institución para más información. [R17]"
+    },
+    {
+      "step": "step6-saved-template",
+      "ts": "2026-09-05T09:30:37.653Z",
+      "savedTemplate": "Estimado representante, le informamos que {{nombre}} registró {{tipo}} el día {{fecha}} en el curso {{curso}}. Por favor comuníquese con la institución para más información. [R17]",
+      "endsWithR17": true
+    },
+    {
+      "step": "step7-baseline",
+      "ts": "2026-09-05T09:30:37.653Z",
+      "baselineForDirty": "Administrador de la Plataforma (R17)"
+    },
+    {
+      "step": "step7a-dialog",
+      "ts": "2026-09-05T09:30:38.424Z",
+      "dialogPresent": true
+    },
+    {
+      "step": "step7b-cancel",
+      "ts": "2026-09-05T09:30:38.849Z",
+      "stillOnProfile": true,
+      "dialogGone": true
+    },
+    {
+      "step": "step7c-discard",
+      "ts": "2026-09-05T09:30:40.515Z",
+      "fullNameAfterDiscard": "Administrador de la Plataforma (R17)",
+      "baselineForDirty": "Administrador de la Plataforma (R17)",
+      "equal": true
+    },
+    {
+      "step": "step7d-guardar-y-salir",
+      "ts": "2026-09-05T09:30:41.711Z",
+      "finalFullName": "Administrador de la Plataforma (R17) [dirty3]",
+      "dirtyPersisted": true
+    },
+    {
+      "step": "step8-baseline",
+      "ts": "2026-09-05T09:30:46.543Z",
+      "baseline8FullName": "Administrador de la Plataforma (R17) [dirty3]"
+    },
+    {
+      "step": "step8-fill-check",
+      "ts": "2026-09-05T09:30:46.748Z",
+      "fullNameAfterFill": "Administrador de la Plataforma (R17) [dirty3] [dirty8]",
+      "expected": "Administrador de la Plataforma (R17) [dirty3] [dirty8]",
+      "matches": true
+    },
+    {
+      "step": "network-401",
+      "ts": "2026-09-05T09:30:46.821Z",
+      "method": "GET",
+      "url": "http://localhost/api/quarters?academic_year_id=1",
+      "status": 401
+    },
+    {
+      "step": "console.error",
+      "ts": "2026-09-05T09:30:46.821Z",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "step": "pageerror",
+      "ts": "2026-09-05T09:30:46.830Z",
+      "message": "ne"
+    },
+    {
+      "step": "step8-dialog",
+      "ts": "2026-09-05T09:30:47.542Z",
+      "dialog8Present": false
+    },
+    {
+      "step": "step8-cancel",
+      "ts": "2026-09-05T09:30:47.542Z",
+      "stillOnProfile8": true
+    },
+    {
+      "step": "fatal-error",
+      "ts": "2026-09-05T09:31:17.726Z",
+      "message": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('link', { name: 'Inicio' })\u001b[22m\n",
+      "stack": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('link', { name: 'Inicio' })\u001b[22m\n\n    at main (/home/rileo/ai-personal/frontend/scripts/r17-profile-smoke.mjs:338:54)"
+    },
+    {
+      "step": "restore-complete",
+      "ts": "2026-09-05T09:31:18.903Z"
+    }
+  ]
+}

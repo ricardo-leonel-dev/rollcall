@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { moduleGuard } from './core/guards/module.guard';
+import { profileCanDeactivateGuard } from './core/guards/profile-can-deactivate.guard';
 
 const placeholder = (title: string) => ({
   loadComponent: () => import('./shared/components/placeholder/placeholder.component').then(m => m.PlaceholderComponent),
@@ -60,6 +61,10 @@ export const routes: Routes = [
       // Single-route sections
       { path: 'calendar', loadComponent: () => import('./features/calendar/calendar.component').then(m => m.CalendarComponent), canActivate: [moduleGuard], data: { module: 'calendar' } },
       { path: 'admin',    loadComponent: () => import('./features/admin/admin.component').then(m => m.AdminComponent), canActivate: [moduleGuard], data: { module: 'admin' } },
+
+      // Profile — reachable by every authenticated user (no moduleGuard).
+      // canDeactivate prompts for unsaved edits before navigation away.
+      { path: 'profile', loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent), canDeactivate: [profileCanDeactivateGuard] },
 
       // Backward-compat redirects
       { path: 'inicio',         redirectTo: 'home',                       pathMatch: 'full' },
