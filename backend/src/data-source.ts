@@ -19,6 +19,10 @@ import { Institution } from './entities/Institution';
 import { UserCourse } from './entities/UserCourse';
 import { UserModule } from './entities/UserModule';
 import { UserMessageTemplate } from './entities/UserMessageTemplate';
+import { CitationReason } from './entities/CitationReason';
+import { Citation } from './entities/Citation';
+import { CitationCitationReason } from './entities/CitationCitationReason';
+import { CitationAttachment } from './entities/CitationAttachment';
 
 const dbSchema = process.env.DB_SCHEMA || 'attendance';
 
@@ -57,6 +61,10 @@ export const AppDataSource = new DataSource({
     UserCourse,
     UserModule,
     UserMessageTemplate,
+    CitationReason,
+    Citation,
+    CitationCitationReason,
+    CitationAttachment,
   ],
   migrations: [],
   subscribers: [],

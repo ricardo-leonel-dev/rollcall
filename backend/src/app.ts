@@ -24,6 +24,8 @@ const logosDir = path.join(process.cwd(), 'uploads', 'logos');
 fs.mkdirSync(logosDir, { recursive: true });
 const justificationsDir = path.join(process.cwd(), 'uploads', 'justifications');
 fs.mkdirSync(justificationsDir, { recursive: true });
+const citationsDir = path.join(process.cwd(), 'uploads', 'citaciones');
+fs.mkdirSync(citationsDir, { recursive: true });
 
 app.use(helmet());
 app.use(cors({ origin: '*', credentials: false }));

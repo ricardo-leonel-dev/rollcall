@@ -21,6 +21,8 @@ export const MODULE_KEYS = [
   'students',
   'admin', 'admin:users', 'admin:courses', 'admin:years', 'admin:permissions', 'admin:roster',
   'student-report',
+  'citations',
+  'citation-reasons',
 ];
 
 export const NOTIFICATION_ACTION_KEYS = ['absences', 'citations'];
