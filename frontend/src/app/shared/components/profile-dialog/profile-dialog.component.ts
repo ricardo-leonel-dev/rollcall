@@ -59,6 +59,14 @@ const NOTIFICATION_TEMPLATE_SECTIONS: NotificationTemplateSection[] = [
     placeholders: ['{{nombre}}', '{{fecha}}', '{{tipo}}', '{{curso}}'],
     previewSample: { nombre: 'JUAN PÉREZ', fecha: '2026-06-17', tipo: 'una falta', curso: 'OCTAVO "A"' },
   },
+  {
+    actionKey: 'citations',
+    label: 'Citaciones (WhatsApp)',
+    description:
+      'Se usa al notificar por WhatsApp a un representante sobre una citación agendada. Es personal — solo aplica a tu cuenta.',
+    placeholders: ['{{nombre}}', '{{fecha}}'],
+    previewSample: { nombre: 'JUAN PÉREZ', fecha: '2026-06-17 a las 10:00' },
+  },
 ];
 
 @Component({

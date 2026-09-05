@@ -6,6 +6,9 @@ import { NotificationTemplate } from '../models/index';
 export const DEFAULT_TEMPLATES: Record<string, string> = {
   absences:
     'Estimado representante, le informamos que {{nombre}} registró {{tipo}} el día {{fecha}} en el curso {{curso}}. Por favor comuníquese con la institución para más información.',
+  citations:
+    'Estimado apoderado, se ha registrado una citación para {{nombre}} el {{fecha}}. ' +
+    'Por favor confirmar asistencia.',
 };
 
 @Injectable({ providedIn: 'root' })
