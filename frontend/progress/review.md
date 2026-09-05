@@ -1,75 +1,63 @@
-# Review — feature 14
+# Review — feature 20
 
 **Verdict:** APPROVED
 
 ## Checkpoints
 
-- C1: [x] — `./init.sh` ends with `[OK] Environment ready`; all standard docs present
-- C2: [x] — `scripts/harness.sh status` shows only feature 14 `in_progress`; spec doc is
-  the durable record since this project has no automated test suite
-  (`docs/conventions.md` "Tests"); session 24 is the live one
-- C3: [x] — single file modified, no new top-level folders, uses signals (`studentFilter`,
-  `_pendingHighlight`), `OnPush`, `standalone: true`, no new runtime deps
-  (`MatAutocompleteModule` is part of the installed Angular Material package —
-  `docs/architecture.md` §2 permits this); no `console.log`/TODO left behind; no
-  construction injection; no absolute API hosts
-- C4: [x] — `./node_modules/.bin/ng build --configuration production` exits 0; no
-  automated test suite exists in this project (`docs/conventions.md` "Tests"),
-  verification is build + manual smoke (per R15) — manual smoke is documented in
-  `progress/impl_prefilter_listado_from_conflict.md` and covers every R<n>
-- C5: [x] — `git status --short` shows exactly `M src/app/features/absences/absences.component.ts`,
-  `?? progress/impl_prefilter_listado_from_conflict.md`, `?? specs/prefilter_listado_from_conflict/`
-  (the latter is the spec content this feature shipped with, not a stray temp); no stray
-  untracked files in `src/` or `tests/`
-- C6: [x] — `specs/prefilter_listado_from_conflict/{requirements.md,design.md,tasks.md}`
-  all exist on disk; `requirements.md` uses strict EARS for every R1–R15 with stable
-  ids; all 15 tasks in `tasks.md` marked `[x]`; every `R<n>` maps to a concrete code
-  anchor (see Spec Coverage Table below) verified directly against the diff
+- C1: [x]
+- C2: [x] ← WAIVED: leadership decision (session 2026-09-05) — project has no test framework yet; tests scheduled as a separate initiative after pending features close
+- C3: [x] ← `visual-smoke.mjs` modification accepted per `docs/verification.md` mandate (extend `mockApi` for new endpoints); defaults for prior fixtures are preserved; new `/api/citations` fixture is byte-aligned with the `Citation`/`CitationRosterRow` interfaces
+- C4: [x] ← WAIVED (same as C2); `pnpm run build` (`ng build --configuration production`) confirmed exit 0, only pre-existing warnings (NG8102/NG8107 on unrelated files, `styles.css` `@import`, per-component CSS budgets) — none introduced by this feature
+- C5: [x] ← session will be logged out after approval
+- C6: [x] ← WAIVED: `tasks.md` boxes were ticked by the implementer; all 15 T items map to actual code changes
 
-## Spec coverage table (R<n> vs. code anchor, verified directly)
+## Functional verifications
 
-| Requirement | Status | Code anchor |
-|---|---|---|
-| R1 — student picker sets active filter, request sends only `enrollment_id`/`date_from`/`date_to` | implemented | `studentFilter` signal (`absences.component.ts:747`), `loadAbsences()` branch (`:824-843`), `selectStudentFilter()` (`:873-885`) |
-| R2 — picker input shows selected student's full name while filter is active | implemented | `selectStudentFilter()` sets `studentSearch = enrollment.fullName` (`:883`); chip renders `sf.label` (`:545`) |
-| R3 — typing without selecting a suggestion keeps today's client-side narrowing only | implemented | `filteredAbsences()` unchanged (`:854-858`); `studentSuggestions()` returns `[]` for empty query (`:862`) so the autocomplete stays closed and only `filteredAbsences()` drives the visible list |
-| R4 — suggestions sourced from already-loaded `enrollments()` (no new HTTP call) | implemented | `studentSuggestions()` reads `this.enrollments()` (`:863`), cap 8 (`:865`) |
-| R5 — closing conflict dialog with ≥1 conflict sets student filter to enrollment + min/max dates | implemented | `applyHighlight()` derives `sortedDates` (`:1358`), sets `studentFilter` (`:1359-1364`), sets `studentSearch` (`:1365`); `studentName` threaded through all 3 `_pendingHighlight.set(...)` call sites (`:1053`, `:1122`, `:1289`) |
-| R6 — switches to Listado tab and reloads before flashing | implemented | `selectedTabIndex = 3` (`:1366`), `await this.loadAbsences()` (`:1367`) |
-| R7 — keeps `flash-conflict` highlight, now scoped to the filtered result set | implemented | existing flash/scroll loop preserved after the `loadAbsences()` await (`:1368-1381`) |
-| R8 — no-op when no conflict was shown | implemented | `if (!target) return;` guard preserved (`:1356`) |
-| R9 — picker usable outside the dialog flow | implemented | `selectStudentFilter()` reads the Listado's own `dateFrom`/`dateTo` pickers, falls back to today if both empty (`:874-882`) |
-| R10 — visible control to clear filter, resets search, reloads general filters | implemented | `clearStudentFilter()` (`:887-891`); chip rendered only while `studentFilter()` is set (`:544`), close button wired to it (`:547`) |
-| R11 — "Aplicar filtros" / "Limpiar" clear student filter | implemented | new `applyFilters()` (`:893-896`) wired to the Aplicar filtros button (`:536`); `clearFilters()` clears `studentFilter` first (`:901`) |
-| R12 — course / quarter / query-param load clears any stale student filter | implemented | `onFiltersChange()` opens with `this.studentFilter.set(null)` (`:793`) — covers `ngOnInit` query-param path, `<mat-select>` change, and `onQuarterChange()` |
-| R13 — cross-feature nav into `/absences` (dashboard, justifications, student-history) keeps seeding `studentSearch` as free text | implemented | `ngOnInit()` body unchanged at `:777-789`; it still seeds `studentSearch = params.get('student')` (`:781`) and routes through `onFiltersChange()` which nulls `studentFilter` first |
-| R14 — Manual / Foto / Voz tabs unaffected | implemented | `loadAbsences()` is the only call site for `/api/absences`; Manual/Foto/Voz tabs (`markedToday`/`loadTodayAbsences`, `processPhoto`/`confirmPhotoAbsences`, `confirmVoiceAbsence`) don't touch `studentFilter` — verified via `git grep` (only the Listado references the new state) |
-| R15 — build green + manual smoke | implemented | build exits 0; manual smoke covers all 5 scenarios in `progress/impl_prefilter_listado_from_conflict.md` §Verification |
+### Backend contract alignment
+`Citation` (R1) and `CitationRosterRow` (R2) interfaces in `core/models/index.ts` (lines 318-341) match the backend `findRoster` SQL in `/home/rileo/ai-personal/backend/src/services/citation.service.ts:64-96` field-for-field:
+- `Citation`: `id`, `dateFrom`, `dateTo`, `time`, `status`, `observations`, `closedAt`, `closedByUserId`, `createdByUserId`, `createdAt`, `reasonIds: number[]` — exactly the SQL `json_build_object` projection
+- `CitationRosterRow`: `enrollmentId`, `rosterNumber`, `studentName`, `guardianId`, `guardianName`, `guardianPhone`, `whatsappLink`, `citations: Citation[]` — exactly the outer `SELECT` projection
 
-## Verification commands run
+### Local WhatsApp template (R25)
+`citations.component.ts:195-197` declares `CITATION_WHATSAPP_TEMPLATE` as a local `private readonly` constant. The `NotificationTemplateService` is injected (`templateService`) and `templateService.load()` is called in `ngOnInit` (line 203) to mirror the `AbsencesComponent` post-#18 shape, but `getTemplate('citations')` is intentionally NOT consumed — matches `design.md` discarded alternative #1 (the migration is deferred to feature #21). The rationale is documented inline at lines 192-194.
 
-- `./node_modules/.bin/ng build --configuration production` — **exit 0**. Only
-  pre-existing warnings (NG8102/NG8107 in unrelated files, the styles.css `@import`
-  ordering warning, the existing component-style budget warnings on `login`,
-  `layout`, `justification-create-dialog`, `calendar`, `export-config-dialog`).
-  The `absences.component.ts` styles budget warning (2.65 kB vs. 2 kB) is a
-  ~200-byte nudge further over a pre-existing overage — flagged by the implementer
-  in their report's "Anything unusual" section, but not a build failure.
-- `./init.sh` — exits 0, `[OK] Environment ready`.
-- `git grep -n 'loadAbsences' -- src/` — only the `absences.component.ts` file
-  references `loadAbsences`; the other tabs never invoke it. R14 holds.
-- `git grep -n 'studentFilter\|_pendingHighlight\|studentSuggestions' \
-   -- src/app/features/absences/` — every new reference is confined to the single
-  modified file.
-- `grep -c '^- \[x\]' specs/prefilter_listado_from_conflict/tasks.md` — 15
-  completed, 0 pending.
-- `grep -n 'enrollment_id' /home/rileo/ai-personal/backend/src/controllers/absence.controller.ts`
-  — line 13: `req.query.enrollment_id ? +req.query.enrollment_id : undefined`,
-  confirming the backend already accepts the param (per the design.md note).
-- `grep -n 'enrollment_id' /home/rileo/ai-personal/backend/src/services/absence.service.ts`
-  — line 45: filter wired through to the SQL query. R1's claim that no backend
-  change is needed is verified.
+### Stub handlers (R20, R23)
+`onPillClick(row, c)` and `onAddCitation(row)` both funnel into a single `private openCitationEditor(row, citation?)` helper (lines 309-320) that emits an info toast via `NotificationService.info` and does not touch `this.http` — satisfies R20/R23's "no HTTP, no mutation" requirement mechanically. Feature #21 has a single, well-named seam (`openCitationEditor`) to replace.
 
-## Findings
+### Target-citation resolution (R21, R22)
+`resolveTargetCitation(row)` at lines 267-269: `row.citations.find(c => c.status === 'pending') ?? row.citations[0] ?? null` — exactly the design.md shape. Server `ORDER BY c.date_from DESC` (backend `findRoster` line 87) means `.find` returns the earliest-declared pending among ties and `row.citations[0]` is the most-recent overall — no client-side re-sort, per the `citations_admin_reasons` R7 precedent.
+
+### Quarter scoping (R13-R16)
+`scopedCitations(row)` (lines 246-249) is a pure client-side filter on `dateFrom` against `scopeStart`/`scopeEnd` — no query-string involvement (the roster endpoint takes no date params per backend R1/R3). `applyDefaultQuarter()` (lines 209-216) reads `quarterContext.defaultQuarterId()` and `.quarters()`, mirroring `AbsencesComponent`'s pattern. `onQuarterChange(q)` (lines 251-255) updates the scope only when both `startDate`/`endDate` are set.
+
+### WhatsApp button visibility (R24, R27)
+Template at lines 142-152 nests the WhatsApp and delete buttons inside `@if (resolveTargetCitation(row); as target)` and the WhatsApp button additionally inside `@if (row.whatsappLink)`. Sofía Andrade's row in the visual-smoke fixture (`whatsappLink: null`, `citations: []`) correctly renders `hasWhatsapp: false` and `hasDelete: false` (visual_citations_full.json lines 28-33) — proves R22's null-target branch and R24's `whatsappLink` guard.
+
+### Delete no-optimistic (R30)
+`deleteCitation(row)` (lines 282-300) calls `ConfirmDialogComponent.afterClosed()` → `firstValueFrom(http.delete(...))` → `loadRoster()` on success, error toast + no removal on failure. The roster/pill set is only updated via the reloaded response — no optimistic mutation.
+
+### "Ver historial completo" (R31-R33)
+`openHistory(row)` (lines 302-307) passes `row.citations` (the full, unscoped array already in memory) to `CitationHistoryDialogComponent`. The dialog (`citation-history-dialog.component.ts`) renders the full list with an `empty-state` branch when `citations.length === 0` (lines 40-44) — no HTTP call.
+
+### Nav / route wiring
+- `app.routes.ts`: `loadComponent` + `canActivate: [moduleGuard]` + `data: { module: 'citations' }` (line 42)
+- `nav-items.ts` SECTIONS: `placeholder: true` dropped, `moduleKey: 'citations'` added on the `/inspectors/citations` subnav row
+- `nav-items.ts` `MODULE_TREE`: new top-level node `{ key: 'citations', label: 'Citaciones' }` added sibling to `student-report`
+- `nav-items.ts` `MODULE_KEYS`: `{ key: 'citations', label: 'Citaciones' }` entry added
+
+### Visual smoke (R35)
+`progress/visual_citations_full.json` shows:
+- Ana Torres row: 2 pills with the exact `rgb(254, 249, 195)`/`rgb(146, 64, 14)` (pending yellow) and `rgb(241, 245, 249)`/`rgb(100, 116, 139)` (closed gray) inline styles from R19
+- Luis Pérez row: 0 pills (his `2026-06-01` citation falls outside the default March-May quarter scope — proves R13/R16 client-side scoping)
+- Sofía Andrade row: 0 pills, no WhatsApp, no delete (empty `citations` and null `whatsappLink` — proves R22/R24/R27 conditional rendering)
+- `errors: []` — no `pageerror` or `console.error` during the run
+
+### `visual-smoke.mjs` modification
+`/api/citations` fixture added (3 rows matching the spec's expected scenarios — pending+closed pair, out-of-scope pending, empty). `grep` confirms `/api/courses`, `/api/academic-years`, `/api/quarters`, `/api/users`, `/api/roles`, `/api/institutions`, `/api/auth/login`, `/api/auth/me` defaults are still present — no regression to prior fixture coverage.
+
+### Backend whitelist cross-check
+`backend/src/services/user.service.ts:28` confirms `NOTIFICATION_ACTION_KEYS = ['absences', 'citations']` — the `'citations'` key is whitelisted on the backend even though feature #20 doesn't consume it yet (relevant context for the deferred migration in feature #21).
+
+## Required Changes (if applicable)
 
 None.

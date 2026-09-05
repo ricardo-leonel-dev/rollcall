@@ -1,0 +1,43 @@
+{
+  "title": "Citaciones",
+  "pills": [
+    {
+      "text": "2026-05-10",
+      "bg": "rgb(254, 249, 195)",
+      "fg": "rgb(146, 64, 14)"
+    },
+    {
+      "text": "2026-04-22",
+      "bg": "rgb(241, 245, 249)",
+      "fg": "rgb(100, 116, 139)"
+    }
+  ],
+  "rows": [
+    {
+      "student": "Ana Torres",
+      "pillCount": 2,
+      "hasWhatsapp": true,
+      "hasDelete": true,
+      "hasAdd": true,
+      "hasMenu": true
+    },
+    {
+      "student": "Luis Pérez",
+      "pillCount": 0,
+      "hasWhatsapp": true,
+      "hasDelete": true,
+      "hasAdd": true,
+      "hasMenu": true
+    },
+    {
+      "student": "Sofía Andrade",
+      "pillCount": 0,
+      "hasWhatsapp": false,
+      "hasDelete": false,
+      "hasAdd": true,
+      "hasMenu": true
+    }
+  ],
+  "errors": [],
+  "screenshot": "/home/rileo/ai-personal/frontend/progress/visual_citations_full.png"
+}

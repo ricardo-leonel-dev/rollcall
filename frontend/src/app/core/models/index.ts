@@ -314,3 +314,28 @@ export interface NotificationTemplate {
   actionKey: string;
   template:  string;
 }
+
+export interface Citation {
+  id: number;
+  dateFrom: string;
+  dateTo: string;
+  time: string | null;
+  status: 'pending' | 'closed';
+  observations: string | null;
+  closedAt: string | null;
+  closedByUserId: number | null;
+  createdByUserId: number;
+  createdAt: string;
+  reasonIds: number[];
+}
+
+export interface CitationRosterRow {
+  enrollmentId: number;
+  rosterNumber: number | null;
+  studentName: string;
+  guardianId: number | null;
+  guardianName: string | null;
+  guardianPhone: string | null;
+  whatsappLink: string | null;
+  citations: Citation[];
+}
