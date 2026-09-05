@@ -72,6 +72,7 @@ export const SECTIONS: SectionItem[] = [
       { route: '/admin', icon: 'class',           label: 'Cursos',         moduleKey: 'admin', queryParams: { tab: 'courses' } },
       { route: '/admin', icon: 'calendar_today',  label: 'Años lectivos',  moduleKey: 'admin', queryParams: { tab: 'years' } },
       { route: '/admin', icon: 'security',        label: 'Permisos',       moduleKey: 'admin', queryParams: { tab: 'permissions' } },
+      { route: '/admin', icon: 'rule',            label: 'Motivos de citación', moduleKey: 'admin', queryParams: { tab: 'citation-reasons' } },
       { route: '/admin', icon: 'upload_file',     label: 'Importar nómina', moduleKey: 'admin', queryParams: { tab: 'roster' } },
       { route: '/admin', icon: 'corporate_fare',  label: 'Instituciones',  moduleKey: 'admin', queryParams: { tab: 'institutions' }, superAdminOnly: true },
     ],
@@ -123,6 +124,7 @@ export const MODULE_TREE: ModuleNode[] = [
       { key: 'admin:courses',     label: 'Cursos' },
       { key: 'admin:years',       label: 'Años lectivos' },
       { key: 'admin:permissions', label: 'Permisos de rol' },
+      { key: 'admin:citation-reasons', label: 'Motivos de citación' },
       { key: 'admin:roster',      label: 'Importar nómina' },
     ],
   },
@@ -144,5 +146,6 @@ export const MODULE_KEYS: { key: string; label: string }[] = [
   { key: 'admin:courses',         label: '↳ Cursos' },
   { key: 'admin:years',           label: '↳ Años lectivos' },
   { key: 'admin:permissions',     label: '↳ Permisos de rol' },
+  { key: 'admin:citation-reasons', label: '↳ Motivos de citación' },
   { key: 'admin:roster',          label: '↳ Importar nómina' },
 ];
