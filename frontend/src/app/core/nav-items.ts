@@ -37,7 +37,7 @@ export const SECTIONS: SectionItem[] = [
       { route: '/inspectors/absences',       icon: 'event_busy', label: 'Administración de faltas',         moduleKey: 'absences' },
       { route: '/inspectors/justifications', icon: 'task_alt',   label: 'Administración de justificaciones', moduleKey: 'justifications' },
       { route: '/inspectors/student-report',  icon: 'summarize',  label: 'Informe estudiantil',              moduleKey: 'student-report' },
-      { route: '/inspectors/citations',      icon: 'campaign',   label: 'Administración de citaciones',     placeholder: true },
+      { route: '/inspectors/citations',      icon: 'campaign',   label: 'Administración de citaciones',     moduleKey: 'citations' },
     ],
   },
   {
@@ -109,6 +109,10 @@ export const MODULE_TREE: ModuleNode[] = [
     label: 'Informe estudiantil',
   },
   {
+    key: 'citations',
+    label: 'Citaciones',
+  },
+  {
     key: 'students',
     label: 'Estudiantes',
   },
@@ -139,6 +143,7 @@ export const MODULE_KEYS: { key: string; label: string }[] = [
   { key: 'absences:photo',        label: '↳ Foto OCR' },
   { key: 'justifications',        label: 'Justificaciones' },
   { key: 'student-report',        label: 'Informe estudiantil' },
+  { key: 'citations',             label: 'Citaciones' },
   { key: 'students',              label: 'Estudiantes' },
   { key: 'calendar',              label: 'Calendario' },
   { key: 'admin',                 label: 'Administración' },

@@ -171,6 +171,46 @@ async function mockApi(context) {
     if (url.includes('/api/courses')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
     }
+    if (url.includes('/api/citations')) {
+      const fixture = [
+        {
+          enrollmentId: 101,
+          rosterNumber: 1,
+          studentName: 'Ana Torres',
+          guardianId: 11,
+          guardianName: 'María Torres',
+          guardianPhone: '+593991234567',
+          whatsappLink: 'https://wa.me/593991234567',
+          citations: [
+            { id: 1, dateFrom: '2026-05-10', dateTo: '2026-05-10', time: '08:30', status: 'pending', observations: 'Atrasos reiterados en el trimestre.', closedAt: null, closedByUserId: null, createdByUserId: 1, createdAt: '2026-05-10T09:00:00.000Z', reasonIds: [1] },
+            { id: 2, dateFrom: '2026-04-22', dateTo: '2026-04-22', time: null, status: 'closed', observations: 'Asistencia confirmada.', closedAt: '2026-04-23T10:00:00.000Z', closedByUserId: 1, createdByUserId: 1, createdAt: '2026-04-22T09:00:00.000Z', reasonIds: [2] },
+          ],
+        },
+        {
+          enrollmentId: 102,
+          rosterNumber: 2,
+          studentName: 'Luis Pérez',
+          guardianId: 12,
+          guardianName: 'Carlos Pérez',
+          guardianPhone: '+593992345678',
+          whatsappLink: 'https://wa.me/593992345678',
+          citations: [
+            { id: 3, dateFrom: '2026-06-01', dateTo: '2026-06-02', time: '07:45', status: 'pending', observations: null, closedAt: null, closedByUserId: null, createdByUserId: 1, createdAt: '2026-06-01T08:00:00.000Z', reasonIds: [3] },
+          ],
+        },
+        {
+          enrollmentId: 103,
+          rosterNumber: 3,
+          studentName: 'Sofía Andrade',
+          guardianId: null,
+          guardianName: null,
+          guardianPhone: null,
+          whatsappLink: null,
+          citations: [],
+        },
+      ];
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixture) });
+    }
     if (url.includes('/api/institutions')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 1, name: 'Test Institution', primaryColor: '#6366f1', secondaryColor: '#8b5cf6' }]) });
     }
