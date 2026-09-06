@@ -3,6 +3,7 @@ import multer from 'multer';
 
 interface HttpError extends Error {
   status?: number;
+  conflict?: unknown;
 }
 
 export function errorMiddleware(err: unknown, req: Request, res: Response, _next: NextFunction): void {
@@ -41,7 +42,11 @@ export function errorMiddleware(err: unknown, req: Request, res: Response, _next
       res.status(409).json({ error: 'Referencia inválida', detail: err.message });
       return;
     }
-    res.status((err as HttpError).status ?? 500).json({ error: err.message });
+    const conflict = (err as HttpError & { conflict?: unknown }).conflict;
+    res.status((err as HttpError).status ?? 500).json({
+      error: err.message,
+      ...(conflict !== undefined ? { conflict } : {}),
+    });
     return;
   }
 
