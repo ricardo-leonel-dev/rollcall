@@ -23,7 +23,15 @@ const CITATION_FIELDS_SQL = `
     SELECT json_agg(ccr.citation_reason_id)
     FROM citation_citation_reasons ccr
     WHERE ccr.citation_id = c.id
-  ), '[]') AS "reasonIds"
+  ), '[]') AS "reasonIds",
+  COALESCE((
+    SELECT json_agg(json_build_object(
+      'id', att.id, 'fileName', att.file_name, 'originalName', att.original_name,
+      'mimeType', att.mime_type, 'createdAt', att.created_at
+    ) ORDER BY att.created_at ASC)
+    FROM citation_attachments att
+    WHERE att.citation_id = c.id
+  ), '[]') AS "attachments"
 `;
 
 async function assertEnrollmentInScope(institutionId: number, courseIds: number[] | null, enrollmentId: number): Promise<Enrollment> {
@@ -83,6 +91,13 @@ export async function findRoster(institutionId: number, courseIds: number[] | nu
           'reasonIds', COALESCE((
             SELECT json_agg(ccr.citation_reason_id)
             FROM citation_citation_reasons ccr WHERE ccr.citation_id = c.id
+          ), '[]'),
+          'attachments', COALESCE((
+            SELECT json_agg(json_build_object(
+              'id', att.id, 'fileName', att.file_name, 'originalName', att.original_name,
+              'mimeType', att.mime_type, 'createdAt', att.created_at
+            ) ORDER BY att.created_at ASC)
+            FROM citation_attachments att WHERE att.citation_id = c.id
           ), '[]')
         ) ORDER BY c.date_from DESC)
         FROM citations c
@@ -92,7 +107,14 @@ export async function findRoster(institutionId: number, courseIds: number[] | nu
     WHERE v.institution_id = $1 AND v.course_id = $2 AND v.academic_year_id = $3
     ORDER BY v.roster_number
   `;
-  return AppDataSource.query(sql, [institutionId, courseId, academicYearId]);
+  const rows = await AppDataSource.query(sql, [institutionId, courseId, academicYearId]);
+  return rows.map((r: any) => ({
+    ...r,
+    citations: r.citations.map((c: any) => ({
+      ...c,
+      attachments: c.attachments.map((a: any) => ({ ...a, url: attachmentUrl(a.fileName) })),
+    })),
+  }));
 }
 
 export async function findByEnrollment(institutionId: number, courseIds: number[] | null, enrollmentId: number, status?: string) {
@@ -105,10 +127,14 @@ export async function findByEnrollment(institutionId: number, courseIds: number[
   const params: any[] = [enrollmentId];
   if (status) { conditions.push(`c.status = $2`); params.push(status); }
 
-  return AppDataSource.query(
+  const rows = await AppDataSource.query(
     `SELECT ${CITATION_FIELDS_SQL} FROM citations c WHERE ${conditions.join(' AND ')} ORDER BY c.date_from DESC`,
     params
   );
+  return rows.map((r: any) => ({
+    ...r,
+    attachments: r.attachments.map((a: any) => ({ ...a, url: attachmentUrl(a.fileName) })),
+  }));
 }
 
 export async function create(institutionId: number, courseIds: number[] | null, data: {
