@@ -17,6 +17,7 @@ import { NotificationTemplateService } from '../../core/services/notification-te
 import { QuarterSelectorComponent } from '../../shared/components/quarter-selector/quarter-selector.component';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { formatCitationDateLabelShort } from '../../shared/utils/citation-date.util';
 import { CitationHistoryDialogComponent } from './citation-history-dialog.component';
 import { CitationDialogComponent } from './citation-dialog.component';
 
@@ -249,7 +250,7 @@ export class CitationsComponent implements OnInit {
   }
 
   pillLabel(c: Citation): string {
-    return c.dateFrom === c.dateTo ? c.dateFrom : `${c.dateFrom} – ${c.dateTo}`;
+    return formatCitationDateLabelShort(c.dateFrom, c.dateTo, c.time);
   }
 
   pillStyle(c: Citation): string {
@@ -266,7 +267,7 @@ export class CitationsComponent implements OnInit {
     const target = this.resolveTargetCitation(row);
     if (!row.whatsappLink || !target) return;
     if (target.status === 'closed') { window.open(row.whatsappLink, '_blank'); return; }
-    const dateLabel = target.time ? `${target.dateFrom} a las ${target.time}` : target.dateFrom;
+    const dateLabel = formatCitationDateLabelShort(target.dateFrom, target.dateFrom, target.time);
     const message = this.templateService.getTemplate('citations')
       .replace(/\{\{nombre\}\}/g, row.studentName)
       .replace(/\{\{fecha\}\}/g, dateLabel);

@@ -121,7 +121,7 @@ const MOCK_USER = {
   title: null,
   signatureLabel: null,
   institution: { id: 1, name: 'Test Institution', primaryColor: '#6366f1', secondaryColor: '#8b5cf6' },
-  moduleKeys: ['admin', 'absences', 'students', 'enrollments', 'dashboard', 'calendar', 'justifications'],
+  moduleKeys: ['admin', 'absences', 'students', 'enrollments', 'dashboard', 'calendar', 'justifications', 'citations'],
 };
 
 const MOCK_YEARS = [
@@ -175,7 +175,7 @@ async function mockApi(context) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_CITATION_REASONS) });
     }
     if (url.includes('/api/courses')) {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 1, name: '5° A', grade: '5°', paralelo: 'A', shift: 'morning' }]) });
     }
     if (url.includes('/api/citations')) {
       const fixture = [
@@ -270,6 +270,10 @@ async function extractDom(page) {
     });
     const quartersStyle = quartersEl ? getComputedStyle(quartersEl) : null;
     const adminRowStyle = adminRowEl ? getComputedStyle(adminRowEl) : null;
+    const pills = sel('.pill').map((p) => p.textContent.replace(/\s+/g, ' ').trim());
+    const sectionLabels = sel('.section-label').map((s) => s.textContent.trim());
+    const dialogDates = sel('.history-row-date').map((d) => d.textContent.replace(/\s+/g, ' ').trim());
+    const pendingBannerItems = sel('.pending-banner-list li').map((li) => li.textContent.replace(/\s+/g, ' ').trim());
     return {
       hasAdminRowQuarters: !!quartersEl,
       hasOldPanel: !!oldPanel,
@@ -282,19 +286,18 @@ async function extractDom(page) {
       adminRowAlignItems: adminRowStyle?.alignItems,
       adminRowDisplay: adminRowStyle?.display,
       activeYearText: (() => {
-        // The year name is a div with inline style font-weight:600 inside .admin-row
-        // (no dedicated class). Find it relative to the first .admin-row that contains
-        // .admin-row-quarters (i.e. the active year row).
         const quarters = document.querySelector('.admin-row .admin-row-quarters');
         const row = quarters?.closest('.admin-row');
-        // Match any div whose inline style font-weight is 600 (browser may or may not
-        // normalize the spacing/formatting).
         const nameDiv = row ? Array.from(row.querySelectorAll('div')).find(d => {
           const m = (d.getAttribute('style') || '').match(/font-weight\s*:\s*600/);
           return !!m;
         }) : null;
         return nameDiv?.textContent?.trim() ?? null;
       })(),
+      pills,
+      sectionLabels,
+      dialogDates,
+      pendingBannerItems,
     };
   });
 }
@@ -321,10 +324,28 @@ await page.waitForSelector('.admin-row, .admin-row-quarters, .inline-quarters-su
 await wait(1500);
 // Optional: open a dialog (or any overlay) before shooting, so features whose
 // UI lives behind a click can be captured too. Unset by default — the shot is
-// byte-identical to before when VISUAL_CLICK isn't provided.
+// byte-identical to before when VISUAL_CLICK isn't provided. VISUAL_CLICK_2
+// (and VISUAL_WAIT_MS_2) chain a second click after the first when an open
+// overlay needs to be resolved (e.g. clicking a mat-option to confirm a
+// selection opened by VISUAL_CLICK).
 if (process.env.VISUAL_CLICK) {
   await page.click(process.env.VISUAL_CLICK, { timeout: 10000 });
-  await wait(1000);
+  await wait(Number(process.env.VISUAL_WAIT_MS) || 1000);
+}
+if (process.env.VISUAL_CLICK_2) {
+  await wait(500);
+  await page.click(process.env.VISUAL_CLICK_2, { timeout: 10000 });
+  await wait(Number(process.env.VISUAL_WAIT_MS_2) || 1500);
+}
+if (process.env.VISUAL_CLICK_3) {
+  await wait(500);
+  await page.click(process.env.VISUAL_CLICK_3, { timeout: 10000 });
+  await wait(Number(process.env.VISUAL_WAIT_MS_3) || 1500);
+}
+if (process.env.VISUAL_CLICK_4) {
+  await wait(500);
+  await page.click(process.env.VISUAL_CLICK_4, { timeout: 10000 });
+  await wait(Number(process.env.VISUAL_WAIT_MS_4) || 1500);
 }
     const info = await extractDom(page);
     await page.screenshot({ path: SCREENSHOT_PATH, fullPage: false });

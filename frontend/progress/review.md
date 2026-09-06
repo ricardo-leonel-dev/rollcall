@@ -1,63 +1,83 @@
-# Review — feature 20
+# Review — feature 27 (`citation_date_format_and_label`)
 
 **Verdict:** APPROVED
 
 ## Checkpoints
 
-- C1: [x]
-- C2: [x] ← WAIVED: leadership decision (session 2026-09-05) — project has no test framework yet; tests scheduled as a separate initiative after pending features close
-- C3: [x] ← `visual-smoke.mjs` modification accepted per `docs/verification.md` mandate (extend `mockApi` for new endpoints); defaults for prior fixtures are preserved; new `/api/citations` fixture is byte-aligned with the `Citation`/`CitationRosterRow` interfaces
-- C4: [x] ← WAIVED (same as C2); `pnpm run build` (`ng build --configuration production`) confirmed exit 0, only pre-existing warnings (NG8102/NG8107 on unrelated files, `styles.css` `@import`, per-component CSS budgets) — none introduced by this feature
-- C5: [x] ← session will be logged out after approval
-- C6: [x] ← WAIVED: `tasks.md` boxes were ticked by the implementer; all 15 T items map to actual code changes
+- C1: [ ] ← Reason: `./init.sh` exits non-zero, but the two `[FAIL]`s in step 3 are pre-existing
+      project state — `specs/citations_admin_reasons/{requirements,design,tasks}.md` and
+      `specs/notification_templates_settings_ui/{requirements,design,tasks}.md` were never
+      committed for those done sdd=1 features (verified with `git log --all --oneline --` on
+      those paths returns nothing). Feature 27's own spec files
+      (`specs/citation_date_format_and_label/{requirements,design,tasks}.md`) are all
+      present. The implementer cannot fix features 18/19's missing specs in the scope of
+      feature 27; recommend the leader resolve those separately.
+- C2: [ ] ← Reason: `package.json` has no test scripts (`ng test`, `vitest`, `jest`, etc.),
+      no Karma/Jasmine setup in `angular.json`, no `*.spec.ts` files anywhere in `src/`
+      (verified). Per the project-wide acknowledgment in `docs/verification.md` and the
+      explicit task instruction, the project has no automated test suite yet — there are
+      therefore no passing tests for the new `citation-date.util.ts` functions
+      (`formatCitationDateLabel`, `formatCitationDateLabelShort`, `formatTime12h`,
+      `formatLongDateEs`, `withTimeSuffix`) or for the three call sites that consume them.
+      `docs/verification.md` mandates Level 1 (`pnpm run build`) as the applicable check
+      in lieu of unit tests, which `pnpm run build` passes (exit 0, zero TS errors).
+- C3: [x] — Four files modified, one new file; no new top-level folders under `src/app`;
+      the new util lives at `src/app/shared/utils/citation-date.util.ts` (per
+      `docs/conventions.md`'s `<domain>.util.ts` rule, matching the existing
+      `date.util.ts`/`citation-reason.util.ts` precedent). Pure functions, no runtime
+      dependency changes (only reuses `dateStringToDate` from `./date.util`, already used
+      by all three call sites). Components remain `standalone: true` /
+      `ChangeDetectionStrategy.OnPush` with inline `template:`/`styles:`; `inject()` is used
+      (not constructor DI); HTTP calls keep the `await firstValueFrom(...)` pattern inside
+      try/catch; no `console.log`/`TODO` leftovers; no NgModule; no absolute API hosts. The
+      `readonly formatCitationDateLabel = formatCitationDateLabel;` field on
+      `CitationDialogComponent` follows the exact same pattern as the existing
+      `citationReasonSeverityBadgeClass` field already in that file.
+- C4: [ ] ← Reason: no test framework exists in this repo, so there are no tests for the
+      changed code (same root cause as C2). `pnpm run build` exits 0, which is the
+      documented Level 1 verification stand-in per `docs/verification.md`. Warnings
+      emitted (`citation-dialog.component.ts` 2.62 kB vs 2 kB budget; several other
+      component CSS budget warnings) are all pre-existing — the new `.section-label` style
+      adds ~90 bytes to a file that was already 2.53 kB before this feature
+      (per `progress/impl_citation_date_format_and_label.md` T11).
+- C5: [x] (deferred) — session 39 is still open and `log-out` is the leader's call after
+      approval.
+- C6: [x] — `specs/citation_date_format_and_label/{requirements.md, design.md, tasks.md}`
+      all exist on disk (approved by Ricardo Aguilar); `requirements.md` uses strict EARS
+      for every R1–R14 with stable ids; `tasks.md` marks all 13 tasks `[x]` and every
+      `R<n>` maps to a concrete, code-verified anchor (see "Spec coverage" below).
 
-## Functional verifications
+## Spec coverage table (R<n> vs. code anchor, verified directly)
 
-### Backend contract alignment
-`Citation` (R1) and `CitationRosterRow` (R2) interfaces in `core/models/index.ts` (lines 318-341) match the backend `findRoster` SQL in `/home/rileo/ai-personal/backend/src/services/citation.service.ts:64-96` field-for-field:
-- `Citation`: `id`, `dateFrom`, `dateTo`, `time`, `status`, `observations`, `closedAt`, `closedByUserId`, `createdByUserId`, `createdAt`, `reasonIds: number[]` — exactly the SQL `json_build_object` projection
-- `CitationRosterRow`: `enrollmentId`, `rosterNumber`, `studentName`, `guardianId`, `guardianName`, `guardianPhone`, `whatsappLink`, `citations: Citation[]` — exactly the outer `SELECT` projection
+| Req  | Anchor                                                        | Verified |
+| ---- | ------------------------------------------------------------- | -------- |
+| R1   | `src/app/shared/utils/citation-date.util.ts:26-31` — full form same-day branch: `` `Agendado el ${formatLongDateEs(dateFrom)}` `` | yes |
+| R2   | `citation-date.util.ts:26-31` — full form multi-day branch: `` `Agendado entre ${formatLongDateEs(dateFrom)} y el ${formatLongDateEs(dateTo)}` `` | yes |
+| R3   | `citation-date.util.ts:14-20` (`formatTime12h`) — `h % 12 === 0 ? 12 : h % 12` plus `AM`/`PM` from `h < 12`; `padStart(2,'0')` on `h12`; minute preserved | yes |
+| R4   | `citation-date.util.ts:22-24` (`withTimeSuffix`) — returns `base` unchanged when `time` is null/falsy | yes |
+| R5   | `citation-date.util.ts:33-38` (`formatCitationDateLabelShort`) — no "Agendado" prefix, en dash `–` for multi-day | yes |
+| R6   | `src/app/features/citations/citations.component.ts:252-254` — `pillLabel(c)` returns `formatCitationDateLabelShort(c.dateFrom, c.dateTo, c.time)` | yes |
+| R7   | `src/app/features/citations/citation-dialog.component.ts:123` — pending banner `<li>` renders `formatCitationDateLabel(c.dateFrom, c.dateTo, c.time)`; no separate `{{c.time}}` suffix (folded into util output) | yes |
+| R8   | `src/app/features/citations/citation-history-dialog.component.ts:50` — `.history-row-date` renders `formatCitationDateLabel(c.dateFrom, c.dateTo, c.time)`; the previous separate `.history-row-time` span was removed and the now-unused CSS rule for it is gone | yes |
+| R9   | `src/app/features/citations/citations.component.ts:270` — `notifyGuardian` constructs `dateLabel = formatCitationDateLabelShort(target.dateFrom, target.dateFrom, target.time)` (passing `dateFrom` twice forces the same-day branch; matches `design.md`'s deliberate call) | yes |
+| R10  | `citation-dialog.component.ts:129` — `<div class="section-label">Agendar entre</div>` immediately above `.date-row`; unconditional (no `@if`), shown in both create and edit mode. Style rule at line 43 (`font-size:12px;font-weight:700;color:var(--muted-strong);margin-bottom:6px;`) | yes |
+| R11  | `citation-dialog.component.ts:286-296` (`save()`) — payload still uses `dateToDateString(this.dateFrom)` / `dateToDateString(this.dateTo)`. `dateToDateString` is imported at line 14 alongside `dateStringToDate`. No request-payload change | yes |
+| R12  | `pnpm run build` exit code: 0 (verified). Zero TypeScript errors introduced; only pre-existing style-budget warnings | yes |
+| R13  | `progress/impl_citation_date_format_and_label.md` T12 — covers all required scenarios (roster pill short form, pending banner full form, history dialog full form, "Agendar entre" heading, WhatsApp `{{fecha}}` short form) | yes |
+| R14  | `progress/visual_citation_date_format_and_label.json` — `"pills": ["lunes 1 de junio del 2026 – martes 2 de junio del 2026 a las 07:45 AM"]`. Human-readable Spanish, short form (no "Agendado" prefix), en dash separator, AM/PM time suffix. Matches the spec's literal example exactly | yes |
 
-### Local WhatsApp template (R25)
-`citations.component.ts:195-197` declares `CITATION_WHATSAPP_TEMPLATE` as a local `private readonly` constant. The `NotificationTemplateService` is injected (`templateService`) and `templateService.load()` is called in `ngOnInit` (line 203) to mirror the `AbsencesComponent` post-#18 shape, but `getTemplate('citations')` is intentionally NOT consumed — matches `design.md` discarded alternative #1 (the migration is deferred to feature #21). The rationale is documented inline at lines 192-194.
+## Notes for the leader
 
-### Stub handlers (R20, R23)
-`onPillClick(row, c)` and `onAddCitation(row)` both funnel into a single `private openCitationEditor(row, citation?)` helper (lines 309-320) that emits an info toast via `NotificationService.info` and does not touch `this.http` — satisfies R20/R23's "no HTTP, no mutation" requirement mechanically. Feature #21 has a single, well-named seam (`openCitationEditor`) to replace.
+- C1/C2/C4 are marked `[ ]` for systemic reasons the implementer cannot resolve inside
+  feature 27's scope: two pre-existing done-sdd=1 features (18, 19) have no spec files on
+  disk (breaking `init.sh`'s step 3), and the project has no test framework at all
+  (`package.json` has no test scripts; `docs/verification.md` and `docs/conventions.md`
+  both explicitly acknowledge this). The reviewer protocol says to mark these `[ ]` rather
+  than rubber-stamp `[x]`. Every requirement of feature 27 itself (R1–R14) is verified
+  green above, the build is clean, and the visual smoke output matches the spec's literal
+  example string — feature 27 is ready to close.
 
-### Target-citation resolution (R21, R22)
-`resolveTargetCitation(row)` at lines 267-269: `row.citations.find(c => c.status === 'pending') ?? row.citations[0] ?? null` — exactly the design.md shape. Server `ORDER BY c.date_from DESC` (backend `findRoster` line 87) means `.find` returns the earliest-declared pending among ties and `row.citations[0]` is the most-recent overall — no client-side re-sort, per the `citations_admin_reasons` R7 precedent.
-
-### Quarter scoping (R13-R16)
-`scopedCitations(row)` (lines 246-249) is a pure client-side filter on `dateFrom` against `scopeStart`/`scopeEnd` — no query-string involvement (the roster endpoint takes no date params per backend R1/R3). `applyDefaultQuarter()` (lines 209-216) reads `quarterContext.defaultQuarterId()` and `.quarters()`, mirroring `AbsencesComponent`'s pattern. `onQuarterChange(q)` (lines 251-255) updates the scope only when both `startDate`/`endDate` are set.
-
-### WhatsApp button visibility (R24, R27)
-Template at lines 142-152 nests the WhatsApp and delete buttons inside `@if (resolveTargetCitation(row); as target)` and the WhatsApp button additionally inside `@if (row.whatsappLink)`. Sofía Andrade's row in the visual-smoke fixture (`whatsappLink: null`, `citations: []`) correctly renders `hasWhatsapp: false` and `hasDelete: false` (visual_citations_full.json lines 28-33) — proves R22's null-target branch and R24's `whatsappLink` guard.
-
-### Delete no-optimistic (R30)
-`deleteCitation(row)` (lines 282-300) calls `ConfirmDialogComponent.afterClosed()` → `firstValueFrom(http.delete(...))` → `loadRoster()` on success, error toast + no removal on failure. The roster/pill set is only updated via the reloaded response — no optimistic mutation.
-
-### "Ver historial completo" (R31-R33)
-`openHistory(row)` (lines 302-307) passes `row.citations` (the full, unscoped array already in memory) to `CitationHistoryDialogComponent`. The dialog (`citation-history-dialog.component.ts`) renders the full list with an `empty-state` branch when `citations.length === 0` (lines 40-44) — no HTTP call.
-
-### Nav / route wiring
-- `app.routes.ts`: `loadComponent` + `canActivate: [moduleGuard]` + `data: { module: 'citations' }` (line 42)
-- `nav-items.ts` SECTIONS: `placeholder: true` dropped, `moduleKey: 'citations'` added on the `/inspectors/citations` subnav row
-- `nav-items.ts` `MODULE_TREE`: new top-level node `{ key: 'citations', label: 'Citaciones' }` added sibling to `student-report`
-- `nav-items.ts` `MODULE_KEYS`: `{ key: 'citations', label: 'Citaciones' }` entry added
-
-### Visual smoke (R35)
-`progress/visual_citations_full.json` shows:
-- Ana Torres row: 2 pills with the exact `rgb(254, 249, 195)`/`rgb(146, 64, 14)` (pending yellow) and `rgb(241, 245, 249)`/`rgb(100, 116, 139)` (closed gray) inline styles from R19
-- Luis Pérez row: 0 pills (his `2026-06-01` citation falls outside the default March-May quarter scope — proves R13/R16 client-side scoping)
-- Sofía Andrade row: 0 pills, no WhatsApp, no delete (empty `citations` and null `whatsappLink` — proves R22/R24/R27 conditional rendering)
-- `errors: []` — no `pageerror` or `console.error` during the run
-
-### `visual-smoke.mjs` modification
-`/api/citations` fixture added (3 rows matching the spec's expected scenarios — pending+closed pair, out-of-scope pending, empty). `grep` confirms `/api/courses`, `/api/academic-years`, `/api/quarters`, `/api/users`, `/api/roles`, `/api/institutions`, `/api/auth/login`, `/api/auth/me` defaults are still present — no regression to prior fixture coverage.
-
-### Backend whitelist cross-check
-`backend/src/services/user.service.ts:28` confirms `NOTIFICATION_ACTION_KEYS = ['absences', 'citations']` — the `'citations'` key is whitelisted on the backend even though feature #20 doesn't consume it yet (relevant context for the deferred migration in feature #21).
-
-## Required Changes (if applicable)
-
-None.
+- The `_debug-citation.mjs` file under `frontend/scripts/` is ignored by the global
+  `.git/info/exclude` rule `/frontend/scripts/*` (verified with `git check-ignore -v`),
+  which is the project convention for ephemeral scratch files per `docs/conventions.md`.
+  Not a stray.

@@ -12,6 +12,7 @@ import { firstValueFrom, retry } from 'rxjs';
 import { Citation, CitationReason } from '../../core/models/index';
 import { NotificationService } from '../../core/services/notification.service';
 import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
+import { formatCitationDateLabel } from '../../shared/utils/citation-date.util';
 import { citationReasonSeverityBadgeClass } from '../../shared/utils/citation-reason.util';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 
@@ -39,6 +40,7 @@ const MAX_FILES = 5;
             MatButtonModule, MatIconModule, MatDatepickerModule],
   styles: [`
     mat-form-field { width: 100%; }
+    .section-label { font-size: 12px; font-weight: 700; color: var(--muted-strong); margin-bottom: 6px; }
     .date-row { display: flex; gap: 12px; }
     .date-row mat-form-field { flex: 1; }
     .time-row { display: flex; gap: 12px; align-items: flex-start; }
@@ -118,15 +120,13 @@ const MAX_FILES = 5;
           </div>
           <ul class="pending-banner-list">
             @for (c of data.pendingCitations; track c.id) {
-              <li>
-                {{c.dateFrom === c.dateTo ? c.dateFrom : c.dateFrom + ' – ' + c.dateTo}}
-                @if (c.time) { · {{c.time}} }
-              </li>
+              <li>{{formatCitationDateLabel(c.dateFrom, c.dateTo, c.time)}}</li>
             }
           </ul>
         </div>
       }
 
+      <div class="section-label">Agendar entre</div>
       <div class="date-row">
         <mat-form-field appearance="outline">
           <mat-label>Desde</mat-label>
@@ -219,6 +219,7 @@ export class CitationDialogComponent implements OnInit {
 
   readonly MAX_FILES = MAX_FILES;
   readonly citationReasonSeverityBadgeClass = citationReasonSeverityBadgeClass;
+  readonly formatCitationDateLabel = formatCitationDateLabel;
 
   dateFrom: Date | null = this.data.citation ? dateStringToDate(this.data.citation.dateFrom) : new Date();
   dateTo: Date | null = this.data.citation ? dateStringToDate(this.data.citation.dateTo) : new Date();
