@@ -19,20 +19,10 @@ function formatTime12h(time: string): string {
   return `${String(h12).padStart(2, '0')}:${mStr} ${period}`;
 }
 
-function withTimeSuffix(base: string, time: string | null): string {
-  return time ? `${base} a las ${formatTime12h(time)}` : base;
+export function formatCitationDateLabel(date: string, time: string): string {
+  return `Agendado el ${formatLongDateEs(date)} a las ${formatTime12h(time)}`;
 }
 
-export function formatCitationDateLabel(dateFrom: string, dateTo: string, time: string | null): string {
-  const base = dateFrom === dateTo
-    ? `Agendado el ${formatLongDateEs(dateFrom)}`
-    : `Agendado entre ${formatLongDateEs(dateFrom)} y el ${formatLongDateEs(dateTo)}`;
-  return withTimeSuffix(base, time);
-}
-
-export function formatCitationDateLabelShort(dateFrom: string, dateTo: string, time: string | null): string {
-  const base = dateFrom === dateTo
-    ? formatLongDateEs(dateFrom)
-    : `${formatLongDateEs(dateFrom)} – ${formatLongDateEs(dateTo)}`;
-  return withTimeSuffix(base, time);
+export function formatCitationDateLabelShort(date: string, time: string): string {
+  return `${formatLongDateEs(date)} a las ${formatTime12h(time)}`;
 }

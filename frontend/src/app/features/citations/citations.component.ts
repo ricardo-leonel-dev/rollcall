@@ -240,7 +240,7 @@ export class CitationsComponent implements OnInit {
 
   scopedCitations(row: CitationRosterRow): Citation[] {
     if (!this.scopeStart || !this.scopeEnd) return row.citations;
-    return row.citations.filter(c => c.dateFrom >= this.scopeStart! && c.dateFrom <= this.scopeEnd!);
+    return row.citations.filter(c => c.date >= this.scopeStart! && c.date <= this.scopeEnd!);
   }
 
   onQuarterChange(q: Quarter | null): void {
@@ -250,7 +250,7 @@ export class CitationsComponent implements OnInit {
   }
 
   pillLabel(c: Citation): string {
-    return formatCitationDateLabelShort(c.dateFrom, c.dateTo, c.time);
+    return formatCitationDateLabelShort(c.date, c.time);
   }
 
   pillStyle(c: Citation): string {
@@ -267,7 +267,7 @@ export class CitationsComponent implements OnInit {
     const target = this.resolveTargetCitation(row);
     if (!row.whatsappLink || !target) return;
     if (target.status === 'closed') { window.open(row.whatsappLink, '_blank'); return; }
-    const dateLabel = formatCitationDateLabelShort(target.dateFrom, target.dateFrom, target.time);
+    const dateLabel = formatCitationDateLabelShort(target.date, target.time);
     const message = this.templateService.getTemplate('citations')
       .replace(/\{\{nombre\}\}/g, row.studentName)
       .replace(/\{\{fecha\}\}/g, dateLabel);
