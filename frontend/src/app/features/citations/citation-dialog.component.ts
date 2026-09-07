@@ -12,7 +12,7 @@ import { firstValueFrom, retry } from 'rxjs';
 import { Citation, CitationAttachment, CitationReason } from '../../core/models/index';
 import { NotificationService } from '../../core/services/notification.service';
 import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
-import { formatCitationDateLabel } from '../../shared/utils/citation-date.util';
+import { formatCitationDateLabel, formatCitationDateLabelShort } from '../../shared/utils/citation-date.util';
 import { citationReasonSeverityBadgeClass } from '../../shared/utils/citation-reason.util';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 
@@ -22,6 +22,16 @@ export interface CitationDialogData {
   whatsappLink: string | null;
   pendingCitations: Citation[];
   citation?: Citation;
+}
+
+interface CitationConflictInfo {
+  id: number;
+  date: string;
+  time: string;
+  studentName?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  courseName?: string;
 }
 
 const ALLOWED_TYPES = [
@@ -55,6 +65,14 @@ const MAX_FILES = 5;
     .pending-banner-title { font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
     .pending-banner-list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding-left: 18px; }
     .pending-banner-list li { font-size: 12px; color: #78350f; }
+
+    .conflict-banner {
+      background: #fee2e2; color: #991b1b;
+      border: 1px solid #fecaca; border-radius: 10px;
+      padding: 10px 14px; margin-bottom: 14px; font-size: 13px;
+    }
+    .conflict-banner-title { font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+    .conflict-banner-line { font-size: 12px; color: #7f1d1d; padding: 1px 0; }
 
     /* Evidence zone/row/tile/remove — same recipe as
        justification-create-dialog.component.ts, applied to a flat pendingFiles
@@ -133,9 +151,23 @@ const MAX_FILES = 5;
         </div>
       }
 
+      @if (conflict(); as c) {
+        <div class="conflict-banner">
+          <div class="conflict-banner-title">
+            <mat-icon style="font-size:16px;width:16px;height:16px">event_busy</mat-icon>
+            {{lastConflictError}}
+          </div>
+          <div class="conflict-banner-line">{{formatCitationDateLabelShort(c.date, c.time)}}</div>
+          @if (c.studentName) { <div class="conflict-banner-line">Estudiante: {{c.studentName}}</div> }
+          @if (c.guardianName) { <div class="conflict-banner-line">Representante: {{c.guardianName}}</div> }
+          @if (c.guardianPhone) { <div class="conflict-banner-line">Teléfono: {{c.guardianPhone}}</div> }
+          @if (c.courseName) { <div class="conflict-banner-line">Curso: {{c.courseName}}</div> }
+        </div>
+      }
+
       <mat-form-field appearance="outline">
         <mat-label>Fecha</mat-label>
-        <input matInput [matDatepicker]="picker" [(ngModel)]="date">
+        <input matInput [matDatepicker]="picker" [(ngModel)]="date" (ngModelChange)="onScheduleFieldChanged()">
         <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
         <mat-datepicker #picker></mat-datepicker>
       </mat-form-field>
@@ -143,7 +175,7 @@ const MAX_FILES = 5;
       <div class="time-row">
         <mat-form-field appearance="outline" class="time-field">
           <mat-label>Hora</mat-label>
-          <input matInput type="time" [(ngModel)]="time">
+          <input matInput type="time" [(ngModel)]="time" (ngModelChange)="onScheduleFieldChanged()">
         </mat-form-field>
       </div>
 
@@ -241,10 +273,13 @@ export class CitationDialogComponent implements OnInit {
   readonly isOrphanCitation = this.isEdit && this.data.citation!.guardianId === null;
   readonly reasons = signal<CitationReason[]>([]);
   readonly saving = signal(false);
+  readonly conflict = signal<CitationConflictInfo | null>(null);
+  lastConflictError = '';
 
   readonly MAX_FILES = MAX_FILES;
   readonly citationReasonSeverityBadgeClass = citationReasonSeverityBadgeClass;
   readonly formatCitationDateLabel = formatCitationDateLabel;
+  readonly formatCitationDateLabelShort = formatCitationDateLabelShort;
 
   date: Date | null = this.data.citation ? dateStringToDate(this.data.citation.date) : new Date();
   time = this.data.citation?.time ?? '';
@@ -340,6 +375,7 @@ export class CitationDialogComponent implements OnInit {
   async save(): Promise<void> {
     if (!this.canSave || this.saving()) return;
     this.saving.set(true);
+    this.conflict.set(null);
     const base = {
       date: dateToDateString(this.date),
       time: this.time,
@@ -367,10 +403,20 @@ export class CitationDialogComponent implements OnInit {
       this.notify.success(this.isEdit ? 'Citación actualizada' : 'Citación creada');
       this.dialogRef.close(true);
     } catch (err: any) {
-      this.notify.error(err?.error?.error ?? 'No se pudo guardar la citación');
+      const conflict = err?.status === 409 ? err?.error?.conflict as CitationConflictInfo | undefined : undefined;
+      if (conflict) {
+        this.conflict.set(conflict);
+        this.lastConflictError = err?.error?.error ?? 'Ya existe una citación pendiente para este representante en un horario cercano';
+      } else {
+        this.notify.error(err?.error?.error ?? 'No se pudo guardar la citación');
+      }
     } finally {
       this.saving.set(false);
     }
+  }
+
+  onScheduleFieldChanged(): void {
+    if (this.conflict()) this.conflict.set(null);
   }
 
   closeCitation(): void {
