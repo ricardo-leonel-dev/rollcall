@@ -6,7 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatMenuModule } from '@angular/material/menu';
+import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { Course, Citation, CitationRosterRow, Quarter } from '../../core/models/index';
@@ -157,12 +157,14 @@ import { CitationDialogComponent } from './citation-dialog.component';
                                     type="button"
                                     [matMenuTriggerFor]="moreMenu"
                                     #moreTrigger="matMenuTrigger"
-                                    (mouseenter)="moreTrigger.openMenu()"
-                                    (mouseleave)="moreTrigger.closeMenu()"
+                                    (mouseenter)="openOverflowMenu(moreTrigger)"
+                                    (mouseleave)="scheduleCloseOverflowMenu(moreTrigger)"
                                     [matTooltip]="extraCitationsTooltip(row)">
                               +{{ extraCitations(row).length }}
                             </button>
-                            <mat-menu #moreMenu="matMenu" class="citations-menu-panel" [hasBackdrop]="false" (mouseleave)="moreTrigger.closeMenu()">
+                            <mat-menu #moreMenu="matMenu" class="citations-menu-panel" [hasBackdrop]="false"
+                                      (mouseenter)="openOverflowMenu(moreTrigger)"
+                                      (mouseleave)="scheduleCloseOverflowMenu(moreTrigger)">
                               @for (c of extraCitations(row); track c.id) {
                                 <button mat-menu-item class="citations-menu-item" (click)="onPillClick(row, c)">
                                   <span class="badge" [style]="pillStyle(c)">{{pillLabel(c)}}</span>
@@ -293,6 +295,23 @@ export class CitationsComponent implements OnInit {
   extraCitationsTooltip(row: CitationRosterRow): string {
     const n = this.extraCitations(row).length;
     return n === 1 ? '1 citación más' : `${n} citaciones más`;
+  }
+
+  private overflowMenuCloseTimer: ReturnType<typeof setTimeout> | null = null;
+
+  openOverflowMenu(trigger: MatMenuTrigger): void {
+    if (this.overflowMenuCloseTimer) {
+      clearTimeout(this.overflowMenuCloseTimer);
+      this.overflowMenuCloseTimer = null;
+    }
+    trigger.openMenu();
+  }
+
+  scheduleCloseOverflowMenu(trigger: MatMenuTrigger): void {
+    if (this.overflowMenuCloseTimer) {
+      clearTimeout(this.overflowMenuCloseTimer);
+    }
+    this.overflowMenuCloseTimer = setTimeout(() => trigger.closeMenu(), 200);
   }
 
   onQuarterChange(q: Quarter | null): void {
