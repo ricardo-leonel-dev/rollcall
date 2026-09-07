@@ -326,9 +326,9 @@ export interface CitationAttachment {
 
 export interface Citation {
   id: number;
-  dateFrom: string;
-  dateTo: string;
-  time: string | null;
+  date: string;
+  time: string;
+  guardianId: number | null;
   status: 'pending' | 'closed';
   observations: string | null;
   closedAt: string | null;

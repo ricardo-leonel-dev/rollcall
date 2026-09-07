@@ -41,8 +41,6 @@ const MAX_FILES = 5;
   styles: [`
     mat-form-field { width: 100%; }
     .section-label { font-size: 12px; font-weight: 700; color: var(--muted-strong); margin-bottom: 6px; }
-    .date-row { display: flex; gap: 12px; }
-    .date-row mat-form-field { flex: 1; }
     .time-row { display: flex; gap: 12px; align-items: flex-start; }
     .time-row mat-form-field.time-field { width: 50%; flex: none; }
     .reason-option-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -120,31 +118,31 @@ const MAX_FILES = 5;
           </div>
           <ul class="pending-banner-list">
             @for (c of data.pendingCitations; track c.id) {
-              <li>{{formatCitationDateLabel(c.dateFrom, c.dateTo, c.time)}}</li>
+              <li>{{formatCitationDateLabel(c.date, c.time)}}</li>
             }
           </ul>
         </div>
       }
 
-      <div class="section-label">Agendar entre</div>
-      <div class="date-row">
-        <mat-form-field appearance="outline">
-          <mat-label>Desde</mat-label>
-          <input matInput [matDatepicker]="pickerFrom" [(ngModel)]="dateFrom">
-          <mat-datepicker-toggle matIconSuffix [for]="pickerFrom"></mat-datepicker-toggle>
-          <mat-datepicker #pickerFrom></mat-datepicker>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Hasta</mat-label>
-          <input matInput [matDatepicker]="pickerTo" [(ngModel)]="dateTo">
-          <mat-datepicker-toggle matIconSuffix [for]="pickerTo"></mat-datepicker-toggle>
-          <mat-datepicker #pickerTo></mat-datepicker>
-        </mat-form-field>
-      </div>
+      @if (isOrphanCitation) {
+        <div class="pending-banner">
+          <div class="pending-banner-title">
+            <mat-icon style="font-size:16px;width:16px;height:16px">warning</mat-icon>
+            Esta citación no tiene representante asignado y no puede editarse.
+          </div>
+        </div>
+      }
+
+      <mat-form-field appearance="outline">
+        <mat-label>Fecha</mat-label>
+        <input matInput [matDatepicker]="picker" [(ngModel)]="date">
+        <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-datepicker #picker></mat-datepicker>
+      </mat-form-field>
 
       <div class="time-row">
         <mat-form-field appearance="outline" class="time-field">
-          <mat-label>Hora (opcional)</mat-label>
+          <mat-label>Hora</mat-label>
           <input matInput type="time" [(ngModel)]="time">
         </mat-form-field>
       </div>
@@ -240,6 +238,7 @@ export class CitationDialogComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
 
   readonly isEdit = !!this.data.citation;
+  readonly isOrphanCitation = this.isEdit && this.data.citation!.guardianId === null;
   readonly reasons = signal<CitationReason[]>([]);
   readonly saving = signal(false);
 
@@ -247,8 +246,7 @@ export class CitationDialogComponent implements OnInit {
   readonly citationReasonSeverityBadgeClass = citationReasonSeverityBadgeClass;
   readonly formatCitationDateLabel = formatCitationDateLabel;
 
-  dateFrom: Date | null = this.data.citation ? dateStringToDate(this.data.citation.dateFrom) : new Date();
-  dateTo: Date | null = this.data.citation ? dateStringToDate(this.data.citation.dateTo) : new Date();
+  date: Date | null = this.data.citation ? dateStringToDate(this.data.citation.date) : new Date();
   time = this.data.citation?.time ?? '';
   observations = this.data.citation?.observations ?? '';
   reasonIds: number[] = this.data.citation?.reasonIds ?? [];
@@ -268,9 +266,10 @@ export class CitationDialogComponent implements OnInit {
   }
 
   get canSave(): boolean {
-    return this.reasonIds.length > 0
-      && !!this.dateFrom && !!this.dateTo
-      && dateToDateString(this.dateFrom) <= dateToDateString(this.dateTo);
+    return !this.isOrphanCitation
+      && this.reasonIds.length > 0
+      && !!this.date
+      && !!this.time;
   }
 
   previewUrl(file: File): string {
@@ -341,14 +340,15 @@ export class CitationDialogComponent implements OnInit {
   async save(): Promise<void> {
     if (!this.canSave || this.saving()) return;
     this.saving.set(true);
-    const payload = {
-      enrollmentId: this.data.enrollmentId,
-      dateFrom: dateToDateString(this.dateFrom),
-      dateTo: dateToDateString(this.dateTo),
-      time: this.time || null,
+    const base = {
+      date: dateToDateString(this.date),
+      time: this.time,
       observations: this.observations.trim() || null,
       reasonIds: this.reasonIds,
     };
+    const payload = this.isEdit
+      ? base
+      : { enrollmentId: this.data.enrollmentId, ...base };
     try {
       const saved = this.isEdit
         ? await firstValueFrom(this.http.put<Citation>(`/api/citations/${this.data.citation!.id}`, payload))
