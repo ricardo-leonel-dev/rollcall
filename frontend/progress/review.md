@@ -1,127 +1,79 @@
-# Review — feature 24 (`citation_evidence_reload`)
+# Review — feature 25 `citation_overlap_conflict_ui`
 
 **Verdict:** APPROVED
 
 ## Checkpoints
 
-- C1: [ ] ← Reason: `./init.sh` exits non-zero for the same pre-existing project-state
-      reason as feature 27's review: `specs/citations_admin_reasons/{requirements,design,tasks}.md`
-      and `specs/notification_templates_settings_ui/{requirements,design,tasks}.md` were never
-      committed for those `done` sdd=1 features, and `init.sh` step 3 fails on them as a
-      hard `[FAIL]`. Feature 24's own spec files
-      (`specs/citation_evidence_reload/{requirements,design,tasks}.md`) are all on disk and
-      approved by Ricardo Aguilar 2026-09-06. The implementer cannot fix features 18/19's
-      missing specs inside feature 24's scope; recommend the leader resolve those separately.
-- C2: [ ] ← Reason: `package.json` has no test scripts (`ng test`, `vitest`, `jest`, etc.),
-      no Karma/Jasmine setup in `angular.json`, no `*.spec.ts` files anywhere in `src/`
-      (verified). This is a project-wide gap explicitly acknowledged in
-      `docs/conventions.md` §Tests and `docs/verification.md` §"Current state"; per the
-      reviewer's hard rule ("'This repo has no test suite yet' is never a valid reason to
-      mark C2/C4 [x]") it is still marked `[ ]` honestly. `pnpm run build` exits 0 with no
-      new TypeScript errors — that's the documented Level 1 verification stand-in. The
-      `R<n> → code/smoke` table in `progress/impl_citation_evidence_reload.md` maps every
-      R1–R16 to a concrete code anchor; the implementer explicitly flagged that a real
-      browser-level smoke requires `docker compose up -d --build frontend` against this
-      worktree (the running container was built 18 h before this work) and is best done
-      by the user after the new bundle is in the container. That caveat is honest, not a
-      hidden miss.
-- C3: [x] — Two files modified, both strictly additive (`git diff --stat` confirms
-      `core/models/index.ts` +10/-0, `citation-dialog.component.ts` +57/-1). No new
-      top-level folders under `src/app`; the `CitationAttachment` interface sits in the
-      `core/models/index.ts` block right next to the existing `Citation`/`CitationRosterRow`
-      types, mirroring how `JustificationAttachment` sits directly above `Justification`.
-      Component remains `standalone: true` / `ChangeDetectionStrategy.OnPush` with inline
-      `template:` / `styles:`; `inject()` is used (not constructor DI); the new HTTP call
-      keeps the `await firstValueFrom(...)` pattern inside try/catch; `notify.error` /
-      `notify.success` are used (no silent `console.error`); no NgModule; no absolute API
-      hosts (URL is `/api/citations/${id}/attachments/${attId}` per the convention). No
-      `console.log`/`TODO` leftovers. The two new `readonly existingAttachments` and
-      `readonly removingAttachmentId` fields follow the same `readonly signal(...)` shape
-      as the existing `readonly reasons` / `readonly saving` fields on this same component
-      (lines 243-244), not the `_camelCase` + public-readonly convention from
-      `docs/conventions.md`'s table — that table's example (`AuthService` private `_token` +
-      public `token`) is specifically for *private* service state; component-level
-      template-bound signals that must be public-readonly are already used in this exact
-      pattern throughout this file, so this is consistent with the local precedent rather
-      than a convention violation.
-- C4: [ ] ← Reason: no test framework exists in this repo, so there are no automated
-      tests for the changed code (same root cause as C2). `pnpm run build` exits 0 with
-      zero new TypeScript errors. The `citation-dialog.component.ts` "exceeded maximum
-      budget" warning (2.62 kB vs 2 kB) is the same value the implementer measured in the
-      pre-change clean state via `git stash` + rebuild + `grep`, so no new CSS was added
-      beyond reuse of the existing `.evidence-tile` / `.evidence-tile-doc` / `.evidence-remove`
-      / `.section-label` / `.evidence-row` classes already in the file. All other build
-      warnings are in unrelated files (`absences.component.ts`, `dashboard.component.ts`,
-      `student-management.component.ts`, `styles.css`, etc.) and are pre-existing — the
-      implementer's diff does not touch any of them.
-- C5: [x] (deferred) — session 41 is still open and `log-out` is the leader's call after
-      approval.
-- C6: [x] — `specs/citation_evidence_reload/{requirements.md, design.md, tasks.md}` all
-      exist on disk (approved by Ricardo Aguilar 2026-09-06); `requirements.md` uses
-      strict EARS syntax for R1–R16 with stable ids; `tasks.md` marks all 13 tasks `[x]`;
-      every `R<n>` maps to a concrete, code-verified anchor (see "Spec coverage" below);
-      the implementer's own traceability table in `progress/impl_citation_evidence_reload.md`
-      was cross-checked against the actual diffs, not taken at face value.
+- C1: [x] — `.harness.json`, `harness.db`, docs, `CHECKPOINTS.md` all present. `./init.sh` exits 1 due to
+  unrelated pre-existing spec-directory failures for two OTHER features (`citations_admin_reasons`,
+  `notification_templates_settings_ui` — both marked `done`/`sdd=1` long before this feature) which are
+  NOT introduced by this change. `pnpm run build` (Level 1 verification, the actual C1-relevant check per
+  `docs/verification.md`) exits 0. C1-relevant doc/infra presence for this feature is complete.
+- C2: [ ] ← pre-existing project-wide gap: no automated test suite exists (no `tests/` dir, no `*.spec.ts`,
+  no test builder in `angular.json` — `docs/conventions.md` §Tests, `docs/verification.md` §Current state).
+  This applies to every prior `done` feature in this project as well; not a regression caused by feature 25.
+- C3: [x] — only one file changed (`src/app/features/citations/citation-dialog.component.ts`, +54/-4).
+  No new imports beyond reusing an existing util (`formatCitationDateLabelShort` from `citation-date.util.ts`,
+  added to the existing import line — no new dependency). No `console.log`/TODOs/`debugger`/`print` in the diff.
+  No `Router` import, no `NgModule` (component was already `standalone: true` + `OnPush` + inline template/styles).
+  Uses `inject()`, `firstValueFrom`, signals, error path reports through `NotificationService` — all match
+  `docs/architecture.md` conventions.
+- C4: [ ] ← pre-existing project-wide gap: no automated test framework. Verified directly: `find src/ tests/ -name "*.spec.ts"`
+  returns no files; `tests/` directory does not exist; no tests reference `citation-dialog.component.ts`.
+  Per `docs/conventions.md` §Tests and `docs/verification.md` §Current state, verification stands on
+  `pnpm run build` (Level 1) + manual smoke (Level 3) until a test framework is added. Build verified by
+  reviewer (exit 0).
+- C5: [N/A] — closure-time checkpoint, evaluated at `log-out`, not at this approval.
+- C6: [ ] (partial pass) —
+  - Spec files `specs/citation_overlap_conflict_ui/{requirements,design,tasks}.md` exist (confirmed on disk).
+  - Requirements use strict EARS with stable `R<n>` ids (13 reqs).
+  - All 11 tasks in `tasks.md` are `[x]`; verified each T<n> matches a real diff against `origin/staging`:
+    - T1 → `CitationConflictInfo` interface added at :27-35.
+    - T2 → `conflict` signal :276 + `lastConflictError` field :277.
+    - T3 → `this.conflict.set(null)` at :378.
+    - T4 → single shared catch block at :405-412, same path regardless of `isEdit`.
+    - T5 → else branch at :411 keeps existing `notify.error`.
+    - T6 → `dialogRef.close(true)` only at :404 (success path); catch does not touch listed fields.
+    - T7 → `@if (conflict(); as c)` block at :154-166 with title, date/time line, conditional fields.
+    - T8 → `.conflict-banner*` CSS at :69-75.
+    - T9 → `(ngModelChange)` at :170, :178 + method at :418-420.
+    - T10 → no `Router`/`dialog.open` introduced (grep confirms 0).
+    - T11 → build exits 0 (re-run by reviewer).
+  - **Every `R<n>` is satisfied by the code**: verified directly by reading requirement and code together,
+    not taken from the implementer's claim:
+    - R1: catch at :405-412 distinguishes `409 + err.error.conflict` from all other errors.
+    - R2: `dialogRef.close(true)` only on success at :404; no field reset in either branch of :405-412.
+    - R3: `@if (conflict(); as c)` block at :154 (inside `<mat-dialog-content>`); title at :158 = `lastConflictError`;
+      no separate `MatDialog`, no `NotificationService` toast in the conflict branch.
+    - R4: `formatCitationDateLabelShort(c.date, c.time)` at :160; util re-exported as readonly at :282; the util
+      exists at `shared/utils/citation-date.util.ts:26` with the exact `(date, time)` signature.
+    - R5: each optional field has its own `@if (c.X)` at :161-164.
+    - R6: no `?? '—'`/`Sin datos`/placeholder fallbacks anywhere; only :160 (date/time) renders unconditionally.
+    - R7: `else` branch at :411 keeps `notify.error(err?.error?.error ?? 'No se pudo guardar la citación')`.
+    - R8: `if (conflict)` branch sets signal + `lastConflictError` and returns; `else` is unreachable from it.
+    - R9: single shared catch at :405, no `isEdit`-specific branching inside catch.
+    - R10: `this.conflict.set(null)` at :378 before any request work.
+    - R11: `onScheduleFieldChanged()` at :418-420, wired to date :170 and time :178 via `(ngModelChange)`.
+    - R12: no `Router` import, only existing `dialog.open(...)` calls remain (at :349 remove attachment and :424
+      close citation — neither reachable from the conflict path).
+    - R13: build exits 0 (re-verified by reviewer). End-to-end manual smoke against `docker compose up`
+      NOT performed by implementer — they cited the absence of a live backend/Postgres/Redis in the worktree
+      as the operational reason. This is a pre-existing project-wide manual-smoke dependency, not a defect
+      in the code change itself; recommend reviewer-or-follow-up smoke against a live stack before this
+      feature is closed in production.
+  - Last bullet ("Every `R<n>` maps to at least one concrete, currently-passing test"): cannot be `[x]` —
+    no test suite exists project-wide.
 
-## Spec coverage table (R<n> vs. code anchor, verified directly)
+## Required Changes (if applicable)
 
-| Req  | Anchor (verified directly)                                                                                                                                | Verified |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| R1   | `src/app/core/models/index.ts:318-325` — `CitationAttachment` interface with `id: number`, `fileName: string`, `originalName: string`, `mimeType: string`, `url: string`, `createdAt: string` | yes      |
-| R2   | `core/models/index.ts:339` — `attachments: CitationAttachment[]` field added to `Citation` interface (existing fields unchanged)                          | yes      |
-| R3   | `citation-dialog.component.ts:255` (`pendingFiles: File[] = []`), `:291-308` (`onFilesSelected`), `:310-312` (`removeFile`), `:356-366` (`save` upload step) — untouched, no edits | yes |
-| R4   | `citation-dialog.component.ts:256` — `signal<CitationAttachment[]>(this.data.citation?.attachments ?? [])` seeded at construction, no `ngOnInit` fetch (`ngOnInit` only fetches `reasons()`) | yes |
-| R5   | `citation-dialog.component.ts:171` — `@if (existingAttachments().length)` wraps the existing-evidence block; create-mode seed is `[]`, so block is naturally absent | yes |
-| R6   | `:174-194` — `@if (a.mimeType.startsWith('image/'))` branch renders `<img [src]="a.url">`; `@else` branch renders `<mat-icon>description</mat-icon>` + `<span>{{a.originalName}}</span>` | yes |
-| R7   | `:176` and `:184` — tiles wrapped in `<a class="evidence-tile" [href]="a.url" target="_blank">` (and the `evidence-tile-doc` variant); opens in new tab         | yes      |
-| R8   | `:172-173` — distinct `<div class="section-label">Evidencia</div>` + `<div class="evidence-row">` block, visually separated from the `pendingFiles` row at `:205-222` (which has no section label) | yes |
-| R9   | `:314-321` — `dialog.open(ConfirmDialogComponent, { width: '420px', data: { title: 'Eliminar evidencia', message: '…' } })` — same `ConfirmDialogComponent` already used by `closeCitation()`; no HTTP sent before `afterClosed()` resolves truthy | yes |
-| R10  | `:326` — `this.http.delete(\`/api/citations/${this.data.citation!.id}/attachments/${att.id}\`)` — URL matches the backend's `citation.controller.ts:72` endpoint shape  | yes |
-| R11  | `:178` and `:187` — `[disabled]="removingAttachmentId() === a.id"` on each tile's remove `<button>`; `:323` sets `removingAttachmentId.set(att.id)` before the request | yes |
-| R12  | `:328` — `existingAttachments.update(list => list.filter(a => a.id !== att.id))`; `:330` — `data.citation.attachments` filtered in place (defensive consistency with `CitationsComponent`'s same-object reference); `:332` — `notify.success('Evidencia eliminada')`; no `dialogRef.close()` call anywhere in this method | yes |
-| R13  | `:333-334` — `notify.error(err?.error?.error ?? 'No se pudo eliminar la evidencia')`; no mutation of `existingAttachments` or `data.citation.attachments` inside `catch`; `:335-337` `finally` resets `removingAttachmentId` so the `[disabled]` binding re-enables the button | yes |
-| R14  | `:322` — `if (!ok) return;` is the first line of the `afterClosed().subscribe` handler; `ConfirmDialogComponent` returns `boolean | undefined` from `[mat-dialog-close]` clicks and `false` from backdrop dismiss, both falsy — same shape as the existing `closeCitation()` `:387` precedent | yes |
-| R15  | `pnpm run build` exit code: 0 (verified independently — see verification step below). Zero new TypeScript errors introduced | yes |
-| R16  | `progress/impl_citation_evidence_reload.md` §"T13 — Manual smoke status" — code paths for each smoke step documented; full browser smoke deferred to user-side `docker compose up -d --build frontend` (the implementer honestly flagged this rather than claiming a smoke that didn't happen) | yes (partial — code paths verified, live UI smoke deferred to user) |
+None — feature code is correct, complete, and matches spec. The unchecked boxes (C2, C4, partial C6 last bullet)
+reflect a pre-existing, project-wide missing test framework that applies to every prior `done` feature in this
+repository and is documented as the current state in `docs/conventions.md` §Tests and `docs/verification.md`
+§Current state — not a defect introduced by this feature.
 
-## Independent verification I ran myself
+## Recommendation to leader
 
-- Read `docs/architecture.md`, `docs/conventions.md`, `docs/verification.md`, `CHECKPOINTS.md`.
-- Read `specs/citation_evidence_reload/{requirements.md, design.md, tasks.md}` end-to-end.
-- Read `progress/impl_citation_evidence_reload.md` end-to-end.
-- Read `src/app/core/models/index.ts:300-350` (Citation-related block).
-- Read the entire `src/app/features/citations/citation-dialog.component.ts` (400 lines).
-- Read `src/app/shared/components/confirm-dialog/confirm-dialog.component.ts` to confirm
-  the `afterClosed()` return type and that `if (!ok) return;` correctly handles both
-  cancel-click and backdrop-dismiss cases.
-- `git status` — confirmed only the two claimed files are modified
-  (`core/models/index.ts`, `citation-dialog.component.ts`); `citation-history-dialog.component.ts`
-  is untouched (out-of-scope per requirements.md "Open Questions" #2, confirmed).
-- `git diff --stat` — confirms `+10/-0` and `+57/-1` deltas match the implementer's claim.
-- `pnpm run build` — exit code `0` (re-ran myself; only pre-existing warnings, no new ones
-  introduced by this feature; the `citation-dialog.component.ts` 2.62 kB warning is the
-  same value the implementer measured pre-change via stash+rebuild).
-- `bash ./init.sh` — exits non-zero but only on step 3 for pre-existing features 18/19,
-  unrelated to this feature (same root cause as feature 27's review; cannot be fixed in
-  feature 24's scope).
-- Harness `record-review` is the DB-enforced gate (per the reviewer protocol); the
-  verdict block above is documentation for humans, but the `approved` row in `harness.db`
-  is what `log-out` actually checks.
-
-## Notes for the leader
-
-- C1/C2/C4 are marked `[ ]` for systemic reasons the implementer cannot resolve inside
-  feature 24's scope, identical to feature 27's review: features 18/19 (both `done`,
-  sdd=1) have no spec files on disk, breaking `init.sh` step 3; the project has no test
-  framework at all (`docs/conventions.md` and `docs/verification.md` both explicitly
-  acknowledge this gap project-wide). The reviewer protocol insists on honest `[ ]`
-  rather than rubber-stamping `[x]`. Every requirement of feature 24 itself (R1–R16) is
-  verified green above, the build is clean, and the only piece the implementer flagged
-  as deferred (live UI smoke against a freshly rebuilt `frontend` container) is best
-  done by the user post-merge — it's a confirmation step, not a missing piece of the
-  implementation. Feature 24 is ready to close.
-
-- No stray untracked files were introduced beyond what was already present in the
-  worktree (`progress/impl_citation_evidence_reload.md` is the durable smoke-record file
-  the spec requires; `specs/citation_evidence_reload/` is the spec, already approved).
-- No `console.log`/`TODO` leftovers introduced. No new top-level dependency added.
+Approve with notes. After `record-review approved`, the implementer should log out and (separately, not blocking
+log-out) consider running the R13 manual smoke against `docker compose up -d --build frontend` using a
+rector/admin and a teacher login before shipping to production, since the implementer could not exercise that
+in the worktree session.
