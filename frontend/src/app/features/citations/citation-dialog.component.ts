@@ -9,7 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { firstValueFrom, retry } from 'rxjs';
-import { Citation, CitationReason } from '../../core/models/index';
+import { Citation, CitationAttachment, CitationReason } from '../../core/models/index';
 import { NotificationService } from '../../core/services/notification.service';
 import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
 import { formatCitationDateLabel } from '../../shared/utils/citation-date.util';
@@ -168,6 +168,32 @@ const MAX_FILES = 5;
         <textarea matInput rows="3" [(ngModel)]="observations" placeholder="Opcional"></textarea>
       </mat-form-field>
 
+      @if (existingAttachments().length) {
+        <div class="section-label" style="margin-top:8px">Evidencia</div>
+        <div class="evidence-row" style="margin-top:6px">
+          @for (a of existingAttachments(); track a.id) {
+            @if (a.mimeType.startsWith('image/')) {
+              <a class="evidence-tile" [href]="a.url" target="_blank" [style.--r.deg]="rotationFor(a.fileName)">
+                <img [src]="a.url">
+                <button class="evidence-remove" [disabled]="removingAttachmentId() === a.id"
+                        (click)="removeExistingAttachment(a); $event.preventDefault()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </a>
+            } @else {
+              <a class="evidence-tile evidence-tile-doc" [href]="a.url" target="_blank" [style.--r.deg]="rotationFor(a.fileName)">
+                <mat-icon>description</mat-icon>
+                <span>{{a.originalName}}</span>
+                <button class="evidence-remove" [disabled]="removingAttachmentId() === a.id"
+                        (click)="removeExistingAttachment(a); $event.preventDefault()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </a>
+            }
+          }
+        </div>
+      }
+
       <input type="file" #fileInput hidden multiple
              accept="image/png,image/jpeg,image/webp,application/pdf,.doc,.docx"
              (change)="onFilesSelected($event)">
@@ -227,6 +253,8 @@ export class CitationDialogComponent implements OnInit {
   observations = this.data.citation?.observations ?? '';
   reasonIds: number[] = this.data.citation?.reasonIds ?? [];
   pendingFiles: File[] = [];
+  readonly existingAttachments = signal<CitationAttachment[]>(this.data.citation?.attachments ?? []);
+  readonly removingAttachmentId = signal<number | null>(null);
 
   private readonly previewUrls = new WeakMap<File, string>();
 
@@ -281,6 +309,33 @@ export class CitationDialogComponent implements OnInit {
 
   removeFile(file: File): void {
     this.pendingFiles = this.pendingFiles.filter(f => f !== file);
+  }
+
+  removeExistingAttachment(att: CitationAttachment): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: {
+        title: 'Eliminar evidencia',
+        message: 'Esta evidencia se eliminará permanentemente. Esta acción no se puede deshacer.',
+      },
+    }).afterClosed().subscribe(async ok => {
+      if (!ok) return;
+      this.removingAttachmentId.set(att.id);
+      try {
+        await firstValueFrom(
+          this.http.delete(`/api/citations/${this.data.citation!.id}/attachments/${att.id}`),
+        );
+        this.existingAttachments.update(list => list.filter(a => a.id !== att.id));
+        if (this.data.citation) {
+          this.data.citation.attachments = this.data.citation.attachments.filter(a => a.id !== att.id);
+        }
+        this.notify.success('Evidencia eliminada');
+      } catch (err: any) {
+        this.notify.error(err?.error?.error ?? 'No se pudo eliminar la evidencia');
+      } finally {
+        this.removingAttachmentId.set(null);
+      }
+    });
   }
 
   async save(): Promise<void> {
