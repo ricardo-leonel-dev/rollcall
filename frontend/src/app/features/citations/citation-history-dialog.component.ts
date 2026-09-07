@@ -47,7 +47,7 @@ export interface CitationHistoryDialogData {
         @for (c of data.citations; track c.id) {
           <div class="history-row">
             <div class="history-row-main">
-              <div class="history-row-date">{{formatCitationDateLabel(c.date, c.time)}}</div>
+              <div class="history-row-date">{{formatCitationDateLabel(c.date, c.time, c.createdAt)}}</div>
               @if (c.observations) {
                 <div class="history-row-obs">{{c.observations}}</div>
               }

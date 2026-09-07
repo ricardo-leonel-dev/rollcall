@@ -136,7 +136,7 @@ const MAX_FILES = 5;
           </div>
           <ul class="pending-banner-list">
             @for (c of data.pendingCitations; track c.id) {
-              <li>{{formatCitationDateLabel(c.date, c.time)}}</li>
+              <li>{{formatCitationDateLabel(c.date, c.time, c.createdAt)}}</li>
             }
           </ul>
         </div>
