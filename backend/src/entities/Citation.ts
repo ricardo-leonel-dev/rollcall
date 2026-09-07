@@ -11,14 +11,14 @@ export class Citation {
   @Column({ name: 'enrollment_id', type: 'integer' })
   enrollmentId!: number;
 
-  @Column({ name: 'date_from', type: 'date' })
-  dateFrom!: string;
+  @Column({ name: 'guardian_id', type: 'integer', nullable: true })
+  guardianId!: number | null;
 
-  @Column({ name: 'date_to', type: 'date' })
-  dateTo!: string;
+  @Column({ name: 'date', type: 'date' })
+  date!: string;
 
-  @Column({ name: 'time', type: 'time', nullable: true })
-  time!: string | null;
+  @Column({ name: 'time', type: 'time' })
+  time!: string;
 
   @Column({ type: 'varchar' })
   status!: 'pending' | 'closed';

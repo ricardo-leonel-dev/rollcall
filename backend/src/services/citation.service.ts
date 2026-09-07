@@ -16,7 +16,7 @@ const ATTACHMENTS_DIR = path.join(process.cwd(), 'uploads', 'citaciones');
 const attachmentUrl = (fileName: string) => `/api/uploads/citaciones/${fileName}`;
 
 const CITATION_FIELDS_SQL = `
-  c.id, c.date_from::text AS "dateFrom", c.date_to::text AS "dateTo", c.time,
+  c.id, c.date::text AS "date", c.time::text AS "time", c.guardian_id AS "guardianId",
   c.status, c.observations, c.closed_at AS "closedAt", c.closed_by_user_id AS "closedByUserId",
   c.created_by_user_id AS "createdByUserId", c.created_at AS "createdAt",
   COALESCE((
@@ -56,9 +56,44 @@ async function assertReasonIds(institutionId: number, reasonIds: unknown): Promi
   return ids;
 }
 
-function assertDateOrder(dateFrom: string, dateTo: string) {
-  if (dateFrom > dateTo) {
-    throw Object.assign(new Error('dateFrom must be on or before dateTo'), { status: 400 });
+async function assertNoGuardianConflict(
+  institutionId: number,
+  guardianId: number,
+  date: string,
+  time: string,
+  courseIds: number[] | null,
+  excludeId?: number,
+): Promise<void> {
+  const rows = await AppDataSource.query(
+    `
+    SELECT c.id, c.date::text AS "date", c.time::text AS "time",
+           v.full_name      AS "studentName",
+           v.guardian_name  AS "guardianName",
+           v.guardian_phone AS "guardianPhone",
+           v.course         AS "courseName"
+    FROM   citations c
+    JOIN   v_enrollments_detail v ON v.enrollment_id = c.enrollment_id
+    WHERE  c.institution_id = $1
+      AND  c.deleted_at IS NULL
+      AND  c.status = 'pending'
+      AND  c.guardian_id = $2
+      AND  c.date = $3
+      AND  ABS(EXTRACT(EPOCH FROM ((c.time - $4)::interval))) < 600
+      AND  ($5::integer IS NULL OR c.id != $5)
+    ORDER  BY c.time ASC, c.id ASC
+    LIMIT  1
+    `,
+    [institutionId, guardianId, date, time, excludeId ?? null],
+  );
+  if (rows.length > 0) {
+    const full = rows[0];
+    const conflict = courseIds === null
+      ? full
+      : { id: full.id, date: full.date, time: full.time };
+    throw Object.assign(
+      new Error('Ya existe una citación pendiente para este representante en un horario cercano'),
+      { status: 409, conflict },
+    );
   }
 }
 
@@ -84,7 +119,7 @@ export async function findRoster(institutionId: number, courseIds: number[] | nu
       v.whatsapp_link AS "whatsappLink",
       COALESCE((
         SELECT json_agg(json_build_object(
-          'id', c.id, 'dateFrom', c.date_from, 'dateTo', c.date_to, 'time', c.time,
+          'id', c.id, 'date', c.date, 'time', c.time, 'guardianId', c.guardian_id,
           'status', c.status, 'observations', c.observations,
           'closedAt', c.closed_at, 'closedByUserId', c.closed_by_user_id,
           'createdByUserId', c.created_by_user_id, 'createdAt', c.created_at,
@@ -99,7 +134,7 @@ export async function findRoster(institutionId: number, courseIds: number[] | nu
             ) ORDER BY att.created_at ASC)
             FROM citation_attachments att WHERE att.citation_id = c.id
           ), '[]')
-        ) ORDER BY c.date_from DESC)
+        ) ORDER BY c.date DESC)
         FROM citations c
         WHERE c.enrollment_id = v.enrollment_id AND c.deleted_at IS NULL
       ), '[]') AS citations
@@ -128,7 +163,7 @@ export async function findByEnrollment(institutionId: number, courseIds: number[
   if (status) { conditions.push(`c.status = $2`); params.push(status); }
 
   const rows = await AppDataSource.query(
-    `SELECT ${CITATION_FIELDS_SQL} FROM citations c WHERE ${conditions.join(' AND ')} ORDER BY c.date_from DESC`,
+    `SELECT ${CITATION_FIELDS_SQL} FROM citations c WHERE ${conditions.join(' AND ')} ORDER BY c.date DESC`,
     params
   );
   return rows.map((r: any) => ({
@@ -138,19 +173,28 @@ export async function findByEnrollment(institutionId: number, courseIds: number[
 }
 
 export async function create(institutionId: number, courseIds: number[] | null, data: {
-  enrollmentId: number; dateFrom: string; dateTo: string; time?: string; observations?: string; reasonIds: unknown;
+  enrollmentId: number; date: string; time: string; observations?: string; reasonIds: unknown;
 }, createdByUserId: number | null = null) {
-  assertDateOrder(data.dateFrom, data.dateTo);
-  await assertEnrollmentInScope(institutionId, courseIds, data.enrollmentId);
+  if (!data.time) {
+    throw Object.assign(new Error('El campo time es obligatorio'), { status: 400 });
+  }
+  if (!data.date) {
+    throw Object.assign(new Error('El campo date es obligatorio'), { status: 400 });
+  }
+  const enrollment = await assertEnrollmentInScope(institutionId, courseIds, data.enrollmentId);
+  if (enrollment.guardianId === null) {
+    throw Object.assign(new Error('La matrícula no tiene representante asignado'), { status: 400 });
+  }
+  await assertNoGuardianConflict(institutionId, enrollment.guardianId, data.date, data.time, courseIds);
   const reasonIds = await assertReasonIds(institutionId, data.reasonIds);
 
   return AppDataSource.transaction(async (em) => {
     const c = em.create(Citation, {
       institutionId,
       enrollmentId: data.enrollmentId,
-      dateFrom: data.dateFrom,
-      dateTo: data.dateTo,
-      time: data.time ?? null,
+      guardianId: enrollment.guardianId,
+      date: data.date,
+      time: data.time,
       observations: data.observations ?? null,
       createdByUserId,
     });
@@ -163,18 +207,25 @@ export async function create(institutionId: number, courseIds: number[] | null, 
 }
 
 export async function update(institutionId: number, courseIds: number[] | null, id: number, data: Partial<{
-  dateFrom: string; dateTo: string; time: string | null; observations: string | null; reasonIds: unknown;
+  date: string; time: string | null; observations: string | null; reasonIds: unknown;
 }>) {
+  if (data.time !== undefined && !data.time) {
+    throw Object.assign(new Error('El campo time no puede estar vacío'), { status: 400 });
+  }
+
   const c = await findOwned(institutionId, courseIds, id);
 
-  const nextDateFrom = data.dateFrom ?? c.dateFrom;
-  const nextDateTo = data.dateTo ?? c.dateTo;
-  assertDateOrder(nextDateFrom, nextDateTo);
+  if (c.guardianId === null) {
+    throw Object.assign(new Error('Esta citación no tiene representante asignado y no puede editarse'), { status: 400 });
+  }
+
+  const nextDate = data.date ?? c.date;
+  const nextTime = data.time ?? c.time;
+  await assertNoGuardianConflict(institutionId, c.guardianId, nextDate, nextTime, courseIds, c.id);
 
   const reasonIds = data.reasonIds !== undefined ? await assertReasonIds(institutionId, data.reasonIds) : undefined;
 
-  if (data.dateFrom !== undefined) c.dateFrom = data.dateFrom;
-  if (data.dateTo !== undefined) c.dateTo = data.dateTo;
+  if (data.date !== undefined) c.date = data.date;
   if (data.time !== undefined) c.time = data.time;
   if (data.observations !== undefined) c.observations = data.observations;
 
