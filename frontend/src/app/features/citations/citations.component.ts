@@ -48,7 +48,7 @@ import { CitationDialogComponent } from './citation-dialog.component';
       padding: 0; background: none; border: none; color: var(--muted); line-height: 1;
     }
     .manual-search .ms-clear:hover { color: var(--ink-soft); }
-    .pills-cell { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pills-cell { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
     .pill {
       cursor: pointer;
       border: none;
@@ -59,6 +59,21 @@ import { CitationDialogComponent } from './citation-dialog.component';
       border-radius: 999px;
       line-height: 1.2;
     }
+    .pill-more {
+      background: var(--paper-deep);
+      color: var(--muted-strong);
+      border: 1px dashed var(--border);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 999px;
+      line-height: 1.2;
+    }
+    .pill-more:hover { background: var(--border-soft); color: var(--ink-soft); }
+    .mat-mdc-menu-panel .citations-menu-panel { padding: 6px; }
+    .citations-menu-item .badge { display: inline-flex; pointer-events: none; }
   `],
   template: `
     <div class="page-header">
@@ -133,10 +148,28 @@ import { CitationDialogComponent } from './citation-dialog.component';
                       <span style="color:var(--muted)">—</span>
                     } @else {
                       <div class="pills-cell">
-                        @for (c of scopedCitations(row); track c.id) {
-                          <button class="pill badge" [style]="pillStyle(c)" (click)="onPillClick(row, c)">
-                            {{pillLabel(c)}}
+                        @if (latestCitation(row); as latest) {
+                          <button class="pill badge" [style]="pillStyle(latest)" (click)="onPillClick(row, latest)">
+                            {{pillLabel(latest)}}
                           </button>
+                          @if (extraCitations(row).length > 0) {
+                            <button class="pill-more"
+                                    type="button"
+                                    [matMenuTriggerFor]="moreMenu"
+                                    #moreTrigger="matMenuTrigger"
+                                    (mouseenter)="moreTrigger.openMenu()"
+                                    (mouseleave)="moreTrigger.closeMenu()"
+                                    [matTooltip]="extraCitationsTooltip(row)">
+                              +{{ extraCitations(row).length }}
+                            </button>
+                            <mat-menu #moreMenu="matMenu" class="citations-menu-panel" (mouseleave)="moreTrigger.closeMenu()">
+                              @for (c of extraCitations(row); track c.id) {
+                                <button mat-menu-item class="citations-menu-item" (click)="onPillClick(row, c)">
+                                  <span class="badge" [style]="pillStyle(c)">{{pillLabel(c)}}</span>
+                                </button>
+                              }
+                            </mat-menu>
+                          }
                         }
                       </div>
                     }
@@ -241,6 +274,25 @@ export class CitationsComponent implements OnInit {
   scopedCitations(row: CitationRosterRow): Citation[] {
     if (!this.scopeStart || !this.scopeEnd) return row.citations;
     return row.citations.filter(c => c.date >= this.scopeStart! && c.date <= this.scopeEnd!);
+  }
+
+  private sortedScopedCitations(row: CitationRosterRow): Citation[] {
+    return [...this.scopedCitations(row)].sort(
+      (a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`)
+    );
+  }
+
+  latestCitation(row: CitationRosterRow): Citation | null {
+    return this.sortedScopedCitations(row)[0] ?? null;
+  }
+
+  extraCitations(row: CitationRosterRow): Citation[] {
+    return this.sortedScopedCitations(row).slice(1);
+  }
+
+  extraCitationsTooltip(row: CitationRosterRow): string {
+    const n = this.extraCitations(row).length;
+    return n === 1 ? '1 citación más' : `${n} citaciones más`;
   }
 
   onQuarterChange(q: Quarter | null): void {
