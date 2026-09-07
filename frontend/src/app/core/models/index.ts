@@ -315,6 +315,15 @@ export interface NotificationTemplate {
   template:  string;
 }
 
+export interface CitationAttachment {
+  id: number;
+  fileName: string;
+  originalName: string;
+  mimeType: string;
+  url: string;
+  createdAt: string;
+}
+
 export interface Citation {
   id: number;
   dateFrom: string;
@@ -327,6 +336,7 @@ export interface Citation {
   createdByUserId: number;
   createdAt: string;
   reasonIds: number[];
+  attachments: CitationAttachment[];
 }
 
 export interface CitationRosterRow {
