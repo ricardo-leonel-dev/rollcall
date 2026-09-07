@@ -162,7 +162,7 @@ import { CitationDialogComponent } from './citation-dialog.component';
                                     [matTooltip]="extraCitationsTooltip(row)">
                               +{{ extraCitations(row).length }}
                             </button>
-                            <mat-menu #moreMenu="matMenu" class="citations-menu-panel" (mouseleave)="moreTrigger.closeMenu()">
+                            <mat-menu #moreMenu="matMenu" class="citations-menu-panel" [hasBackdrop]="false" (mouseleave)="moreTrigger.closeMenu()">
                               @for (c of extraCitations(row); track c.id) {
                                 <button mat-menu-item class="citations-menu-item" (click)="onPillClick(row, c)">
                                   <span class="badge" [style]="pillStyle(c)">{{pillLabel(c)}}</span>
