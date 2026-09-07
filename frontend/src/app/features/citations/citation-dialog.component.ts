@@ -12,7 +12,7 @@ import { firstValueFrom, retry } from 'rxjs';
 import { Citation, CitationAttachment, CitationReason } from '../../core/models/index';
 import { NotificationService } from '../../core/services/notification.service';
 import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
-import { formatCitationDateLabel, formatCitationDateLabelShort } from '../../shared/utils/citation-date.util';
+import { formatCitationTargetLabel, formatCitationCreatedAtLabel, formatCitationDateLabelShort } from '../../shared/utils/citation-date.util';
 import { citationReasonSeverityBadgeClass } from '../../shared/utils/citation-reason.util';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 
@@ -63,8 +63,10 @@ const MAX_FILES = 5;
       padding: 10px 14px; margin-bottom: 14px; font-size: 13px;
     }
     .pending-banner-title { font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
-    .pending-banner-list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding-left: 18px; }
+    .pending-banner-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding-left: 18px; }
     .pending-banner-list li { font-size: 12px; color: #78350f; }
+    .pending-citation-target { font-weight: 700; }
+    .pending-citation-created { font-size: 11px; color: #92702f; margin-top: 1px; }
 
     .conflict-banner {
       background: #fee2e2; color: #991b1b;
@@ -136,7 +138,10 @@ const MAX_FILES = 5;
           </div>
           <ul class="pending-banner-list">
             @for (c of data.pendingCitations; track c.id) {
-              <li>{{formatCitationDateLabel(c.date, c.time, c.createdAt)}}</li>
+              <li>
+                <div class="pending-citation-target">{{formatCitationTargetLabel(c.date, c.time)}}</div>
+                <div class="pending-citation-created">{{formatCitationCreatedAtLabel(c.createdAt)}}</div>
+              </li>
             }
           </ul>
         </div>
@@ -278,7 +283,8 @@ export class CitationDialogComponent implements OnInit {
 
   readonly MAX_FILES = MAX_FILES;
   readonly citationReasonSeverityBadgeClass = citationReasonSeverityBadgeClass;
-  readonly formatCitationDateLabel = formatCitationDateLabel;
+  readonly formatCitationTargetLabel = formatCitationTargetLabel;
+  readonly formatCitationCreatedAtLabel = formatCitationCreatedAtLabel;
   readonly formatCitationDateLabelShort = formatCitationDateLabelShort;
 
   date: Date | null = this.data.citation ? dateStringToDate(this.data.citation.date) : new Date();

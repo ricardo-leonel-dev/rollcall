@@ -6,9 +6,12 @@ const MONTHS_ES = [
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
 ];
 
-function formatLongDateEs(dateStr: string): string {
-  const d = dateStringToDate(dateStr)!;
+function formatLongDateEsFromDate(d: Date): string {
   return `${WEEKDAYS_ES[d.getDay()]} ${d.getDate()} de ${MONTHS_ES[d.getMonth()]} del ${d.getFullYear()}`;
+}
+
+function formatLongDateEs(dateStr: string): string {
+  return formatLongDateEsFromDate(dateStringToDate(dateStr)!);
 }
 
 function to12h(h: number): { h12: number; period: 'AM' | 'PM' } {
@@ -17,25 +20,25 @@ function to12h(h: number): { h12: number; period: 'AM' | 'PM' } {
   return { h12, period };
 }
 
+function formatTime12hFromParts(h: number, m: number): string {
+  const { h12, period } = to12h(h);
+  return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
+}
+
 function formatTime12h(time: string): string {
   const [hStr, mStr] = time.split(':');
-  const { h12, period } = to12h(Number(hStr));
-  return `${String(h12).padStart(2, '0')}:${mStr} ${period}`;
-}
-
-function formatCreatedAtShort(createdAt: string): string {
-  const d = new Date(createdAt);
-  const { h12, period } = to12h(d.getHours());
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  return `${day}/${month}/${d.getFullYear()} ${String(h12).padStart(2, '0')}:${minutes} ${period}`;
-}
-
-export function formatCitationDateLabel(date: string, time: string, createdAt: string): string {
-  return `Agendado el ${formatCreatedAtShort(createdAt)} para el ${formatLongDateEs(date)} a las ${formatTime12h(time)}`;
+  return formatTime12hFromParts(Number(hStr), Number(mStr));
 }
 
 export function formatCitationDateLabelShort(date: string, time: string): string {
   return `${formatLongDateEs(date)} a las ${formatTime12h(time)}`;
+}
+
+export function formatCitationTargetLabel(date: string, time: string): string {
+  return `Cita: ${formatCitationDateLabelShort(date, time)}`;
+}
+
+export function formatCitationCreatedAtLabel(createdAt: string): string {
+  const d = new Date(createdAt);
+  return `Registrada el ${formatLongDateEsFromDate(d)} a las ${formatTime12hFromParts(d.getHours(), d.getMinutes())}`;
 }

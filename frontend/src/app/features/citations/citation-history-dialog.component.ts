@@ -3,7 +3,7 @@ import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/materia
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { Citation } from '../../core/models/index';
-import { formatCitationDateLabel } from '../../shared/utils/citation-date.util';
+import { formatCitationTargetLabel, formatCitationCreatedAtLabel } from '../../shared/utils/citation-date.util';
 
 export interface CitationHistoryDialogData {
   studentName: string;
@@ -29,6 +29,7 @@ export interface CitationHistoryDialogData {
     }
     .history-row-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     .history-row-date { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+    .history-row-created { font-size: 11px; color: var(--muted); margin-top: -2px; }
     .history-row-obs { font-size: 12px; color: var(--muted-strong); white-space: pre-line; word-break: break-word; }
     .actions { display: flex; justify-content: flex-end; margin-top: 16px; }
   `],
@@ -47,7 +48,8 @@ export interface CitationHistoryDialogData {
         @for (c of data.citations; track c.id) {
           <div class="history-row">
             <div class="history-row-main">
-              <div class="history-row-date">{{formatCitationDateLabel(c.date, c.time, c.createdAt)}}</div>
+              <div class="history-row-date">{{formatCitationTargetLabel(c.date, c.time)}}</div>
+              <div class="history-row-created">{{formatCitationCreatedAtLabel(c.createdAt)}}</div>
               @if (c.observations) {
                 <div class="history-row-obs">{{c.observations}}</div>
               }
@@ -70,5 +72,6 @@ export interface CitationHistoryDialogData {
 export class CitationHistoryDialogComponent {
   readonly dialogRef = inject(MatDialogRef<CitationHistoryDialogComponent>);
   readonly data: CitationHistoryDialogData = inject(MAT_DIALOG_DATA);
-  readonly formatCitationDateLabel = formatCitationDateLabel;
+  readonly formatCitationTargetLabel = formatCitationTargetLabel;
+  readonly formatCitationCreatedAtLabel = formatCitationCreatedAtLabel;
 }
