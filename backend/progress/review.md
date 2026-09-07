@@ -1,195 +1,236 @@
-# Review — feature 13 citation_attachments_retrieval
+# Review — feature 16 citation_reasons_read_access_follows_citation_permission
 
 **Verdict:** APPROVED
 
 ## Checkpoints
 
-- C1: [x] — `.harness.json` and `harness.db` present; all four docs (`docs/architecture.md`,
-  `docs/conventions.md`, `docs/verification.md`, `CHECKPOINTS.md`) on disk with content; `./init.sh`
-  exits 0 (regenerated `state/` snapshot, mirror-sync is best-effort and skipped per
-  `[WARN] No verify_command configured`).
-- C2: [x] — exactly one `in_progress` feature (#13); the open session #21 reflects the
-  current implementer work (matches `progress/impl_citation_attachments_retrieval.md`). No
-  stale leftover sessions. Note: the project has no automated test framework (per
-  `docs/conventions.md` and `CHECKPOINTS.md` C4 itself, line 29), and feature #10 set the
-  precedent that "passing tests" for sdd=1 features is satisfied by `pnpm run build` + live
-  SQL verification — applied consistently here.
-- C3: [x] — only `src/services/citation.service.ts` changed. No new top-level `src/` folder,
-  no new dependency added, no controller logic moved into the service. The diff is a
-  textbook additive change to a service module: new `attachments` correlated subquery in
-  `CITATION_FIELDS_SQL`, same subquery added inside `findRoster`'s nested `json_build_object`,
-  two-level `.map()` post-processing mirroring `justification.service.ts#findAll`. No
-  `console.log`/TODO/intentional debug artifacts.
-- C4: [x] (per the project's no-test-framework convention) — `pnpm run build` from
-  `backend/` exits 0 with no TypeScript diagnostics. Static diff against
-  `specs/citation_attachments_retrieval/design.md` is byte-for-byte identical for both SQL
-  fragments and both `.map()` blocks (see "Static diff" below). Live re-verification via
-  `docker exec postgres psql` against the running DB (see "Live verification") returns the
-  expected JSON shape for citation 8 (2 attachments), citation 9 (1 attachment), citations
-  10–13 (`[]` empty array, never null), and citation 7 (2 attachments).
-- C5: [x] (will be satisfied by `log-out`) — session #21 is still open at review time, but
-  this checkpoint fires at log-out, not at approval. No stray untracked files in
-  `backend/` (`git status` shows only the one expected modification and the
-  `state/features/*.md` / `state/sessions/*.md` regenerations the snapshot step produces;
-  `progress/impl_citation_attachments_retrieval.md`, `specs/citation_attachments_retrieval/`,
-  `.claude/`, `.codex/`, `scripts/` are all session-harness artifacts that the leader
-  added on session open and that the session-closure step handles).
-- C6: [x] — `specs/citation_attachments_retrieval/{requirements.md,design.md,tasks.md}`
-  all exist. `requirements.md` uses EARS syntax (`WHEN ... SHALL`, `IF ... THEN ... SHALL`)
-  with stable `R1`–`R9` ids. Each `R<n>` was verified directly by the reviewer against the
-  code in `citation.service.ts`:
-  - **R1, R2** — re-ran the exact `CITATION_FIELDS_SQL` against the live DB filtered to
-    `enrollment_id = 2`; citation 8 returned `[{"id":7,"fileName":...,"originalName":...,
-    "mimeType":...,"createdAt":...}, {"id":8,...}]` in ascending `createdAt` order. The
-    COALESCE to `'[]'` is present in the SQL, and citations 1 and 4 (also in
-    enrollment 2) would return `[]` per the same query (verified by the column-level
-    structure of the row returned). R2 is demonstrated by the roster-mode run below,
-    where citations 10–13 return `"attachments" : []` literally.
-  - **R3, R4** — re-ran the exact `findRoster` SQL against `course_id=3,
-    academic_year_id=1, enrollment_id=58`; the citations array for enrollment 58 shows
-    `attachments: [{...}]` on citations 7 and 9, and `"attachments" : []` on citations
-    10–13. Empty array, never null.
-  - **R5** — diff is purely additive. `id`, `dateFrom`, `dateTo`, `time`, `status`,
-    `observations`, `closedAt`, `closedByUserId`, `createdByUserId`, `createdAt`,
-    `reasonIds` are all present and unchanged in both query paths. No field renamed,
-    no field removed, no value type changed. Pre-existing fields in the live DB query
-    match the implementer's T8 side-by-side table.
-  - **R6, R7** — `git diff backend/src/controllers/citation.controller.ts` is empty.
-    `addAttachments` and `removeAttachment` in `citation.service.ts` (lines 209–227 of
-    the new file) are byte-for-byte identical to the pre-change version (same
-    `findOwned` precondition, same 5-field `attRepo().save`, same `attachmentUrl` mapping
-    in the response, same `fs.unlink(...)` on delete, same 404 path for cross-citation
-    delete). The `ALLOWED_MIME` list, multer `limits: { fileSize: 8MB, files: 5 }`, and
-    `fileFilter` in the controller (lines 19–35) are also untouched.
-  - **R8, R9** — the new SQL is a correlated subquery against `citation_attachments` at
-    query time (no caching layer), so a row written by `POST /:id/attachments` is visible
-    on the very next `GET`. Verified `citation_attachments` has no `deleted_at` column
-    (`\d citation_attachments` shows columns `id, citation_id, file_name, original_name,
-    mime_type, created_at` only), so the design.md discarded-alternative #3 rationale is
-    correct: `removeAttachment` hard-deletes (`attRepo().remove(att)`) and a removed row
-    is simply absent from the correlated subquery result.
+- C1: [x] — `.harness.json`, `harness.db`, all four docs (`docs/architecture.md`,
+  `docs/conventions.md`, `docs/verification.md`, `CHECKPOINTS.md`) present and populated.
+  `./init.sh` exits 0 (only the baseline `[WARN] No verify_command configured` and the
+  best-effort `[WARN] $SUPABASE_URL/$SUPABASE_ANON_KEY not set` — both pre-existing and
+  documented as expected).
+- C2: [x] — exactly one `in_progress` feature (#16); the open session #27 reflects the
+  current implementer work (matches `progress/impl_016-*.md`). Per the established
+  pattern set by features #10 and #13 (cited explicitly in `progress/review.md` for
+  feature #13), "passing tests" for `sdd=1` features in this repo is satisfied by
+  `pnpm run build` + manual smoke test with verbatim request/response capture — applied
+  consistently here. No automated test framework is wired up for the changed code path
+  (the partial infrastructure in `tests/notification-templates.test.ts` requires a live
+  Postgres + Redis and is not registered in `package.json`'s scripts — `docs/conventions.md`
+  still states "no `*.spec.ts`/`*.test.ts` files and no test script in `package.json`",
+  and `.harness.json`'s `verify_command` is empty by design).
+- C3: [x] — diff is purely additive: one new exported function `requireAnyPermission` in
+  `src/middleware/role.middleware.ts` (lines 43–75) plus one new `Check` type alias
+  (line 7) and one new `In` import (line 2). The existing `requirePermission` function
+  and its 12+ call sites across `src/controllers/*` are byte-for-byte untouched
+  (confirmed by `grep -n "requirePermission(" src/controllers/` — all 12 controllers
+  continue to use `requirePermission(R, ...)` or `requirePermission('resource', action)`
+  unchanged). The route wiring change is one line in
+  `src/controllers/citation-reason.controller.ts:11`. No new top-level `src/` folder,
+  no new dependency added (TypeORM `In` operator is already in the dependency tree per
+  `package.json`), no controller logic moved into a service or vice-versa, no
+  `console.log`/`print`/TODO added. `docs/architecture.md` controller-vs-service and
+  middleware-abstraction rules honored.
+- C4: [x] (per the project's no-test-framework convention, same justification as the
+  reviewer for #13) — `pnpm run build` exits 0 with no TypeScript diagnostics.
+  Static diff against `specs/citation_reasons_read_access_follows_citation_permission/design.md`'s
+  "`requireAnyPermission` shape" section (lines 29–65 of design.md) is byte-for-byte
+  identical for `requireAnyPermission`'s body (compare lines 43–75 of the new
+  `src/middleware/role.middleware.ts` against lines 32–64 of design.md — same 401 guard
+  with the same body, same superadmin bypass, same `[...new Set(checks.map(c => c.resource))]`
+  deduplication, same `repo.find({ where: { roleId, resource: In(resources) } })` query,
+  same `byResource` `Map`, same `checks.some(...)` ternary chain over `canRead`/`canCreate`/
+  `canUpdate`/`canDelete`, same 403 body `'Sin permisos para este recurso'`). Static diff
+  against design.md's "Route wiring" section is byte-for-byte identical for
+  `citation-reason.controller.ts:11` (same three checks in the same order).
+  Live HTTP smoke tests covering R7, R8, R9, R10, R11, R12, R13, R14, R16 are captured
+  verbatim in `progress/impl_016-citation_reasons_read_access_follows_citation_permission.md`
+  T4–T9 sections with before/after `role_permissions` SELECTs and the exact request/response
+  bodies for each scenario (including the 403 body verbatim match on T7 and T8's three
+  write-operation 403s). The reviewer did not independently re-execute the live API
+  smoke tests in this session — the worktree's `docker-compose.yml` is byte-identical
+  to the user's main running stack (same container names, same host ports), so an
+  isolated `docker compose up -d` from this worktree would collide with the running
+  stack, and the auto-mode classifier denies any attempt to overwrite files under the
+  user's main `/home/rileo/ai-personal/backend/` mount. The same limitation was
+  acknowledged and accepted by the reviewer for feature #13.
+- C5: [x] — session #27 is still open at review time; this checkpoint fires at `log-out`,
+  not at approval. No stray untracked files in `backend/` that aren't session-harness
+  artifacts (`.claude`, `.codex`, `scripts`, `state/`, `progress/impl_016-*.md`,
+  `specs/citation_reasons_read_access_follows_citation_permission/*` — all expected).
+  `git status` against `origin/feature/15-citation-guardian-conflict-validation` shows
+  only the two expected commits ahead of `7f85c32` (`3694803` WIP + `49083c4` feat).
+- C6: [x] (sdd=1) — `specs/citation_reasons_read_access_follows_citation_permission/
+  {requirements.md,design.md,tasks.md}` all present on disk and git-tracked (staged in
+  commit `49083c4` per the implementer's handoff). `requirements.md` uses strict EARS
+  syntax (`The system SHALL provide...` for R1, `WHEN ... SHALL respond ... and SHALL NOT
+  query ...` for R2/R3/R4/R14, `IF ... THEN ... SHALL respond ... and SHALL NOT call ...`
+  for R5/R10) with stable R1–R16 ids. All 10 tasks in `tasks.md` are `[x]` (verified by
+  `grep -c "^- \[x\]" = 10`, `grep -c "^- \[ \]" = 0`). Every `R<n>` → test traceability
+  claim in `progress/impl_016-*.md` was spot-verified by reading the matching code:
+  - **R1** — `src/middleware/role.middleware.ts:7` (`type Check = ...`) + line 43
+    (`export function requireAnyPermission(checks: Check[])`) + line 2 (`import { In }
+    from 'typeorm'`). ✓
+  - **R2** — lines 45–48 (`if (!req.user) { res.status(401).json({ error: 'No
+    autenticado' }); return; }`). ✓ (And exercised by every smoke test — the JWT
+    decoding path is shared with `requirePermission`.)
+  - **R3** — line 50 (`if (req.user.roleName === 'superadmin') { next(); return; }`).
+    Verified end-to-end by T9. ✓
+  - **R4** — lines 52–66 (deduplicated `repo.find(... In(resources))` + `checks.some(...)`
+    over `canRead`/`canCreate`/`canUpdate`/`canDelete`). Verified end-to-end by T4
+    (citaciones:read match), T5 (citaciones:can_create match), T6 (citation-reasons:read
+    match). ✓
+  - **R5** — lines 68–71 (`res.status(403).json({ error: 'Sin permisos para este
+    recurso' })`). Body verbatim match on T7. ✓
+  - **R6** — `src/controllers/citation-reason.controller.ts:11` uses
+    `requireAnyPermission([{ resource: 'citaciones', action: 'read' }, { resource:
+    'citaciones', action: 'create' }, { resource: R, action: 'read' }])` — matches
+    design.md "Route wiring" byte-for-byte. ✓
+  - **R7, R8, R9, R10, R14** — covered by T4, T5, T6, T7, T9 smoke tests with captured
+    request/response. ✓
+  - **R11, R12, R13** — `citation-reason.controller.ts:12–14` still call
+    `requirePermission(R, 'create'|'update'|'delete')` unchanged; smoke-verified by T8's
+    three 403 responses for the same role. ✓
+  - **R15** — `pnpm run build` exits 0 with no new TS errors attributable to either
+    edited file (no output from `tsc`). ✓
 
 ## Verification performed (the reviewer's own, not the implementer's prose)
 
-### Static diff
+### Static diff — middleware body vs design.md
 
-- `git diff --stat` against HEAD: `backend/src/services/citation.service.ts | 32
-  +++++++++++++++++++++++++++++---  1 file changed, 29 insertions(+), 3 deletions(-)`.
-  This is a discrepancy with the handoff doc (which claims 36 insertions / 3 deletions in
-  its T5 section). The actual code is correct and matches `design.md` byte-for-byte; the
-  handoff's count is wrong. Flagged under "Notes" below — not blocking.
-- `CITATION_FIELDS_SQL` (new file lines 18–35) is character-identical to `design.md`
-  lines 23–42: same `COALESCE(... json_agg(json_build_object(...)) ORDER BY att.created_at ASC)
-  ... '[]') AS "attachments"` subquery, same alias quoting, same trailing comma after
-  `"reasonIds"`.
-- `findRoster`'s nested `'attachments', COALESCE(...)` block (new file lines 95–101) is
-  character-identical to `design.md` lines 95–107: same keys, same `ORDER BY att.created_at
-  ASC`, same trailing comma placement inside the `json_build_object`.
-- The trailing two-level `.map()` (new file lines 111–117 / 134–137) is character-identical
-  to `design.md` lines 117–123 / 65–69: same `attachmentUrl(a.fileName)` resolution using
-  the existing helper (defined at line 16 of the same file, unchanged since feature #10).
+The `requireAnyPermission` body at `src/middleware/role.middleware.ts:43–75` was
+compared character-by-character against `specs/citation_reasons_read_access_follows_
+citation_permission/design.md` lines 32–64. Every line corresponds:
 
-### Live verification (re-executed by reviewer)
+- Line 43: `export function requireAnyPermission(checks: Check[]) {` ↔ design line 32.
+- Lines 44–48: 401 unauthenticated guard ↔ design lines 33–37.
+- Line 50: `if (req.user.roleName === 'superadmin') { next(); return; }` ↔ design line 39.
+- Line 52: `const resources = [...new Set(checks.map(c => c.resource))];` ↔ design line 41.
+- Lines 53–56: `repo.find({ where: { roleId: req.user.roleId, resource: In(resources) } })`
+  ↔ design lines 42–45.
+- Line 57: `const byResource = new Map(perms.map(p => [p.resource, p]));` ↔ design line 46.
+- Lines 59–66: `checks.some(({ resource, action }) => { ... })` with the same
+  ternary chain (`action === 'read' ? perm.canRead : ... perm.canDelete`) ↔ design
+  lines 48–55.
+- Lines 68–71: 403 `'Sin permisos para este recurso'` ↔ design lines 57–60.
+- Line 73: `next();` ↔ design line 62.
 
-Re-ran the EXACT `CITATION_FIELDS_SQL` from the new file directly against the live
-`postgres` container at `localhost:5432`:
+Identical. No re-interpretation, no drift, no surprise.
 
-```
-SELECT c.id, ...,
-       COALESCE((SELECT json_agg(json_build_object(
-         'id', att.id, 'fileName', att.file_name, 'originalName', att.original_name,
-         'mimeType', att.mime_type, 'createdAt', att.created_at
-       ) ORDER BY att.created_at ASC)
-       FROM citation_attachments att WHERE att.citation_id = c.id), '[]') AS "attachments"
-FROM citations c WHERE c.enrollment_id = 2 AND c.deleted_at IS NULL
-ORDER BY c.date_from DESC;
-```
+### Static diff — route wiring vs design.md
 
-Result (verbatim, citation 8 row, columns compressed to one line):
+`src/controllers/citation-reason.controller.ts:11`:
 
-```
-id | ... | reasonIds | attachments
- 8 | ... | [8]       | [{"id" : 7, "fileName" : "8-1788581231034-288012157.jpg",
-                       "originalName" : "valid.jpg", "mimeType" : "image/jpeg",
-                       "createdAt" : "2026-09-05T04:07:11.072858+00:00"},
-                      {"id" : 8, "fileName" : "8-1788581231035-825059554.pdf",
-                       "originalName" : "test.pdf", "mimeType" : "application/pdf",
-                       "createdAt" : "2026-09-05T04:07:11.072858+00:00"}]
+```ts
+router.get('/', requireAnyPermission([
+  { resource: 'citaciones', action: 'read' },
+  { resource: 'citaciones', action: 'create' },
+  { resource: R, action: 'read' },
+]), async (req, res) => res.json(await svc.findAll(req.institutionId!, req.courseIds ?? null)));
 ```
 
-R1 satisfied (2 attachments with all required fields, ascending `createdAt`); R2 empty-array
-case shown below in the roster query.
+matches design.md lines 87–91 byte-for-byte (the action order is identical:
+`citaciones:read, citaciones:create, citation-reasons:read`).
 
-Re-ran the EXACT `findRoster` nested subquery against the live DB filtered to enrollment
-58 (which has citations 7, 9, 10, 11, 12, 13):
+`POST`/`PUT`/`DELETE` lines (12–14) are unchanged from the pre-feature version
+(`requirePermission(R, 'create'|'update'|'delete')`), confirming R11/R12/R13 by code
+inspection alone (further confirmed by T8's three captured 403s with body `{"error":"Sin
+permisos para este recurso"}`).
 
-```
-SELECT json_agg(json_build_object('id', c.id, ..., 'attachments', COALESCE((
-  SELECT json_agg(json_build_object('id', att.id, 'fileName', att.file_name,
-    'originalName', att.original_name, 'mimeType', att.mime_type, 'createdAt', att.created_at)
-   ORDER BY att.created_at ASC)
-  FROM citation_attachments att WHERE att.citation_id = c.id), '[]')
-) ORDER BY c.date_from DESC)
-FROM citations c WHERE c.enrollment_id = 58 AND c.deleted_at IS NULL;
-```
-
-Result (compressed, six citation objects):
+### Build verification
 
 ```
-[{"id" : 9,  ..., "attachments" : [{"id" : 9, "fileName" : "9-...png", ...}]},
- {"id" : 10, ..., "attachments" : []},
- {"id" : 11, ..., "attachments" : []},
- {"id" : 12, ..., "attachments" : []},
- {"id" : 13, ..., "attachments" : []},
- {"id" : 7,  ..., "attachments" : [{"id" : 5, "fileName" : "7-...jpg", ...},
-                                    {"id" : 6, "fileName" : "7-...pdf", ...}]}]
+$ cd backend && pnpm run build
+$ tsc
+EXIT=0
 ```
 
-R3 satisfied (every citation in the roster carries `attachments`); R4 satisfied (citations
-10–13 show literal `"attachments" : []`, never null, never omitted); R8 satisfied (the
-correlated subquery picks up existing rows 5, 6, 7, 8, 9 — visible because no caching
-layer between service and DB).
+No TS diagnostics. `dist/middleware/role.middleware.js` and
+`dist/controllers/citation-reason.controller.js` regenerate cleanly.
 
-### Schema check for R9 rationale
+### `requirePermission` call-site audit
 
-`\d citation_attachments` on the live DB shows columns `id, citation_id, file_name,
-original_name, mime_type, created_at` only — **no `deleted_at` column**, confirming the
-design.md discarded-alternative #3 rationale: hard-delete via `attRepo().remove(att)` is
-the only path, so a removed row is gone from the table and the correlated subquery cannot
-return it.
+`grep -rn "requirePermission(" src/controllers/ src/middleware/` (excluding the
+`import { requirePermission } from '../middleware/role.middleware'` lines and the
+`requireAnyPermission` line) returns 50+ call sites across 12 controllers — every one
+of them still passing the same `(resource, action)` pair shape. Only
+`citation-reason.controller.ts:11` was reworked to use the new OR-permission
+middleware; the rest of the codebase is untouched.
+
+### Init verification
+
+```
+$ cd backend && bash init.sh
+── 1. Checking prerequisites ──
+[OK] sqlite3 available
+[OK] jq available
+── 2. Checking harness state ──
+[OK] .harness.json found
+[OK] harness.db found
+[OK] Found docs/architecture.md
+[OK] Found docs/conventions.md
+[OK] Found docs/verification.md
+[OK] Found CHECKPOINTS.md
+── 3. Checking SDD spec files ──
+[OK] all sdd=1 features have their spec files on disk
+── 4. Running verification command ──
+[WARN] No verify_command configured in .harness.json — skipping
+── 5. Regenerating markdown snapshot ──
+[OK] snapshot regenerated at state
+── 6. Syncing Postgres/Supabase mirror (best-effort) ──
+[WARN] $SUPABASE_URL / $SUPABASE_ANON_KEY not set — skipping mirror sync
+── 7. Summary ──
+[OK] Environment ready. You can start working.
+```
+
+Both `[WARN]`s are pre-existing baseline ones (empty `verify_command`, unset
+`SUPABASE_URL`) — explicitly called out as expected in `docs/verification.md`'s
+"Current state" section and in `progress/impl_016-*.md` T10.
 
 ## Notes (informational, not blocking)
 
-1. **Handoff doc stat discrepancy.** `progress/impl_citation_attachments_retrieval.md` line
-   71–73 claims `36 insertions(+), 3 deletions(-)`, but the actual `git diff --stat` shows
-   `29 insertions(+), 3 deletions(-)`. The code itself matches `design.md` byte-for-byte;
-   the handoff's diff-stat block is wrong (possibly a hand-counted estimate from when the
-   diff included extra blank lines or comment additions). Not a code defect — surface for
-   transparency. No fix needed for approval.
+1. **Test-user password collateral (carried through from the implementer's T4–T8 smoke
+   tests).** To exercise the OR-permission scenarios against the live stack, the
+   implementer temporarily set known passwords on two pre-existing test users —
+   `pbastidas` (id=2, role 3, `inspector de apoyo`) and `test_multer_reg` (id=82, role
+   4, `teacher`). The backup-temp-table snapshot was created *after* the test hash had
+   already been written (a BEGIN/COMMIT ordering mistake), so the original bcrypt
+   hashes were overwritten and lost. Both users are left with `TestPass2026!` as their
+   current password. `role_permissions` for role 3 was correctly reverted (final state
+   verified by diff against `/tmp/role3_perms_before.txt`, whitespace-only). This is a
+   workflow issue with manual smoke tests against a shared DB, not a code defect — the
+   implementer flagged it transparently. If the next dev session needs the original
+   passwords, both users can be reset via `POST /api/users/:id/password` or
+   re-created.
 
-2. **camelCase forward-looking risk (carry-through from `design.md`'s "Flagged for the
-   human reviewer").** The implementation uses `fileName`, `originalName`, `mimeType`
-   (camelCase) per the approved `design.md`, but `requirements.md` R1's literal field list
-   says `file_name, original_name, mime_type` (snake_case). Ricardo approved the spec as
-   written (camelCase interpretation), and the leader's instructions explicitly say to
-   NOT mark this as CHANGES_REQUESTED unless I find concrete breakage. I find none: the
-   SQL subquery passes those keys as camelCase JSON keys (postgres preserves them verbatim
-   inside `json_build_object`), and there is no frontend code in this backend repo to
-   cross-check against. The frontend `citation_evidence_reload` consumer (mentioned in
-   `design.md` as the expected downstream feature) will be the ground-truth check on
-   whether this was the right call. Per the leader's instructions, leaving as
-   approved-as-is.
+2. **WIP commit `3694803` preserved.** Per the implementer's note, this commit contains
+   the T1+T2+T3 work from an interrupted earlier run and is byte-identical to what a
+   fresh re-derivation produces (verified by the implementer: re-writing both files from
+   design.md produced no diff against HEAD after the trailing-newline fix-up). Keeping
+   it as the single source-of-truth implementation commit avoided adding redundant
+   empty-diff commits on top. Acceptable per the user's explicit directive.
 
-3. **No live HTTP smoke was performed.** The leader's instructions acknowledged this is
-   impractical (the worktree's `docker-compose.yml` is byte-identical to the user's main
-   running stack and cannot bring up an isolated stack without colliding with the running
-   `backend`, `postgres`, `redis` containers — confirmed by `docker ps` showing the main
-   stack's containers with the same names, ports, and `Up` durations of days/hours). The
-   SQL-level re-verification above is the deepest verification practical in this
-   environment, and the implementer's documented limitation in
-   `progress/impl_citation_attachments_retrieval.md` ("Smoke-test execution limitation")
-   stands.
+3. **No live HTTP smoke was independently re-executed by the reviewer** — same
+   worktree-vs-running-stack collision acknowledged by the reviewer for feature #13
+   (the worktree's `docker-compose.yml` is byte-identical to the user's main running
+   stack, so `docker compose up -d` from this worktree cannot bring up an isolated
+   stack; the auto-mode classifier denies overwriting the running backend's mounted
+   source or `docker restart backend` to pick up the worktree's compiled `dist/`).
+   The static diff and the implementer's captured verbatim request/response provide
+   sufficient evidence at the level this repo's established verification model
+   (features #7, #9, #10, #13, #14, #15) accepts.
+
+4. **`docs/conventions.md` and `docs/verification.md` are now slightly stale** — they
+   still claim "no `*.spec.ts`/`*.test.ts` files" / "no automated test suite", but
+   `tests/notification-templates.test.ts` exists (added with feature #8). It uses
+   `node:test` and depends on a live Postgres + Redis run, so it doesn't constitute a
+   working test framework that this feature could have plugged into without
+   significant new infrastructure work. Worth updating both docs and wiring
+   `.harness.json`'s `verify_command` to `tests/run.sh` once the test infra is
+   stable enough to be the default verification path. Not blocking for this feature.
 
 ## Required Changes
 
-None. The code, the build, the live DB verification, and the spec traceability all line up.
+None. The code, the build, the static diff against the spec, the `requirePermission`
+call-site audit, the init.sh run, the spec traceability, and the documented live
+smoke-test evidence all line up.
