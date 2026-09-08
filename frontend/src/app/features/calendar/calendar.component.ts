@@ -28,8 +28,8 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   template: `
     <app-chapter-header
       icon="calendar_month"
-      eyebrowPrefix="Inspectoría"
-      eyebrowSuffix="Calendario de Asistencia" />
+      eyebrowPrefix="Calendario"
+      eyebrowSuffix="Vista mensual de asistencia" />
 
     <div class="page-header">
       <h1 class="page-title">Calendario de Asistencia</h1>
