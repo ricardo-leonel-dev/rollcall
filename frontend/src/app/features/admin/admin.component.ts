@@ -18,6 +18,8 @@ import { AcademicYearContextService } from '../../core/services/academic-year-co
 import { NotificationService } from '../../core/services/notification.service';
 import { QuarterService } from '../../core/services/quarter.service';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
+import { SealAvatarComponent } from '../../shared/components/seal-avatar/seal-avatar.component';
 import { CITATION_REASON_SEVERITY_OPTIONS, citationReasonSeverityBadgeClass } from '../../shared/utils/citation-reason.util';
 import { InstitutionDialogComponent } from './institution-dialog.component';
 import { AcademicYearDialogComponent, AcademicYearDialogResult } from './academic-year-dialog.component';
@@ -33,7 +35,8 @@ import { MODULE_KEYS } from '../../core/nav-items';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatFormFieldModule, MatSelectModule,
-            MatInputModule, MatButtonModule, MatIconModule, MatCheckboxModule],
+            MatInputModule, MatButtonModule, MatIconModule, MatCheckboxModule,
+            ChapterHeaderComponent, SealAvatarComponent],
   styles: [`
     .tab-content { padding: 20px; }
     .admin-row {
@@ -89,14 +92,20 @@ import { MODULE_KEYS } from '../../core/nav-items';
     }
     .hidden-mobile { display: block; }
     .hidden-desktop { display: none; }
-    @media (max-width: 768px) {
+    /* Tablet range (768-1024px) also uses the card variant so the table
+       doesn't squeeze into a portrait-tablet viewport. See feature 29. */
+    @media (max-width: 1024px) {
       .hidden-mobile { display: none; }
       .hidden-desktop { display: block; }
     }
   `],
   template: `
     <div class="page-header">
-      <h1 class="page-title">Administración</h1>
+      <app-chapter-header
+        icon="admin_panel_settings"
+        roman="I"
+        subtitle="Institucional"
+        title="Administración" />
       @if (auth.isSuperAdmin()) {
         <button mat-stroked-button (click)="openQueueMonitor()"
           style="display:flex;align-items:center;gap:6px;font-size:13px">
@@ -119,13 +128,11 @@ import { MODULE_KEYS } from '../../core/nav-items';
           @for (inst of institutionContext.institutions(); track inst.id) {
             <div class="admin-row">
               <div style="display:flex;align-items:center;gap:12px">
-                <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
-                  @if (inst.logoUrl) {
-                    <img [src]="inst.logoUrl" alt="" style="width:100%;height:100%;object-fit:cover">
-                  } @else {
-                    <mat-icon style="color:var(--accent)">corporate_fare</mat-icon>
-                  }
-                </div>
+                @if (inst.logoUrl) {
+                  <app-seal-avatar [size]="40" [src]="inst.logoUrl" [bgColor]="'transparent'" alt="" />
+                } @else {
+                  <app-seal-avatar [size]="40" icon="corporate_fare" />
+                }
                 <div style="font-weight:600">{{inst.name}}</div>
               </div>
               <div class="admin-row-actions">
@@ -314,7 +321,7 @@ import { MODULE_KEYS } from '../../core/nav-items';
                     <td style="color:var(--muted);width:36px">{{i+1}}</td>
                     <td>
                       <div style="display:flex;align-items:center;gap:10px">
-                        <div class="user-avatar">{{(u.fullName || u.username)[0].toUpperCase()}}</div>
+                        <app-seal-avatar [size]="36" [initials]="(u.fullName || u.username)[0].toUpperCase()" />
                         <div>
                           <div style="font-weight:600">{{u.fullName || u.username}}</div>
                           <div style="font-size:12px;color:var(--muted)">
@@ -361,7 +368,7 @@ import { MODULE_KEYS } from '../../core/nav-items';
             @for (u of users(); track u.id) {
               <div class="admin-row">
                 <div style="display:flex;align-items:center;gap:12px">
-                  <div class="user-avatar">{{(u.fullName || u.username)[0].toUpperCase()}}</div>
+                  <app-seal-avatar [size]="36" [initials]="(u.fullName || u.username)[0].toUpperCase()" />
                   <div>
                     <div style="font-weight:600">{{u.fullName || u.username}}</div>
                     <div style="font-size:12px;color:var(--muted)">@{{u.username}} · <span style="color:var(--accent)">{{u.roleName}}</span></div>
