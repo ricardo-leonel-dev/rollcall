@@ -173,11 +173,95 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
       .admin-row-actions { flex-wrap: wrap; width: 100%; }
       .admin-row-quarters { width: 100%; }
     }
+    /* Cuaderno user card (feature 30): the spec calls for a horizontal
+       "fila-tarjeta" on tablet — seal | scope | divider | actions side by
+       side — so the user-row variant overrides the generic .admin-row
+       column break at 1280px and only stacks vertically on very small
+       phones (<600px) where horizontal doesn't fit. The vertical divider
+       between the identity and actions blocks is visible whenever the
+       card is horizontal, hidden on the smallest phones where stacking
+       makes it meaningless. */
+    .admin-row.user-row {
+      flex-direction: row;
+      align-items: center;
+      flex-wrap: nowrap;
+      gap: 12px;
+    }
+    .admin-row.user-row > div:first-child {
+      flex: 1;
+      min-width: 0;
+    }
+    .admin-row.user-row .admin-row-actions {
+      width: auto;
+      flex-shrink: 0;
+    }
     .user-avatar {
       width: 36px; height: 36px; border-radius: 9px;
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: white; display: flex; align-items: center; justify-content: center;
       font-size: 14px; font-weight: 700; flex-shrink: 0;
+    }
+    /* Cuaderno folio (feature 30): right-aligned "Registros: NNN" with the
+       same double-filete treatment chapter-header uses (ink .55 + border) so
+       every list in the Cuaderno system opens with the same register-count
+       rhythm. The rules are duplicated here (rather than imported from
+       chapter-header.component) so the folio stays self-contained inside
+       the users tab and can move independently of the page-level header. */
+    .users-folio {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+    .users-folio .filete-ink {
+      height: 1px;
+      background: var(--ink);
+      opacity: .55;
+    }
+    .users-folio .filete-border {
+      height: 1px;
+      background: var(--border);
+    }
+    .users-folio-text {
+      font-family: 'Nunito', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted-strong);
+      padding-top: 4px;
+      text-align: right;
+    }
+    .users-folio-text b {
+      color: var(--ink);
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 0;
+    }
+    /* Cuaderno vertical divider (feature 30): between the identity block
+       and the actions block in the user card. Renders as a 1px hairline
+       in --border, same hue as the filete so the whole card reads as one
+       Cuaderno envelope. */
+    .user-card-divider {
+      width: 1px;
+      align-self: stretch;
+      background: var(--border);
+      flex-shrink: 0;
+      min-height: 24px;
+    }
+    @media (max-width: 600px) {
+      .admin-row.user-row {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .admin-row.user-row > div:first-child {
+        width: 100%;
+      }
+      .admin-row.user-row .admin-row-actions {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+      .user-card-divider { display: none; }
     }
     .hidden-mobile { display: block; }
     .hidden-desktop { display: none; }
@@ -400,10 +484,21 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
       <!-- USUARIOS -->
       @if (activeTab() === 'users') {
         <div class="tab-content">
-          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;gap:12px;flex-wrap:wrap">
             <button mat-flat-button color="primary" (click)="openUserDialog()">
               <mat-icon>person_add</mat-icon> Nuevo usuario
             </button>
+            <!-- Cuaderno folio (feature 30): real count from the API, rendered
+                 above the table with the same double filete (ink .55 + border)
+                 the chapter-header uses for the page-level title — keeps the
+                 Cuaderno "every list opens with a register count" rhythm. -->
+            <div class="users-folio">
+              <div class="filete-ink"></div>
+              <div class="filete-border"></div>
+              <div class="users-folio-text">
+                Registros: <b>{{ users().length }}</b>
+              </div>
+            </div>
           </div>
 
           <!-- Desktop table -->
@@ -427,6 +522,18 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
                           <div style="font-weight:600">{{u.fullName || u.username}}</div>
                           <div style="font-size:12px;color:var(--muted)">
                             @if (u.moduleKeys?.length) { <span class="badge-gray" style="margin-right:4px">Acceso limitado</span> }
+                          </div>
+                          <!-- Cuaderno scope line (feature 30): real
+                               courseIds.length, with "Todos los cursos" as the
+                               null/empty fallback (same meaning as
+                               req.courseIds in the permissions middleware —
+                               "no scope restriction", NOT "zero courses"). -->
+                          <div style="font-size:12px;color:var(--muted-strong);margin-top:2px">
+                            @if (u.courseIds && u.courseIds.length > 0) {
+                              <b>{{ u.courseIds.length }}</b> {{ u.courseIds.length === 1 ? 'curso asignado' : 'cursos asignados' }}
+                            } @else {
+                              Todos los cursos
+                            }
                           </div>
                         </div>
                       </div>
@@ -467,17 +574,36 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
           <!-- Mobile cards -->
           <div class="hidden-desktop">
             @for (u of users(); track u.id) {
-              <div class="admin-row">
+              <div class="admin-row user-row">
                 <div style="display:flex;align-items:center;gap:12px">
                   <app-seal-avatar [size]="36" [initials]="(u.fullName || u.username)[0].toUpperCase()" />
                   <div>
                     <div style="font-weight:600">{{u.fullName || u.username}}</div>
                     <div style="font-size:12px;color:var(--muted)">@{{u.username}} · <span style="color:var(--accent)">{{u.roleName}}</span></div>
+                    <!-- Cuaderno scope line (feature 30): same null/empty
+                         semantics as the desktop cell. Sits below the @user
+                         line so the card reads top-down: name → handle+role →
+                         scope. -->
+                    <div style="font-size:12px;color:var(--muted-strong);margin-top:2px">
+                      @if (u.courseIds && u.courseIds.length > 0) {
+                        <b>{{ u.courseIds.length }}</b> {{ u.courseIds.length === 1 ? 'curso asignado' : 'cursos asignados' }}
+                      } @else {
+                        Todos los cursos
+                      }
+                    </div>
                     @if (u.signatureLabel) {
                       <div style="font-size:11px;color:var(--muted)">{{u.signatureLabel}}</div>
                     }
                   </div>
                 </div>
+                <!-- Cuaderno vertical divider (feature 30): separates the
+                     identity block from the actions block on the
+                     tarjeta-horizontal layout that takes over at 1280px and
+                     below. On the smallest phones the whole .admin-row
+                     flexes to a vertical stack so the divider is purely
+                     decorative, but keeping it preserves the rhythm in
+                     landscape and tablet portrait. -->
+                <div class="user-card-divider"></div>
                 <div class="admin-row-actions">
                   @if (u.roleName !== 'superadmin') {
                     <button mat-icon-button style="color:var(--muted-strong)" (click)="openUserDialog(u)"><mat-icon>edit</mat-icon></button>
