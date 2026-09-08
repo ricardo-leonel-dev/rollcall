@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, signal, inject, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, computed, inject, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -30,6 +30,36 @@ import { UserDialogComponent } from './user-dialog.component';
 import { UserPermissionsDialogComponent } from './user-permissions-dialog.component';
 import { RoleDialogComponent } from './role-dialog.component';
 import { MODULE_KEYS } from '../../core/nav-items';
+
+export const ADMIN_TAB_CHAPTER_NUMERAL: Record<string, string> = {
+  users: 'I',
+  courses: 'II',
+  years: 'III',
+  permissions: 'IV',
+  'citation-reasons': 'V',
+  roster: 'VI',
+  institutions: 'VII',
+};
+
+export const ADMIN_TAB_EYEBROW_SUFFIX: Record<string, string> = {
+  users: 'Gestión de personal',
+  courses: 'Cursos',
+  years: 'Calendario académico',
+  permissions: 'Permisos',
+  'citation-reasons': 'Motivos de citación',
+  roster: 'Importar nómina',
+  institutions: 'Instituciones del sistema',
+};
+
+export const ADMIN_TAB_TITLE: Record<string, string> = {
+  users: 'Usuarios',
+  courses: 'Cursos',
+  years: 'Años lectivos',
+  permissions: 'Permisos',
+  'citation-reasons': 'Motivos de citación',
+  roster: 'Importar nómina',
+  institutions: 'Instituciones',
+};
 
 @Component({
   standalone: true,
@@ -103,9 +133,10 @@ import { MODULE_KEYS } from '../../core/nav-items';
     <div class="page-header">
       <app-chapter-header
         icon="admin_panel_settings"
-        roman="I"
-        subtitle="Institucional"
-        title="Administración" />
+        [eyebrowPrefix]="chapterEyebrowPrefix()"
+        eyebrowSeparator="—"
+        [eyebrowSuffix]="chapterEyebrowSuffix()"
+        [title]="chapterTitle()" />
       @if (auth.isSuperAdmin()) {
         <button mat-stroked-button (click)="openQueueMonitor()"
           style="display:flex;align-items:center;gap:6px;font-size:13px">
@@ -551,6 +582,10 @@ export class AdminComponent implements OnInit {
     this.route.queryParamMap.pipe(map(p => p.get('tab') ?? 'users')),
     { initialValue: this.route.snapshot.queryParamMap.get('tab') ?? 'users' }
   );
+
+  readonly chapterEyebrowPrefix = computed(() => `Capítulo ${ADMIN_TAB_CHAPTER_NUMERAL[this.activeTab()] ?? ''}`);
+  readonly chapterEyebrowSuffix = computed(() => ADMIN_TAB_EYEBROW_SUFFIX[this.activeTab()] ?? '');
+  readonly chapterTitle = computed(() => ADMIN_TAB_TITLE[this.activeTab()] ?? '');
 
   readonly moduleKeys = MODULE_KEYS;
 

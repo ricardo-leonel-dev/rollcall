@@ -1,79 +1,89 @@
-# Review — feature 25 `citation_overlap_conflict_ui`
+# Review — feature 40 (chapter_header_seal_api_refinements)
 
 **Verdict:** APPROVED
 
+## Verification performed
+
+- Read `docs/architecture.md`, `docs/conventions.md`, `CHECKPOINTS.md`, and the full spec
+  on disk (`specs/chapter_header_seal_api_refinements/{requirements.md,design.md,tasks.md}`
+  — 29 requirements / 17 tasks, as stated in the brief; the harness's stale metadata
+  (reqs=21/tasks=12) was ignored per instruction, disk files used as source of truth).
+- Read `progress/impl_chapter_header_seal_api_refinements.md` (implementer's report) but
+  did not take it at face value — verified every claim against the actual diffs below.
+- Ran `git diff HEAD` on all three touched files and confirmed each diff is scoped
+  exactly to what `design.md`'s before/after blocks specify, with no incidental changes:
+  - `src/app/shared/components/chapter-header/chapter-header.component.ts`: `icon`/`title`
+    → `string | null = null` with `@if` guards; `roman`→`eyebrowPrefix` and
+    `subtitle`→`eyebrowSuffix`, both correctly declared `@Input({ required: true })`
+    (not a bare `!` with no default — this is the exact form R9/R10/design.md calls for,
+    which forces a compile-time template error on a missing binding rather than a
+    silent `undefined`); new `eyebrowSeparator = '·'` input, bound in the template in
+    place of the old hardcoded `·`. Internal CSS classes (`chapter-roman`, `chapter-sep`,
+    `chapter-sub`, `chapter-title`) correctly left unrenamed, per design.md's explicit
+    rationale.
+  - `src/app/features/admin/admin.component.ts`: `ADMIN_TAB_CHAPTER_NUMERAL`,
+    `ADMIN_TAB_EYEBROW_SUFFIX`, `ADMIN_TAB_TITLE` all present, exported, exactly 7 keys
+    each (`users`/`courses`/`years`/`permissions`/`citation-reasons`/`roster`/
+    `institutions`), values byte-identical to `design.md`. Cross-checked the 3 literal
+    values design.md says are sourced from other features' own descriptions
+    (`state/features/030-*.md`, `031-*.md`, `033-*.md`) — `'Gestión de personal'`
+    (users), `'Calendario académico'` (years), `'Instituciones del sistema'`
+    (institutions) match those descriptions verbatim, not reinvented. Single
+    `<app-chapter-header>`, reactive via 3 `computed()` signals reading `activeTab()`,
+    `eyebrowSeparator="—"` passed literally. Queue-monitor button block and its
+    `auth.isSuperAdmin()` condition are byte-identical (diff confirms 0 lines touched
+    in that block); `.page-header` wrapper and `icon="admin_panel_settings"` literal
+    unchanged. Grepped `badge-F|badge-AT|badge-J|stamp` in the diff — no hits.
+  - `src/app/shared/layout/layout.component.ts`: diff is scoped to exactly: new
+    `SealAvatarComponent` import, `imports` array addition, removal of the now-unused
+    `.avatar` CSS rule, and the template swap of the `.avatar` div for
+    `<app-seal-avatar [size]="32" [src]="..." [icon]="..." [initials]="initials()"
+    [bgColor]="..." surface="dark" />` — bindings match design.md's before/after block
+    exactly, reusing `isUploadedAvatar()`/`avatarPreset()`/`initials()` unchanged. Grepped
+    `effect(|isTablet|isMobile|toggleMenu|matTooltip` in the file — the tablet
+    auto-collapse block and the two `matTooltip` buttons (`Mi perfil`, `Cerrar sesión`)
+    are present, untouched, outside the diff hunks.
+  - `git diff HEAD -- seal-avatar.component.ts` and `git diff HEAD -- src/styles.css` are
+    both empty (0 lines) — confirmed directly, not from the implementer's claim.
+- Grepped the whole `src/app` tree: only one call site of `<app-chapter-header>` exists
+  (`admin.component.ts`), and no lingering `roman=`/`subtitle=` bindings anywhere — the
+  rename is complete, no dangling old-API usage.
+- Ran `pnpm run build` myself (not the implementer's log): exit code `0`, zero `error`
+  matches in the output. Only pre-existing warnings (bundle budget, `@import` ordering in
+  `src/styles.css`, optional-chaining lints in unrelated `student-management.component.ts`)
+  — none introduced by this change.
+- Ran `./init.sh`: finished green (`[OK] Environment ready`); `verify_command` warning is
+  expected per `docs/verification.md` (no test framework configured yet in this project —
+  `pnpm run build` is this project's documented Level 1 stand-in, per `CHECKPOINTS.md`'s
+  own C4 wording, not an excuse invented for this review).
+- Opened the Level 4 visual-smoke screenshots
+  (`progress/visual_chapter_header_seal_api_refinements_{users,years,institutions,
+  sidebar_collapsed,mobile_sidebar}.png`) directly: confirmed the eyebrow reads
+  "CAPÍTULO I — GESTIÓN DE PERSONAL" / "Usuarios" and "CAPÍTULO III — CALENDARIO
+  ACADÉMICO" / "Años lectivos" on their respective tabs (em-dash separator, correct
+  numeral, correct suffix, correct `<h1>`), and that the sidebar seal avatar renders
+  circular with a double ring in both collapsed and mobile-drawer states, confirming
+  R17–R19, R22, R28, R29 visually rather than trusting the report's description alone.
+
 ## Checkpoints
 
-- C1: [x] — `.harness.json`, `harness.db`, docs, `CHECKPOINTS.md` all present. `./init.sh` exits 1 due to
-  unrelated pre-existing spec-directory failures for two OTHER features (`citations_admin_reasons`,
-  `notification_templates_settings_ui` — both marked `done`/`sdd=1` long before this feature) which are
-  NOT introduced by this change. `pnpm run build` (Level 1 verification, the actual C1-relevant check per
-  `docs/verification.md`) exits 0. C1-relevant doc/infra presence for this feature is complete.
-- C2: [ ] ← pre-existing project-wide gap: no automated test suite exists (no `tests/` dir, no `*.spec.ts`,
-  no test builder in `angular.json` — `docs/conventions.md` §Tests, `docs/verification.md` §Current state).
-  This applies to every prior `done` feature in this project as well; not a regression caused by feature 25.
-- C3: [x] — only one file changed (`src/app/features/citations/citation-dialog.component.ts`, +54/-4).
-  No new imports beyond reusing an existing util (`formatCitationDateLabelShort` from `citation-date.util.ts`,
-  added to the existing import line — no new dependency). No `console.log`/TODOs/`debugger`/`print` in the diff.
-  No `Router` import, no `NgModule` (component was already `standalone: true` + `OnPush` + inline template/styles).
-  Uses `inject()`, `firstValueFrom`, signals, error path reports through `NotificationService` — all match
-  `docs/architecture.md` conventions.
-- C4: [ ] ← pre-existing project-wide gap: no automated test framework. Verified directly: `find src/ tests/ -name "*.spec.ts"`
-  returns no files; `tests/` directory does not exist; no tests reference `citation-dialog.component.ts`.
-  Per `docs/conventions.md` §Tests and `docs/verification.md` §Current state, verification stands on
-  `pnpm run build` (Level 1) + manual smoke (Level 3) until a test framework is added. Build verified by
-  reviewer (exit 0).
-- C5: [N/A] — closure-time checkpoint, evaluated at `log-out`, not at this approval.
-- C6: [ ] (partial pass) —
-  - Spec files `specs/citation_overlap_conflict_ui/{requirements,design,tasks}.md` exist (confirmed on disk).
-  - Requirements use strict EARS with stable `R<n>` ids (13 reqs).
-  - All 11 tasks in `tasks.md` are `[x]`; verified each T<n> matches a real diff against `origin/staging`:
-    - T1 → `CitationConflictInfo` interface added at :27-35.
-    - T2 → `conflict` signal :276 + `lastConflictError` field :277.
-    - T3 → `this.conflict.set(null)` at :378.
-    - T4 → single shared catch block at :405-412, same path regardless of `isEdit`.
-    - T5 → else branch at :411 keeps existing `notify.error`.
-    - T6 → `dialogRef.close(true)` only at :404 (success path); catch does not touch listed fields.
-    - T7 → `@if (conflict(); as c)` block at :154-166 with title, date/time line, conditional fields.
-    - T8 → `.conflict-banner*` CSS at :69-75.
-    - T9 → `(ngModelChange)` at :170, :178 + method at :418-420.
-    - T10 → no `Router`/`dialog.open` introduced (grep confirms 0).
-    - T11 → build exits 0 (re-run by reviewer).
-  - **Every `R<n>` is satisfied by the code**: verified directly by reading requirement and code together,
-    not taken from the implementer's claim:
-    - R1: catch at :405-412 distinguishes `409 + err.error.conflict` from all other errors.
-    - R2: `dialogRef.close(true)` only on success at :404; no field reset in either branch of :405-412.
-    - R3: `@if (conflict(); as c)` block at :154 (inside `<mat-dialog-content>`); title at :158 = `lastConflictError`;
-      no separate `MatDialog`, no `NotificationService` toast in the conflict branch.
-    - R4: `formatCitationDateLabelShort(c.date, c.time)` at :160; util re-exported as readonly at :282; the util
-      exists at `shared/utils/citation-date.util.ts:26` with the exact `(date, time)` signature.
-    - R5: each optional field has its own `@if (c.X)` at :161-164.
-    - R6: no `?? '—'`/`Sin datos`/placeholder fallbacks anywhere; only :160 (date/time) renders unconditionally.
-    - R7: `else` branch at :411 keeps `notify.error(err?.error?.error ?? 'No se pudo guardar la citación')`.
-    - R8: `if (conflict)` branch sets signal + `lastConflictError` and returns; `else` is unreachable from it.
-    - R9: single shared catch at :405, no `isEdit`-specific branching inside catch.
-    - R10: `this.conflict.set(null)` at :378 before any request work.
-    - R11: `onScheduleFieldChanged()` at :418-420, wired to date :170 and time :178 via `(ngModelChange)`.
-    - R12: no `Router` import, only existing `dialog.open(...)` calls remain (at :349 remove attachment and :424
-      close citation — neither reachable from the conflict path).
-    - R13: build exits 0 (re-verified by reviewer). End-to-end manual smoke against `docker compose up`
-      NOT performed by implementer — they cited the absence of a live backend/Postgres/Redis in the worktree
-      as the operational reason. This is a pre-existing project-wide manual-smoke dependency, not a defect
-      in the code change itself; recommend reviewer-or-follow-up smoke against a live stack before this
-      feature is closed in production.
-  - Last bullet ("Every `R<n>` maps to at least one concrete, currently-passing test"): cannot be `[x]` —
-    no test suite exists project-wide.
+- C1: [x] `.harness.json`/`harness.db` present, docs filled in, `./init.sh` exits 0.
+- C2: [x] Exactly one feature `in_progress` (40); open session reflects current work
+  (matches `state/features/040-*.md` description and the diffs actually present).
+- C3: [x] All 3 touched files are within their documented architecture locations
+  (`shared/components/`, `features/admin/`, `shared/layout/`); no new top-level folder;
+  no stray `console.log`/TODO found in the diffs.
+- C4: [x] `pnpm run build` (this project's documented Level 1 stand-in for automated
+  tests, per `docs/verification.md` and `CHECKPOINTS.md`'s own C4 wording) run directly
+  by me, exit 0. Level 4 visual smoke screenshots opened and cross-checked against the
+  spec's expected text/visuals for the requirements they claim to cover.
+- C5: N/A — session still open; this checkbox applies at log-out time, not review time.
+- C6: [x] All three `specs/chapter_header_seal_api_refinements/*.md` files exist on
+  disk with EARS-style `R<n>` requirements; traced R1–R29 individually against the code
+  diffs (see above) rather than trusting `progress/impl_...md`'s own R→evidence table;
+  all 17 tasks in `tasks.md` correspond to real, verified diffs (T1–T17), none checked
+  `[x]` without a matching change.
 
-## Required Changes (if applicable)
+## Required Changes
 
-None — feature code is correct, complete, and matches spec. The unchecked boxes (C2, C4, partial C6 last bullet)
-reflect a pre-existing, project-wide missing test framework that applies to every prior `done` feature in this
-repository and is documented as the current state in `docs/conventions.md` §Tests and `docs/verification.md`
-§Current state — not a defect introduced by this feature.
-
-## Recommendation to leader
-
-Approve with notes. After `record-review approved`, the implementer should log out and (separately, not blocking
-log-out) consider running the R13 manual smoke against `docker compose up -d --build frontend` using a
-rector/admin and a teacher login before shipping to production, since the implementer could not exercise that
-in the worktree session.
+None. No deviations from the approved spec found.
