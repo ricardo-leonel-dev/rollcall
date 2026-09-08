@@ -45,12 +45,12 @@ type PeriodPreset = 'today' | 'yesterday' | '7d' | '15d' | '30d' | 'full' | 'cus
     }
   `],
   template: `
+    <app-chapter-header
+      icon="dashboard"
+      eyebrowPrefix="Inspectoría"
+      eyebrowSuffix="Resumen del período" />
     <div class="page-header">
-      <app-chapter-header
-        icon="dashboard"
-        eyebrowPrefix="Inspectoría"
-        eyebrowSuffix="Resumen del período"
-        title="Dashboard" />
+      <h1 class="page-title">Dashboard</h1>
       <span style="color:var(--muted);font-size:13px">{{today}}</span>
     </div>
 
