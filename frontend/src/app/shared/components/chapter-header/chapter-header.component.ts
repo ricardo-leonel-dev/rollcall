@@ -5,8 +5,8 @@ import { MatIconModule } from '@angular/material/icon';
  * Chapter header pattern for the 'Cuaderno institucional' redesign.
  *
  * Anatomy:
- *   eyebrow  — icon · roman numeral · separator · subtitle
- *   h1       — main title (Nunito, ink)
+ *   eyebrow  — optional icon · eyebrowPrefix · eyebrowSeparator · eyebrowSuffix
+ *   h1       — optional main title (Nunito, ink)
  *   filete   — two horizontal rules below the title:
  *              • top: ink at .55 opacity (warm thin line)
  *              • bottom: --border (slightly cooler thin line, same color as cards)
@@ -94,12 +94,12 @@ import { MatIconModule } from '@angular/material/icon';
   template: `
     <header class="chapter-header">
       <div class="chapter-eyebrow">
-        <mat-icon>{{ icon }}</mat-icon>
-        <span class="chapter-roman">{{ roman }}</span>
-        <span class="chapter-sep">·</span>
-        <span class="chapter-sub">{{ subtitle }}</span>
+        @if (icon) { <mat-icon>{{ icon }}</mat-icon> }
+        <span class="chapter-roman">{{ eyebrowPrefix }}</span>
+        <span class="chapter-sep">{{ eyebrowSeparator }}</span>
+        <span class="chapter-sub">{{ eyebrowSuffix }}</span>
       </div>
-      <h1 class="chapter-title">{{ title }}</h1>
+      @if (title) { <h1 class="chapter-title">{{ title }}</h1> }
       <div class="chapter-filete" aria-hidden="true">
         <div class="filete-ink"></div>
         <div class="filete-border"></div>
@@ -108,12 +108,15 @@ import { MatIconModule } from '@angular/material/icon';
   `,
 })
 export class ChapterHeaderComponent {
-  /** Material icon name shown at the start of the eyebrow row. */
-  @Input() icon!: string;
-  /** Roman numeral or short ordinal (I, II, III, IV, …). */
-  @Input() roman!: string;
-  /** Short subtitle shown after the roman numeral. */
-  @Input() subtitle!: string;
-  /** Main h1 title. */
-  @Input() title!: string;
+  /** Material icon name shown at the start of the eyebrow row. Omit for no icon. */
+  @Input() icon: string | null = null;
+  /** Leading eyebrow text — a Roman numeral ("Capítulo I") or a plain category word
+   *  ("Inspectoría"); the component has no opinion on which. */
+  @Input({ required: true }) eyebrowPrefix!: string;
+  /** Text rendered after `eyebrowPrefix` + `eyebrowSeparator`. */
+  @Input({ required: true }) eyebrowSuffix!: string;
+  /** Character(s) between `eyebrowPrefix` and `eyebrowSuffix`. */
+  @Input() eyebrowSeparator = '·';
+  /** Optional page/tab h1. Omit when the host page already has its own `.page-title`. */
+  @Input() title: string | null = null;
 }

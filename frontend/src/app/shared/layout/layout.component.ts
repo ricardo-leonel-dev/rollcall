@@ -15,11 +15,13 @@ import { QuarterContextService } from '../../core/services/quarter-context.servi
 import { ThemeService } from '../../core/services/theme.service';
 import { resolveAvatarPreset } from '../../features/profile/profile.component';
 import { SECTIONS, SubNavItem } from '../../core/nav-items';
+import { SealAvatarComponent } from '../components/seal-avatar/seal-avatar.component';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, FormsModule, MatIconModule, MatButtonModule, MatTooltipModule, MatSelectModule],
+  imports: [RouterOutlet, RouterLink, FormsModule, MatIconModule, MatButtonModule,
+            MatTooltipModule, MatSelectModule, SealAvatarComponent],
   styles: [`
     :host { display: flex; height: 100vh; overflow: hidden; }
 
@@ -127,19 +129,6 @@ import { SECTIONS, SubNavItem } from '../../core/nav-items';
       padding: 10px 12px;
       border-radius: 10px;
     }
-    .avatar {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
     .user-info { overflow: hidden; }
     .user-name { color: #f5f0e8; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .user-role { color: #8a7c6e; font-size: 11px; white-space: nowrap; }
@@ -236,15 +225,13 @@ import { SECTIONS, SubNavItem } from '../../core/nav-items';
 
       <div class="user-area">
         <div class="user-card">
-          <div class="avatar" [style.background]="isUploadedAvatar() ? 'transparent' : (avatarPreset()?.color ?? null)">
-            @if (isUploadedAvatar()) {
-              <img [src]="auth.currentUser()?.avatarUrl" style="width:100%;height:100%;border-radius:8px;object-fit:cover">
-            } @else if (avatarPreset()) {
-              <mat-icon style="font-size:18px;width:18px;height:18px">{{avatarPreset()!.icon}}</mat-icon>
-            } @else {
-              {{initials()}}
-            }
-          </div>
+          <app-seal-avatar
+            [size]="32"
+            [src]="isUploadedAvatar() ? (auth.currentUser()?.avatarUrl ?? null) : null"
+            [icon]="avatarPreset()?.icon ?? null"
+            [initials]="initials()"
+            [bgColor]="avatarPreset()?.color ?? null"
+            surface="dark" />
           @if (!collapsed() || isMobile()) {
             <div class="user-info">
               <div class="user-name">{{auth.currentUser()?.fullName ?? auth.currentUser()?.username}}</div>
