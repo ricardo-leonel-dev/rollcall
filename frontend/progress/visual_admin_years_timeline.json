@@ -1,0 +1,22 @@
+{
+  "hasAdminRowQuarters": true,
+  "hasOldPanel": false,
+  "chipCount": 0,
+  "chips": [],
+  "adminRowQuartersDisplay": "flex",
+  "adminRowQuartersFlexDirection": "row",
+  "adminRowQuartersGap": "normal",
+  "adminRowQuartersAlignItems": "normal",
+  "adminRowAlignItems": "flex-start",
+  "adminRowDisplay": "flex",
+  "activeYearText": "Año Lectivo 2026",
+  "pills": [],
+  "sectionLabels": [],
+  "dialogDates": [],
+  "pendingBannerItems": [],
+  "screenshot": "/home/rileo/ai-personal-worktrees/feature-29-cuaderno-institucional/frontend/progress/visual_admin_years_timeline.png",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  }
+}

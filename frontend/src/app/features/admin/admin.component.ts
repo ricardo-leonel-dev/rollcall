@@ -21,6 +21,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
 import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
 import { SealAvatarComponent } from '../../shared/components/seal-avatar/seal-avatar.component';
 import { CITATION_REASON_SEVERITY_OPTIONS, citationReasonSeverityBadgeClass } from '../../shared/utils/citation-reason.util';
+import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
 import { InstitutionDialogComponent } from './institution-dialog.component';
 import { AcademicYearDialogComponent, AcademicYearDialogResult } from './academic-year-dialog.component';
 import { QuartersDialogComponent, QuartersDialogResult } from './quarters-dialog.component';
@@ -71,34 +72,92 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
     .tab-content { padding: 20px; }
     .admin-row {
       display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
-      padding: 12px 16px; background: var(--paper); border-radius: 12px; border: 1px solid var(--border);
+      padding: 12px 16px; background: var(--paper); border-radius: 12px;
+      border-top: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      border-left: 4px solid var(--muted);
       margin-bottom: 8px;
     }
+    .admin-row.is-active { border-left-color: var(--accent); }
     .admin-row-actions { display: flex; align-items: center; gap: 8px; }
     .admin-row-quarters {
       display: flex; flex-direction: row; justify-content: center;
       flex: 1; min-width: 0;
     }
-    .quarter-chip-list {
-      display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
-      min-width: 0;
-    }
-    .period-chip {
-      display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px;
-      max-width: 100%; min-width: 0; box-sizing: border-box;
+    /* Cuaderno años-lectivos timeline (feature 31): segments positioned by
+       each quarter's real calendar offset from y.startDate, as a % of the
+       full [y.startDate, y.endDate] range. The quarter chip-list pattern is
+       gone for active years; the empty-state CTA below is kept verbatim —
+       only its containing .quarter-chip-list wrapper is removed (it lived
+       inside this same container before).
+
+       feature 41 fix: segments and the HOY marker share one coordinate
+       system (see yearPct() in the component) so real gaps between
+       quarters (recesses/vacations — quarters are validated as
+       non-overlapping, NOT contiguous, see quarters-dialog.component.ts)
+       render as visible empty track instead of being packed away, and HOY
+       always lands inside the segment whose real date range contains today.
+       .timeline-track no longer clips (overflow: hidden removed) so the
+       HOY marker + its "HOY" label, which both intentionally extend beyond
+       the track's box (-6px/-16px), render in full. Segments are clipped to
+       the track's rounded corners by the inner .timeline-segments wrapper
+       instead, which is a sibling of .timeline-hoy and shares its
+       border-radius via inherit — this keeps the rounded-corner look for
+       segments without clipping the marker that sits outside the wrapper. */
+    .timeline-track {
+      position: relative;
+      height: 28px;
+      border-radius: 6px;
       background: var(--paper-deep);
       border: 1px solid var(--border-soft);
-      border-left: 2px solid var(--accent);
-      border-radius: var(--radius-sm);
+      flex: 1;
+      min-width: 0;
     }
-    .period-chip-name {
-      font-family: 'Nunito', sans-serif; font-weight: 600; font-size: 13px;
+    .timeline-segments {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      overflow: hidden;
+    }
+    .timeline-segment {
+      position: absolute;
+      top: 0; bottom: 0;
+      padding: 6px 8px;
+      display: flex; align-items: center;
+      background: var(--accent-soft);
+      border-right: 1px solid var(--paper);
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .timeline-segment:last-child { border-right: none; }
+    .timeline-segment-name {
+      font-family: 'Nunito', sans-serif; font-size: 11px; font-weight: 700;
       color: var(--ink);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+      letter-spacing: 0.04em; text-transform: uppercase;
+      white-space: nowrap; text-overflow: ellipsis; overflow: hidden;
+      min-width: 0;
     }
-    .period-chip-range {
-      font-family: 'Nunito', sans-serif; font-weight: 400; font-size: 11px;
-      color: var(--muted-strong); white-space: nowrap;
+    .timeline-hoy {
+      position: absolute;
+      top: -6px; bottom: -6px;
+      border-left: 2px solid var(--ink);
+      pointer-events: none;
+    }
+    .timeline-hoy-label {
+      position: absolute;
+      top: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--ink);
+      color: var(--paper);
+      font-family: 'Nunito', sans-serif;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      padding: 1px 5px;
+      border-radius: 3px;
+      white-space: nowrap;
     }
     .period-chip-empty {
       font-family: 'Nunito', sans-serif; font-weight: 400; font-size: 12px;
@@ -194,33 +253,44 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
             </button>
           </div>
           @for (y of years(); track y.id) {
-            <div class="admin-row">
+            <div class="admin-row" [class.is-active]="y.isActive">
               <div style="display:flex;align-items:center;gap:12px">
-                <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center">
-                  <mat-icon style="color:var(--accent)">calendar_today</mat-icon>
-                </div>
+                <app-seal-avatar [size]="36" icon="calendar_today" />
                 <div>
                   <div style="font-weight:600">{{y.name}}</div>
                   <div style="font-size:12px;color:var(--muted)">{{y.startDate ?? '—'}} → {{y.endDate ?? '—'}}</div>
                 </div>
               </div>
               @if (y.isActive) {
-                @let rows = quarterRowsFor(y.id);
-                <div class="admin-row-quarters">
-                  <div class="quarter-chip-list">
-                    @for (q of rows; track q.id) {
-                      <span class="period-chip" title="{{q.name}} · {{q.startDate ?? '—'}} → {{q.endDate ?? '—'}}">
-                        <span class="period-chip-name">{{q.name}}</span>
-                        <span class="period-chip-range">{{q.startDate ?? '—'}} → {{q.endDate ?? '—'}}</span>
-                      </span>
-                    } @empty {
-                      <span class="period-chip-empty">
-                        Sin períodos configurados.
-                        <a class="period-chip-cta" (click)="openQuartersDialog(y)">Configurar trimestres</a>
-                      </span>
-                    }
+                @let segments = timelineSegmentsFor(y);
+                @if (segments.length > 0) {
+                  <div class="admin-row-quarters">
+                    <div class="timeline-track">
+                      <div class="timeline-segments">
+                        @for (q of segments; track q.id) {
+                          <div class="timeline-segment"
+                               [style.left]="segmentLeft(q, y)"
+                               [style.width]="segmentWidth(q, y)"
+                               title="{{q.name}} · {{q.startDate ?? '—'}} → {{q.endDate ?? '—'}}">
+                            <span class="timeline-segment-name">{{q.name}}</span>
+                          </div>
+                        }
+                      </div>
+                      @if (timelineHoy(y, segments); as pct) {
+                        <div class="timeline-hoy" [style.left]="pct">
+                          <span class="timeline-hoy-label">HOY</span>
+                        </div>
+                      }
+                    </div>
                   </div>
-                </div>
+                } @else {
+                  <div class="admin-row-quarters">
+                    <span class="period-chip-empty">
+                      Sin períodos configurados.
+                      <a class="period-chip-cta" (click)="openQuartersDialog(y)">Configurar trimestres</a>
+                    </span>
+                  </div>
+                }
               }
               <div class="admin-row-actions">
                 <span [class]="y.isActive ? 'badge-J' : 'badge-gray'">{{y.isActive ? 'Activo' : 'Inactivo'}}</span>
@@ -574,6 +644,75 @@ export class AdminComponent implements OnInit {
     const next = new Map(this._quartersByYear());
     next.set(yearId, [...quarters]);
     this._quartersByYear.set(next);
+  }
+
+  // Timeline support (feature 31). All dates are 'YYYY-MM-DD' strings; the
+  // existing date.util helpers parse them in the local time zone, so day
+  // differences are measured in whole local days and string comparison on the
+  // ISO form matches chronological order.
+  todayStr(): string {
+    return dateToDateString(new Date());
+  }
+
+  daysBetween(start: string, end: string): number | null {
+    const a = dateStringToDate(start);
+    const b = dateStringToDate(end);
+    if (!a || !b) return null;
+    return Math.round((b.getTime() - a.getTime()) / 86400000);
+  }
+
+  // Quarters eligible for the timeline: requires both the academic year and
+  // the quarter to have non-null start/end dates so left/width can be
+  // computed. The empty-state CTA is the natural fallback when this returns
+  // an empty list (no quarters configured, or any year missing dates).
+  timelineSegmentsFor(y: AcademicYear): readonly Quarter[] {
+    if (!y.startDate || !y.endDate) return [];
+    return this.quarterRowsFor(y.id).filter(q => !!q.startDate && !!q.endDate);
+  }
+
+  // Shared calendar coordinate system (feature 41): % offset of `dateStr`
+  // from y.startDate, as a fraction of the full [y.startDate, y.endDate]
+  // range. Both segment positioning (segmentLeft/segmentWidth) and the HOY
+  // marker (timelineHoy) go through this single function so they can never
+  // drift apart — quarters are validated as non-overlapping but NOT
+  // contiguous (see quarters-dialog.component.ts), so real gaps between them
+  // must be reflected as empty track space rather than packed away.
+  private yearPct(dateStr: string | null, y: AcademicYear): number | null {
+    if (!dateStr || !y.startDate || !y.endDate) return null;
+    const yDays = this.daysBetween(y.startDate, y.endDate);
+    if (yDays === null || yDays <= 0) return null;
+    const offsetDays = this.daysBetween(y.startDate, dateStr);
+    if (offsetDays === null) return null;
+    let pct = (offsetDays / yDays) * 100;
+    if (pct < 0) pct = 0;
+    if (pct > 100) pct = 100;
+    return pct;
+  }
+
+  segmentLeft(q: Quarter, y: AcademicYear): string {
+    const pct = this.yearPct(q.startDate, y);
+    return pct === null ? '0%' : `${pct}%`;
+  }
+
+  segmentWidth(q: Quarter, y: AcademicYear): string {
+    const left = this.yearPct(q.startDate, y);
+    const right = this.yearPct(q.endDate, y);
+    if (left === null || right === null) return '0%';
+    return `${Math.max(0, right - left)}%`;
+  }
+
+  // HOY marker percentage position. Only emitted when today falls inside both
+  // [y.startDate, y.endDate] AND at least one configured segment covers today
+  // — covers the "no aparece si no cae dentro de ningún trimestre configurado"
+  // acceptance criterion by gating on a quarter, not just the year range.
+  timelineHoy(y: AcademicYear, segments: readonly Quarter[]): string | null {
+    if (!y.startDate || !y.endDate) return null;
+    const today = this.todayStr();
+    if (today < y.startDate || today > y.endDate) return null;
+    const inSegment = segments.some(q => q.startDate && q.endDate && q.startDate <= today && today <= q.endDate);
+    if (!inSegment) return null;
+    const pct = this.yearPct(today, y);
+    return pct === null ? null : `${pct}%`;
   }
 
   selRole: number | null = null;
