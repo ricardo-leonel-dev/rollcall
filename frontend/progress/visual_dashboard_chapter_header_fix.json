@@ -1,0 +1,16 @@
+{
+  "hasAdminRowQuarters": false,
+  "hasOldPanel": false,
+  "chipCount": 0,
+  "chips": [],
+  "activeYearText": null,
+  "pills": [],
+  "sectionLabels": [],
+  "dialogDates": [],
+  "pendingBannerItems": [],
+  "screenshot": "/home/rileo/ai-personal-worktrees/feature-29-cuaderno-institucional/frontend/progress/visual_dashboard_chapter_header_fix.png",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  }
+}
