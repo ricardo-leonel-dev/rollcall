@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, OnInit, signal, computed, inject, effect } from '@angular/core';
 import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -317,6 +317,20 @@ export class LayoutComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly bp = inject(BreakpointObserver);
 
+  constructor() {
+    // Auto-collapse on entering the tablet range. We don't gate on a
+    // "user-toggled" flag because the spec wants the *default* to be
+    // collapsed, even on re-entry: leaving the range preserves whatever
+    // state the user left (mobile slide-out / desktop expanded), and coming
+    // back resets to collapsed. The manual toggle still works inside the
+    // range — see `toggleMenu()`.
+    effect(() => {
+      if (this.isTablet()) {
+        this.collapsed.set(true);
+      }
+    });
+  }
+
   // Superadmin requests need the X-Institution-Id header, which the auth
   // interceptor only attaches once institutionContext has picked one — gate
   // the routed page behind that so no child component's ngOnInit fires an
@@ -358,6 +372,15 @@ export class LayoutComponent implements OnInit {
 
   readonly isMobile = toSignal(
     this.bp.observe('(max-width: 767px)').pipe(map(r => r.matches)),
+    { initialValue: false }
+  );
+
+  // Tablet range (768-1024px): sidebar starts collapsed by default so a
+  // portrait tablet has room for the table/card content instead of the full
+  // 240px sidebar eating half the viewport. Manual toggle still works inside
+  // the range — see `effect` below and `toggleMenu()`.
+  readonly isTablet = toSignal(
+    this.bp.observe('(min-width: 768px) and (max-width: 1024px)').pipe(map(r => r.matches)),
     { initialValue: false }
   );
 
