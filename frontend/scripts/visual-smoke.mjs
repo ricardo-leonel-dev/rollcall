@@ -124,21 +124,30 @@ const MOCK_USER = {
   moduleKeys: ['admin', 'absences', 'students', 'enrollments', 'dashboard', 'calendar', 'justifications', 'citations'],
 };
 
+// feature 41 fixture: this year's quarters are NOT contiguous — there's a
+// real 26-day gap between T1 and T2 (a recess/vacation), which quarters
+// validation allows (only overlap + in-range are checked, see
+// quarters-dialog.component.ts). "Today" (real system clock, matched to this
+// project's fixed dev date of 2026-09-08) falls inside T2 — the *second*
+// quarter, not the first — so this fixture exercises both: (a) the gap must
+// render as visible empty track between T1 and T2, and (b) the HOY marker
+// must land inside T2's real bounding box, not wherever a gap-less packed
+// layout would place it.
 const MOCK_YEARS = [
   {
     id: 1,
     name: 'Año Lectivo 2026',
-    startDate: '2026-03-01',
-    endDate: '2026-12-15',
+    startDate: '2026-01-01',
+    endDate: '2026-12-20',
     isActive: true,
     institutionId: 1,
   },
 ];
 
 const MOCK_QUARTERS = [
-  { id: 1, academicYearId: 1, name: 'T1', sequenceNumber: 1, startDate: '2026-03-01', endDate: '2026-05-30', description: null },
-  { id: 2, academicYearId: 1, name: 'T2', sequenceNumber: 2, startDate: '2026-06-01', endDate: '2026-08-31', description: null },
-  { id: 3, academicYearId: 1, name: 'T3', sequenceNumber: 3, startDate: '2026-09-01', endDate: '2026-12-15', description: null },
+  { id: 1, academicYearId: 1, name: 'T1', sequenceNumber: 1, startDate: '2026-01-05', endDate: '2026-03-20', description: null },
+  { id: 2, academicYearId: 1, name: 'T2', sequenceNumber: 2, startDate: '2026-04-15', endDate: '2026-09-30', description: null },
+  { id: 3, academicYearId: 1, name: 'T3', sequenceNumber: 3, startDate: '2026-10-01', endDate: '2026-12-15', description: null },
 ];
 
 const MOCK_CITATION_REASONS = [
@@ -251,6 +260,65 @@ async function extractDom(page) {
     const quartersEl = document.querySelector('.admin-row-quarters');
     const adminRowEl = document.querySelector('.admin-row');
     const oldPanel = document.querySelector('.inline-quarters-summary');
+
+    // feature 41: walk up from `el` to <body>, and for every ancestor whose
+    // computed overflow (x or y) is 'hidden'/'clip', check whether `el`'s
+    // bounding rect is fully contained inside that ancestor's bounding rect.
+    // If not, the ancestor is actually clipping `el` in the rendered page —
+    // this is a behavioral check (real coordinates), not a visual read of
+    // the screenshot.
+    function clippingAncestor(el) {
+      if (!el) return { clipped: null, ancestorSelector: null, elementRect: null, ancestorRect: null };
+      const elRect = el.getBoundingClientRect().toJSON();
+      let node = el.parentElement;
+      while (node && node !== document.body) {
+        const cs = getComputedStyle(node);
+        const hides = (v) => v === 'hidden' || v === 'clip';
+        if (hides(cs.overflowX) || hides(cs.overflowY) || hides(cs.overflow)) {
+          const ancRect = node.getBoundingClientRect().toJSON();
+          const contained =
+            elRect.left >= ancRect.left - 0.5 &&
+            elRect.right <= ancRect.right + 0.5 &&
+            elRect.top >= ancRect.top - 0.5 &&
+            elRect.bottom <= ancRect.bottom + 0.5;
+          if (!contained) {
+            return {
+              clipped: true,
+              ancestorSelector: node.className ? `.${String(node.className).trim().split(/\s+/).join('.')}` : node.tagName,
+              elementRect: elRect,
+              ancestorRect: ancRect,
+            };
+          }
+        }
+        node = node.parentElement;
+      }
+      return { clipped: false, ancestorSelector: null, elementRect: elRect, ancestorRect: null };
+    }
+
+    const timelineTrackEl = document.querySelector('.timeline-track');
+    const timelineHoyEl = document.querySelector('.timeline-hoy');
+    const timelineHoyLabelEl = document.querySelector('.timeline-hoy-label');
+    const timelineSegmentEls = sel('.timeline-segment');
+    const timelineSegments = timelineSegmentEls.map((s) => ({
+      title: s.getAttribute('title'),
+      rect: s.getBoundingClientRect().toJSON(),
+      left: getComputedStyle(s).left,
+      width: getComputedStyle(s).width,
+    }));
+    // The fixture (see MOCK_QUARTERS above) puts the mocked "today" inside
+    // T2 — assert the HOY marker's left edge falls within T2's own
+    // bounding-box [left, right], not wherever a gap-less packed layout
+    // would have placed it.
+    const t2Segment = timelineSegments.find((s) => (s.title || '').startsWith('T2'));
+    const timelineHoyLabelClipping = clippingAncestor(timelineHoyLabelEl);
+    const timelineHoyClipping = clippingAncestor(timelineHoyEl);
+    const timelineHoyRect = timelineHoyEl ? timelineHoyEl.getBoundingClientRect().toJSON() : null;
+    const timelineHoyAlignment = (t2Segment && timelineHoyRect) ? {
+      hoyLeft: timelineHoyRect.left,
+      t2Left: t2Segment.rect.left,
+      t2Right: t2Segment.rect.right,
+      hoyWithinT2: timelineHoyRect.left >= t2Segment.rect.left - 0.5 && timelineHoyRect.left <= t2Segment.rect.right + 0.5,
+    } : null;
     const chips = sel('.period-chip').map((chip) => {
       const ordinal = chip.querySelector('.period-chip-ordinal');
       const name = chip.querySelector('.period-chip-name');
@@ -298,6 +366,14 @@ async function extractDom(page) {
       sectionLabels,
       dialogDates,
       pendingBannerItems,
+      // feature 41 assertions — timeline HOY clipping + segment/HOY alignment.
+      timelineTrackRect: timelineTrackEl ? timelineTrackEl.getBoundingClientRect().toJSON() : null,
+      timelineSegments,
+      timelineHoyRect,
+      timelineHoyLabelRect: timelineHoyLabelEl ? timelineHoyLabelEl.getBoundingClientRect().toJSON() : null,
+      timelineHoyLabelClipping,
+      timelineHoyClipping,
+      timelineHoyAlignment,
     };
   });
 }
