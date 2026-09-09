@@ -177,14 +177,36 @@ async function mockApi(context) {
     if (url.includes('/api/users')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
     }
+    if (url.includes('/api/roles/permissions/')) {
+      // feature 34 fixture: a small permissions matrix for the role selected
+      // by the smoke, so the Permisos tab renders the table (it gates the
+      // table on @if (permissions().length)). Resource names match the
+      // backend's role_permissions schema so the eyebrow + table render
+      // together.
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
+        { resource: 'absences',       canRead: true,  canCreate: true,  canUpdate: true,  canDelete: false },
+        { resource: 'students',        canRead: true,  canCreate: true,  canUpdate: true,  canDelete: false },
+        { resource: 'justifications',  canRead: true,  canCreate: true,  canUpdate: true,  canDelete: true  },
+      ]) });
+    }
     if (url.includes('/api/roles')) {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
+        { id: 1, name: 'admin', description: 'Administrador', institutionId: 1, permissions: null },
+      ]) });
     }
     if (url.includes('/api/citation-reasons')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_CITATION_REASONS) });
     }
     if (url.includes('/api/courses')) {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 1, name: '5° A', grade: '5°', paralelo: 'A', shift: 'morning' }]) });
+      // feature 34 fixture: three courses (5° A, 5° B, 6° A) so the folio's
+      // plural grammar ("3 cursos") is exercised. The previous single-row
+      // fixture only covered the singular path; with 3 rows the visual
+      // smoke can catch a regression that drops the pluralized noun.
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
+        { id: 1, name: '5° A', grade: '5°', paralelo: 'A', shift: 'morning' },
+        { id: 2, name: '5° B', grade: '5°', paralelo: 'B', shift: 'morning' },
+        { id: 3, name: '6° A', grade: '6°', paralelo: 'A', shift: 'afternoon' },
+      ]) });
     }
     if (url.includes('/api/citations')) {
       const fixture = [
@@ -370,7 +392,7 @@ async function extractDom(page) {
       });
     const allScopeEls = scopeLineEls.length ? scopeLineEls : inlineScopeEls;
     const allSealEls = sealEls.length ? sealEls : sel('.seal');
-    return {
+    const original = {
       hasAdminRowQuarters: !!quartersEl,
       hasOldPanel: !!oldPanel,
       chipCount: chips.length,
@@ -516,6 +538,150 @@ async function extractDom(page) {
         };
       })(),
       institutionFolioAbsent: !document.querySelector('.inst-folio, .institutions-folio, [class*="inst"][class*="folio"]'),
+    };
+    // feature 34 assertions — Cuaderno admin tabs II/IV/V/VI. Each tab's
+    // eyebrow Roman numeral must read correctly, the page-level double
+    // filete must render, and (for Cursos/Motivos) the folio must show
+    // the real count with correct singular/plural grammar. Severity
+    // badges in Motivos are checked to still emit .badge-F/.badge-AT/
+    // .badge-J (NOT replaced by a folio class). Lateral spine check
+    // confirms .admin-row cards keep the border-left: 4px the spec calls
+    // for, matching Usuarios/Años lectivos.
+    const folioSnapshot = (selector) => {
+      const root = document.querySelector(selector);
+      if (!root) return { present: false };
+      const ink = root.querySelector('.filete-ink');
+      const border = root.querySelector('.filete-border');
+      const text = root.querySelector('[class$="-folio-text"]');
+      const number = text?.querySelector('b');
+      const fullText = text?.textContent?.replace(/\s+/g, ' ').trim() ?? null;
+      return {
+        present: true,
+        text: fullText,
+        numberText: number?.textContent?.trim() ?? null,
+        numberIsBold: number ? getComputedStyle(number).fontWeight === '800' : null,
+        fileteInk: ink ? {
+          height: getComputedStyle(ink).height,
+          background: getComputedStyle(ink).backgroundColor,
+          opacity: getComputedStyle(ink).opacity,
+        } : null,
+        fileteBorder: border ? {
+          height: getComputedStyle(border).height,
+          background: getComputedStyle(border).backgroundColor,
+        } : null,
+      };
+    };
+    const coursesFolio = folioSnapshot('.courses-folio');
+    const citationReasonsFolio = folioSnapshot('.citation-reasons-folio');
+    // Eyebrow / filete / title are shared across every active tab (the
+    // page-level <app-chapter-header> reads the same ADMIN_TAB_* maps);
+    // these helpers report what's rendered so a per-tab smoke can assert
+    // the Roman numeral matches (II / IV / V / VI).
+    const eyebrowInfo = (() => {
+      const el = document.querySelector('.chapter-eyebrow');
+      if (!el) return { present: false };
+      return {
+        present: true,
+        roman: el.querySelector('.chapter-roman')?.textContent?.trim() ?? null,
+        sub:   el.querySelector('.chapter-sub')?.textContent?.trim() ?? null,
+        separator: el.querySelector('.chapter-sep')?.textContent?.trim() ?? null,
+        full: el.textContent.replace(/\s+/g, ' ').trim(),
+      };
+    })();
+    const chapterFilete = {
+      ink: !!document.querySelector('.chapter-filete .filete-ink'),
+      border: !!document.querySelector('.chapter-filete .filete-border'),
+    };
+    const coursesEyebrow = eyebrowInfo;
+    const coursesTitle = document.querySelector('.chapter-title')?.textContent?.trim() ?? null;
+    const coursesFiletePresent = chapterFilete.ink && chapterFilete.border;
+    const coursesFolioPresent = coursesFolio.present;
+    const coursesFolioCount = coursesFolio.numberText !== null ? Number(coursesFolio.numberText) : null;
+    const coursesFolioGrammar = (() => {
+      const t = coursesFolio.text;
+      if (!t) return { matches: null };
+      return {
+        matches: t === 'Registros: 1 curso' || /^Registros: \d+ cursos$/.test(t),
+        rejectsOnePlural: !/^Registros: 1 cursos$/.test(t),
+      };
+    })();
+    const citationReasonsEyebrow = eyebrowInfo;
+    const citationReasonsTitle = document.querySelector('.chapter-title')?.textContent?.trim() ?? null;
+    const citationReasonsFiletePresent = chapterFilete.ink && chapterFilete.border;
+    const citationReasonsFolioPresent = citationReasonsFolio.present;
+    const citationReasonsFolioCount = citationReasonsFolio.numberText !== null ? Number(citationReasonsFolio.numberText) : null;
+    const citationReasonsFolioGrammar = (() => {
+      const t = citationReasonsFolio.text;
+      if (!t) return { matches: null };
+      return {
+        matches: t === 'Registros: 1 motivo' || /^Registros: \d+ motivos$/.test(t),
+        rejectsOnePlural: !/^Registros: 1 motivos$/.test(t),
+      };
+    })();
+    const permissionsEyebrow = eyebrowInfo;
+    const permissionsTitle = document.querySelector('.chapter-title')?.textContent?.trim() ?? null;
+    const permissionsFiletePresent = chapterFilete.ink && chapterFilete.border;
+    // Permisos tab doesn't render a folio (per spec) — explicit absent check.
+    const permissionsFolioAbsent = !document.querySelector('.permissions-folio');
+    const rosterEyebrow = eyebrowInfo;
+    const rosterTitle = document.querySelector('.chapter-title')?.textContent?.trim() ?? null;
+    const rosterFiletePresent = chapterFilete.ink && chapterFilete.border;
+    const rosterFolioAbsent = !document.querySelector('.roster-folio');
+    // Severity badges in Motivos: must still emit .badge-F / .badge-AT /
+    // .badge-J (NOT replaced by a folio class). The fixture has all three
+    // severities so this asserts the page-level severity-badges invariant.
+    const severityBadgeClassPreserved = (() => {
+      const badges = Array.from(document.querySelectorAll('.admin-row .badge-F, .admin-row .badge-AT, .admin-row .badge-J, table .badge-F, table .badge-AT, table .badge-J'));
+      const hasF = badges.some((b) => b.classList.contains('badge-F'));
+      const hasAT = badges.some((b) => b.classList.contains('badge-AT'));
+      const hasJ = badges.some((b) => b.classList.contains('badge-J'));
+      return { count: badges.length, hasF, hasAT, hasJ, all: hasF && hasAT && hasJ };
+    })();
+    // Lateral spine: .admin-row cards in Cursos/Motivos must keep the
+    // border-left: 4px the shared .admin-row rule provides. The desktop
+    // table rows live inside .data-table (no border-left needed there).
+    const lateralSpine = (() => {
+      const adminRowEls = Array.from(document.querySelectorAll('.admin-row'));
+      if (adminRowEls.length === 0) return { present: false, count: 0 };
+      return {
+        present: true,
+        count: adminRowEls.length,
+        allHaveSpine: adminRowEls.every((r) => {
+          const blw = getComputedStyle(r).borderLeftWidth;
+          return blw === '4px';
+        }),
+        allHaveSpineColor: adminRowEls.every((r) => {
+          const c = getComputedStyle(r).borderLeftColor;
+          return c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent';
+        }),
+      };
+    })();
+    return {
+      ...original,
+      coursesEyebrow,
+      coursesTitle,
+      coursesFiletePresent,
+      coursesFolioPresent,
+      coursesFolio,
+      coursesFolioCount,
+      coursesFolioGrammar,
+      citationReasonsEyebrow,
+      citationReasonsTitle,
+      citationReasonsFiletePresent,
+      citationReasonsFolioPresent,
+      citationReasonsFolio,
+      citationReasonsFolioCount,
+      citationReasonsFolioGrammar,
+      permissionsEyebrow,
+      permissionsTitle,
+      permissionsFiletePresent,
+      permissionsFolioAbsent,
+      rosterEyebrow,
+      rosterTitle,
+      rosterFiletePresent,
+      rosterFolioAbsent,
+      severityBadgeClassPreserved,
+      lateralSpine,
     };
   });
 }
