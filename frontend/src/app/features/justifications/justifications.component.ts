@@ -19,11 +19,12 @@ import { NotificationService } from '../../core/services/notification.service';
 import { QuarterContextService } from '../../core/services/quarter-context.service';
 import { QuarterSelectorComponent } from '../../shared/components/quarter-selector/quarter-selector.component';
 import { JustificationCreateDialogComponent, JustifyGroup } from './justification-create-dialog.component';
+import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule, MatTooltipModule, QuarterSelectorComponent],
+  imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule, MatIconModule, MatTooltipModule, QuarterSelectorComponent, ChapterHeaderComponent],
   styles: [`
     .tab-content { padding: 20px 0; }
     .detail-stamps { display: inline-flex; gap: 4px; cursor: pointer; padding: 2px; border-radius: 8px; transition: background .12s ease; }
@@ -72,6 +73,11 @@ import { JustificationCreateDialogComponent, JustifyGroup } from './justificatio
     .evidence-add-pill mat-icon { font-size: 16px; width: 16px; height: 16px; }
   `],
   template: `
+    <app-chapter-header
+      icon="task_alt"
+      eyebrowPrefix="Inspectoría"
+      eyebrowSuffix="Historial de justificaciones" />
+
     <div class="page-header">
       <h1 class="page-title">Justificaciones</h1>
     </div>
