@@ -179,6 +179,77 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
       color: white; display: flex; align-items: center; justify-content: center;
       font-size: 14px; font-weight: 700; flex-shrink: 0;
     }
+    /* Cuaderno institution card (feature 33): horizontal "ficha" on tablet
+       and desktop — seal | identity (name + stats line) | divider | actions
+       — so the whole row reads as one envelope. The stats line uses real
+       counts from institution_stats_backend (#17) and falls back to a
+       neutral "Sin estadísticas" message when the backend didn't return
+       them (e.g. signature drift) rather than inventing numbers.
+
+       The .inst-row variant mirrors .user-row (feature 30) intentionally —
+       every list in the Cuaderno system opens with the same horizontal
+       tarjeta rhythm, so the eye doesn't have to re-learn the layout
+       between tabs. Vertical stack only kicks in below 600px where a
+       horizontal row would overflow; above that the divider stays visible
+       so the actions block reads as a separate group on tablet portrait. */
+    .admin-row.inst-row {
+      flex-direction: row;
+      align-items: center;
+      flex-wrap: nowrap;
+      gap: 12px;
+    }
+    .admin-row.inst-row > div:first-child {
+      flex: 1;
+      min-width: 0;
+    }
+    .admin-row.inst-row .admin-row-actions {
+      width: auto;
+      flex-shrink: 0;
+    }
+    .inst-card-divider {
+      width: 1px;
+      align-self: stretch;
+      background: var(--border);
+      flex-shrink: 0;
+      min-height: 24px;
+    }
+    .inst-stats {
+      font-family: 'Nunito', sans-serif;
+      font-size: 12px;
+      color: var(--muted-strong);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .inst-stats b {
+      color: var(--ink);
+      font-weight: 800;
+    }
+    .inst-stats .inst-stats-sep {
+      color: var(--border);
+      margin: 0 6px;
+      font-weight: 700;
+    }
+    .inst-stats-empty {
+      color: var(--muted);
+      font-style: italic;
+    }
+    @media (max-width: 600px) {
+      .admin-row.inst-row {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .admin-row.inst-row > div:first-child {
+        width: 100%;
+      }
+      .admin-row.inst-row .admin-row-actions {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+      .inst-card-divider { display: none; }
+      .inst-stats { white-space: normal; }
+    }
     .hidden-mobile { display: block; }
     .hidden-desktop { display: none; }
     /* Tablet range (768-1024px) also uses the card variant so the table
@@ -216,15 +287,43 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
             </button>
           </div>
           @for (inst of institutionContext.institutions(); track inst.id) {
-            <div class="admin-row">
-              <div style="display:flex;align-items:center;gap:12px">
+            <div class="admin-row inst-row">
+              <div style="display:flex;align-items:center;gap:12px;min-width:0">
+                <!-- Cuaderno institution seal (feature 33): logoUrl real when
+                     present, otherwise initials of the institution name —
+                     same feature-base double-ring seal the rest of the
+                     system uses. -->
                 @if (inst.logoUrl) {
                   <app-seal-avatar [size]="40" [src]="inst.logoUrl" [bgColor]="'transparent'" alt="" />
                 } @else {
-                  <app-seal-avatar [size]="40" icon="corporate_fare" />
+                  <app-seal-avatar [size]="40" [initials]="(inst.name || '?')[0].toUpperCase()" />
                 }
-                <div style="font-weight:600">{{inst.name}}</div>
+                <div style="min-width:0">
+                  <div style="font-weight:600">{{inst.name}}</div>
+                  <!-- Cuaderno stats line (feature 33): real counts from
+                       institution_stats_backend (feature #17). Singular/plural
+                       matches feature 30's grammar pattern — never "1
+                       estudiantes". The separator dots sit on --border so
+                       they read as soft punctuation, not as data. -->
+                  <div class="inst-stats">
+                    @if (inst.stats) {
+                      <b>{{ inst.stats.students }}</b> {{ inst.stats.students === 1 ? 'estudiante' : 'estudiantes' }}
+                      <span class="inst-stats-sep">·</span>
+                      <b>{{ inst.stats.courses }}</b> {{ inst.stats.courses === 1 ? 'curso' : 'cursos' }}
+                      <span class="inst-stats-sep">·</span>
+                      <b>{{ inst.stats.users }}</b> {{ inst.stats.users === 1 ? 'usuario' : 'usuarios' }}
+                    } @else {
+                      <span class="inst-stats-empty">Sin estadísticas disponibles</span>
+                    }
+                  </div>
+                </div>
               </div>
+              <!-- Cuaderno vertical divider (feature 33): separates the
+                   identity block from the actions block on the
+                   horizontal tarjeta layout. Hidden when the card stacks
+                   on the smallest phones (<600px) via the media query
+                   above. -->
+              <div class="inst-card-divider"></div>
               <div class="admin-row-actions">
                 <button mat-icon-button style="color:var(--muted-strong)" (click)="openInstitutionDialog(inst)"><mat-icon>edit</mat-icon></button>
                 <input type="color" title="Color primario" [value]="inst.primaryColor || '#6366f1'"
