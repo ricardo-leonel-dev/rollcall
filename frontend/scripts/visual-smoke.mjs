@@ -351,6 +351,25 @@ async function extractDom(page) {
     const sectionLabels = sel('.section-label').map((s) => s.textContent.trim());
     const dialogDates = sel('.history-row-date').map((d) => d.textContent.replace(/\s+/g, ' ').trim());
     const pendingBannerItems = sel('.pending-banner-list li').map((li) => li.textContent.replace(/\s+/g, ' ').trim());
+    // feature 30 selectors — Cuaderno Users tab folio + seals + scope lines.
+    const folioEl = document.querySelector('.users-folio');
+    const folioFileteInkEl = document.querySelector('.users-folio .filete-ink');
+    const folioFileteBorderEl = document.querySelector('.users-folio .filete-border');
+    const folioTextEl = document.querySelector('.users-folio-text');
+    const folioNumberEl = document.querySelector('.users-folio-text b');
+    const sealEls = sel('.admin-row .seal, table .seal, .users-folio ~ * .seal');
+    const userRowEls = sel('.admin-row.user-row');
+    const scopeLineEls = sel('.admin-row .user-scope, table .user-scope, .users-folio ~ * .user-scope');
+    // Fallback: scope lines are inline-styled in admin.component.ts (no
+    // dedicated class), so the selector above may miss them. Match by
+    // text content as a backup so the assertion always runs.
+    const inlineScopeEls = Array.from(document.querySelectorAll('.admin-row div, table tbody td div'))
+      .filter((d) => {
+        const t = (d.textContent || '').trim();
+        return /^(Todos los cursos|1 curso asignado|\d+ cursos asignados)$/.test(t);
+      });
+    const allScopeEls = scopeLineEls.length ? scopeLineEls : inlineScopeEls;
+    const allSealEls = sealEls.length ? sealEls : sel('.seal');
     return {
       hasAdminRowQuarters: !!quartersEl,
       hasOldPanel: !!oldPanel,
@@ -383,6 +402,60 @@ async function extractDom(page) {
       timelineHoyLabelClipping,
       timelineHoyClipping,
       timelineHoyAlignment,
+      // feature 30 assertions — Cuaderno Users tab behavior.
+      usersFolio: folioEl ? {
+        present: true,
+        text: folioTextEl?.textContent.replace(/\s+/g, ' ').trim() ?? null,
+        numberText: folioNumberEl?.textContent?.trim() ?? null,
+        numberIsBold: folioNumberEl ? getComputedStyle(folioNumberEl).fontWeight === '800' : null,
+        fileteInk: folioFileteInkEl ? {
+          height: getComputedStyle(folioFileteInkEl).height,
+          background: getComputedStyle(folioFileteInkEl).backgroundColor,
+          opacity: getComputedStyle(folioFileteInkEl).opacity,
+        } : null,
+        fileteBorder: folioFileteBorderEl ? {
+          height: getComputedStyle(folioFileteBorderEl).height,
+          background: getComputedStyle(folioFileteBorderEl).backgroundColor,
+        } : null,
+      } : { present: false },
+      userSeals: allSealEls.map((s) => {
+        const cs = getComputedStyle(s);
+        return {
+          borderRadius: cs.borderRadius,
+          isCircular: cs.borderRadius === '50%',
+          hasDoubleRing: cs.borderTopWidth === '2px' && cs.outlineStyle === 'solid',
+          size: { w: s.getBoundingClientRect().width, h: s.getBoundingClientRect().height },
+        };
+      }),
+      userSealCount: allSealEls.length,
+      userSealsAllCircular: allSealEls.length > 0 && allSealEls.every((s) => getComputedStyle(s).borderRadius === '50%'),
+      userScopeLines: allScopeEls.map((d) => {
+        const b = d.querySelector('b');
+        return {
+          text: (d.textContent || '').replace(/\s+/g, ' ').trim(),
+          numberIsBold: b ? getComputedStyle(b).fontWeight === '700' || getComputedStyle(b).fontWeight === '800' : null,
+          matchesAllCourses: /^Todos los cursos$/.test((d.textContent || '').trim()),
+          matchesCounted: /^(1 curso asignado|\d+ cursos asignados)$/.test((d.textContent || '').trim()) && !/^1 cursos asignados$/.test((d.textContent || '').trim()),
+        };
+      }),
+      userCardLayout: userRowEls.length > 0 ? {
+        count: userRowEls.length,
+        flexDirection: getComputedStyle(userRowEls[0]).flexDirection,
+        isHorizontal: getComputedStyle(userRowEls[0]).flexDirection === 'row',
+        isVertical: getComputedStyle(userRowEls[0]).flexDirection === 'column',
+      } : { count: 0 },
+      // Layout presence: on desktop the table is visible and cards are
+      // hidden; on mobile cards are visible and the table is hidden.
+      layoutMode: (() => {
+        const tableWrap = document.querySelector('.data-table-wrap.hidden-mobile');
+        const cardsWrap = document.querySelector('.hidden-desktop');
+        const tableVisible = tableWrap ? getComputedStyle(tableWrap).display !== 'none' : null;
+        const cardsVisible = cardsWrap ? getComputedStyle(cardsWrap).display !== 'none' : null;
+        if (tableVisible === null || cardsVisible === null) return null;
+        if (tableVisible && !cardsVisible) return 'desktop';
+        if (!tableVisible && cardsVisible) return 'mobile-or-tablet-cards';
+        return 'mixed';
+      })(),
       // feature 33 assertions — Cuaderno Instituciones tab behavior.
       // Each one is a real behavior check, not a structural node count:
       // the chapter-header eyebrow must read "Capítulo VII — Instituciones
