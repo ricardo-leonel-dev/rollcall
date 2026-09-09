@@ -241,6 +241,51 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
       font-size: 13px;
       letter-spacing: 0;
     }
+    /* Cuaderno folio for Cursos tab (feature 34): same double-filete +
+       right-aligned register-count rhythm as .users-folio, but kept
+       self-contained so the Cursos list can move independently of the
+       Usuarios list. .courses-folio / .citation-reasons-folio / .users-folio
+       share the same geometry — comma-grouped below so we don't pay the
+       CSS budget three times over for identical rules. Each wrapper class
+       is still its own scope (no users-folio reuse), so each list can
+       move independently. Severity badges in Motivos (this tab) stay on
+       .badge-F/.badge-AT/.badge-J — NOT replaced by a folio class. */
+    .courses-folio,
+    .citation-reasons-folio {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+    .courses-folio .filete-ink,
+    .citation-reasons-folio .filete-ink {
+      height: 1px;
+      background: var(--ink);
+      opacity: .55;
+    }
+    .courses-folio .filete-border,
+    .citation-reasons-folio .filete-border {
+      height: 1px;
+      background: var(--border);
+    }
+    .courses-folio-text,
+    .citation-reasons-folio-text {
+      font-family: 'Nunito', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted-strong);
+      padding-top: 4px;
+      text-align: right;
+    }
+    .courses-folio-text b,
+    .citation-reasons-folio-text b {
+      color: var(--ink);
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 0;
+    }
     /* Cuaderno institution card (feature 33): horizontal "ficha" on tablet/desktop
        — seal | identity (name + stats) | divider | actions. Stats line uses real
        counts from institution_stats_backend (#17); falls back to muted italic
@@ -458,10 +503,24 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
       <!-- CURSOS -->
       @if (activeTab() === 'courses') {
         <div class="tab-content">
-          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+          <!-- Cuaderno folio (feature 34): "Registros: N cursos" on the right,
+               real count from /api/courses, with the same double filete
+               (ink .55 + border) the chapter-header uses for the page-level
+               title. Mirrors feature 30's users-folio pattern so every
+               list in the Cuaderno system opens with the same register-count
+               rhythm. Singular/plural grammar matches feature 30/33
+               (1 curso / N cursos, never "1 cursos"). -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;gap:12px;flex-wrap:wrap">
             <button mat-flat-button color="primary" (click)="openCourseDialog()">
               <mat-icon>add</mat-icon> Agregar curso
             </button>
+            <div class="courses-folio">
+              <div class="filete-ink"></div>
+              <div class="filete-border"></div>
+              <div class="courses-folio-text">
+                Registros: <b>{{ courses().length }}</b> {{ courses().length === 1 ? 'curso' : 'cursos' }}
+              </div>
+            </div>
           </div>
           <div class="data-table-wrap hidden md:block">
             <table class="data-table">
@@ -503,10 +562,22 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
       <!-- MOTIVOS DE CITACIÓN -->
       @if (activeTab() === 'citation-reasons') {
         <div class="tab-content">
-          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+          <!-- Cuaderno folio (feature 34): "Registros: N motivos" on the right,
+               real count from /api/citation-reasons, with the same double
+               filete (ink .55 + border) the chapter-header uses. Severity
+               badges (.badge-F/.badge-AT/.badge-J) below the folio are
+               untouched. Singular/plural grammar matches feature 30/33. -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;gap:12px;flex-wrap:wrap">
             <button mat-flat-button color="primary" (click)="openCitationReasonDialog()">
               <mat-icon>add</mat-icon> Agregar motivo
             </button>
+            <div class="citation-reasons-folio">
+              <div class="filete-ink"></div>
+              <div class="filete-border"></div>
+              <div class="citation-reasons-folio-text">
+                Registros: <b>{{ citationReasons().length }}</b> {{ citationReasons().length === 1 ? 'motivo' : 'motivos' }}
+              </div>
+            </div>
           </div>
           <div class="data-table-wrap hidden md:block">
             <table class="data-table">
