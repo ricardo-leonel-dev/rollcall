@@ -27,6 +27,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
 import { AbsenceRangeDialogComponent, AbsenceRangeDialogResult } from './absence-range-dialog.component';
 import { AbsenceDialogComponent } from './absence-dialog.component';
 import { AbsenceSaveResultDialogComponent } from './absence-save-result-dialog.component';
+import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
 
 interface VoiceLog {
   id: number;
@@ -73,7 +74,8 @@ interface StudentFilter {
   imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule,
             MatButtonModule, MatIconModule, MatTooltipModule, MatMenuModule, MatDatepickerModule,
             MatAutocompleteModule,
-            WhatsappIconComponent, QuarterSelectorComponent, DecimalPipe, DatePipe, SlicePipe],
+            WhatsappIconComponent, QuarterSelectorComponent, DecimalPipe, DatePipe, SlicePipe,
+            ChapterHeaderComponent],
   styles: [`
     .tab-content { padding: 20px 0; }
     @keyframes pulse-mic {
@@ -151,6 +153,11 @@ interface StudentFilter {
     .student-filter-chip strong { color: var(--ink); font-weight: 600; }
   `],
   template: `
+    <app-chapter-header
+      icon="event_busy"
+      eyebrowPrefix="Inspectoría"
+      eyebrowSuffix="Registro de asistencia" />
+
     <div class="page-header">
       <h1 class="page-title">Inasistencias</h1>
     </div>
