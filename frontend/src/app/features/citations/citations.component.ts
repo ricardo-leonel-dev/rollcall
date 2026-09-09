@@ -17,6 +17,7 @@ import { NotificationTemplateService } from '../../core/services/notification-te
 import { QuarterSelectorComponent } from '../../shared/components/quarter-selector/quarter-selector.component';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
 import { formatCitationDateLabelShort } from '../../shared/utils/citation-date.util';
 import { CitationHistoryDialogComponent } from './citation-history-dialog.component';
 import { CitationDialogComponent } from './citation-dialog.component';
@@ -25,7 +26,8 @@ import { CitationDialogComponent } from './citation-dialog.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatSelectModule, MatFormFieldModule, MatButtonModule, MatIconModule,
-            MatTooltipModule, MatMenuModule, WhatsappIconComponent, QuarterSelectorComponent],
+            MatTooltipModule, MatMenuModule, WhatsappIconComponent, QuarterSelectorComponent,
+            ChapterHeaderComponent],
   styles: [`
     .manual-search {
       display: flex; align-items: center; gap: 6px;
@@ -76,6 +78,11 @@ import { CitationDialogComponent } from './citation-dialog.component';
     .citations-menu-item .badge { display: inline-flex; pointer-events: none; }
   `],
   template: `
+    <app-chapter-header
+      icon="campaign"
+      eyebrowPrefix="Inspectoría"
+      eyebrowSuffix="Registro de citaciones" />
+
     <div class="page-header">
       <h1 class="page-title">Citaciones</h1>
     </div>
