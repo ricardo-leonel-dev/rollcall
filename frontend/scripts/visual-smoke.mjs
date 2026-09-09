@@ -114,7 +114,7 @@ const MOCK_USER = {
   username: 'visual-smoke',
   fullName: 'Visual Smoke',
   email: null,
-  roleName: 'admin',
+  roleName: process.env.VISUAL_ROLE || 'admin',
   roleId: 1,
   institutionId: 1,
   avatarUrl: null,
@@ -175,19 +175,7 @@ async function mockApi(context) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_QUARTERS) });
     }
     if (url.includes('/api/users')) {
-      // feature 30 fixture: a mix of users with different courseIds states
-      // so the visual smoke actually exercises (a) the "N cursos asignados"
-      // scope line, (b) the "Todos los cursos" null/empty fallback, and
-      // (c) the "Registros: NNN" folio above the table. MOCK_COURSES ids
-      // match the /api/courses mock above.
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
-        { id: 1, username: 'admin',      fullName: 'María Paredes',   email: 'maria.paredes@inst.test',  roleId: 1, roleName: 'admin',       institutionId: 1, avatarUrl: null, title: 'Lic.',  signatureLabel: 'Inspectora general', isActive: true, courseIds: null,      moduleKeys: null },
-        { id: 2, username: 'jlopez',     fullName: 'Juan López',      email: 'juan.lopez@inst.test',     roleId: 2, roleName: 'docente',     institutionId: 1, avatarUrl: null, title: 'Msc.',  signatureLabel: 'Docente de matemática', isActive: true, courseIds: [1],     moduleKeys: null },
-        { id: 3, username: 'kgonzalez',  fullName: 'Karen González',  email: 'karen.gonzalez@inst.test', roleId: 2, roleName: 'docente',     institutionId: 1, avatarUrl: null, title: 'Lic.',  signatureLabel: 'Docente de lengua',   isActive: true, courseIds: [1, 2], moduleKeys: null },
-        { id: 4, username: 'parias',     fullName: 'Pedro Arias',     email: 'pedro.arias@inst.test',    roleId: 3, roleName: 'inspector',   institutionId: 1, avatarUrl: null, title: null,    signatureLabel: null,                       isActive: true, courseIds: [],       moduleKeys: ['admin','absences','citations'] },
-        { id: 5, username: 'lmendoza',   fullName: 'Lucía Mendoza',   email: 'lucia.mendoza@inst.test',  roleId: 2, roleName: 'docente',     institutionId: 1, avatarUrl: null, title: 'Msc.',  signatureLabel: 'Docente de ciencias',  isActive: true, courseIds: [1],     moduleKeys: null },
-        { id: 6, username: 'rcarrera',   fullName: 'Rosa Carrera',    email: 'rosa.carrera@inst.test',   roleId: 4, roleName: 'secretaria',  institutionId: 1, avatarUrl: null, title: null,    signatureLabel: 'Secretaría académica',  isActive: true, courseIds: null,      moduleKeys: null },
-      ]) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
     }
     if (url.includes('/api/roles')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
@@ -239,7 +227,16 @@ async function mockApi(context) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixture) });
     }
     if (url.includes('/api/institutions')) {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 1, name: 'Test Institution', primaryColor: '#6366f1', secondaryColor: '#8b5cf6' }]) });
+      // feature 33 fixture: each institution carries the stats the backend
+      // attaches via findAll (backend #17). Mixed counts so the visual
+      // smoke actually exercises the singular/plural grammar ("1 estudiante"
+      // vs "N estudiantes") and the dot separators, instead of rendering
+      // one trivial row. logoUrl intentionally omitted on the second one
+      // so the initials-fallback seal is also exercised.
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
+        { id: 1, name: 'Unidad Educativa San Martín', logoUrl: null, primaryColor: '#6366f1', secondaryColor: '#8b5cf6', isActive: true, stats: { students: 248, courses: 12, users: 34 } },
+        { id: 2, name: 'Colegio Andino',           logoUrl: null, primaryColor: '#0ea5e9', secondaryColor: '#22d3ee', isActive: true, stats: { students: 1,   courses: 1,  users: 1 } },
+      ]) });
     }
     if (url.includes('/api/notification-templates')) {
       // ProfileComponent fetches this in ngOnInit to load the WhatsApp template.
@@ -354,16 +351,7 @@ async function extractDom(page) {
     const sectionLabels = sel('.section-label').map((s) => s.textContent.trim());
     const dialogDates = sel('.history-row-date').map((d) => d.textContent.replace(/\s+/g, ' ').trim());
     const pendingBannerItems = sel('.pending-banner-list li').map((li) => li.textContent.replace(/\s+/g, ' ').trim());
-
-    // feature 30 assertions — Cuaderno Users tab. Each one is a real
-    // behavior check the spec requires, not a structural node count: the
-    // folio must carry the live user count AND its double filete, every
-    // user seal must be the circular feature-base variant, every scope
-    // line must read either "N cursos asignados" (with N bolded) or
-    // "Todos los cursos", and the card layout must switch between
-    // horizontal (tablet/desktop) and vertical (mobile) per the spec's
-    // breakpoint. A buggy implementation would fail one of these even
-    // if the page renders visually.
+    // feature 30 selectors — Cuaderno Users tab folio + seals + scope lines.
     const folioEl = document.querySelector('.users-folio');
     const folioFileteInkEl = document.querySelector('.users-folio .filete-ink');
     const folioFileteBorderEl = document.querySelector('.users-folio .filete-border');
@@ -468,6 +456,66 @@ async function extractDom(page) {
         if (!tableVisible && cardsVisible) return 'mobile-or-tablet-cards';
         return 'mixed';
       })(),
+      // feature 33 assertions — Cuaderno Instituciones tab behavior.
+      // Each one is a real behavior check, not a structural node count:
+      // the chapter-header eyebrow must read "Capítulo VII — Instituciones
+      // del sistema", every institution row must show the live stats line
+      // with the bold numbers and singular/plural grammar the spec
+      // requires, the seal must be the circular double-ring feature-base
+      // variant, and there must be NO INS-001 folio (acceptance #4).
+      institutionEyebrow: (() => {
+        const el = document.querySelector('.chapter-eyebrow');
+        if (!el) return { present: false };
+        const roman = el.querySelector('.chapter-roman')?.textContent?.trim() ?? null;
+        const sub   = el.querySelector('.chapter-sub')?.textContent?.trim() ?? null;
+        const sep   = el.querySelector('.chapter-sep')?.textContent?.trim() ?? null;
+        return { present: true, roman, sub, separator: sep, full: el.textContent.replace(/\s+/g, ' ').trim() };
+      })(),
+      institutionTitle: document.querySelector('.chapter-title')?.textContent?.trim() ?? null,
+      institutionFiletePresent: !!document.querySelector('.chapter-filete .filete-ink') && !!document.querySelector('.chapter-filete .filete-border'),
+      institutionRowCount: document.querySelectorAll('.admin-row.inst-row').length,
+      institutionStatsLines: Array.from(document.querySelectorAll('.admin-row.inst-row .inst-stats')).map((el) => {
+        const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+        const boldEls = Array.from(el.querySelectorAll('b'));
+        return {
+          text,
+          boldCount: boldEls.length,
+          boldValuesAllBold: boldEls.length === 3 && boldEls.every((b) => {
+            const fw = getComputedStyle(b).fontWeight;
+            return fw === '700' || fw === '800';
+          }),
+          // Grammar: must never be "1 estudiantes" / "1 cursos" / "1 usuarios".
+          matchesSingularForOne: /(^|\D)1\s+(estudiante|curso|usuario)(\s|$)/.test(text),
+          matchesPluralForMany:  /(^|\D)[0-9]{2,}\s+(estudiantes|cursos|usuarios)(\s|$)/.test(text),
+          // Three counts, two separators.
+          separatorCount: (text.match(/·/g) || []).length,
+        };
+      }),
+      institutionSeals: Array.from(document.querySelectorAll('.admin-row.inst-row .seal')).map((s) => {
+        const cs = getComputedStyle(s);
+        return {
+          borderRadius: cs.borderRadius,
+          isCircular: cs.borderRadius === '50%',
+          hasDoubleRing: cs.borderTopWidth === '2px' && cs.outlineStyle === 'solid',
+        };
+      }),
+      institutionSealsAllCircular: (() => {
+        const seals = Array.from(document.querySelectorAll('.admin-row.inst-row .seal'));
+        return seals.length > 0 && seals.every((s) => getComputedStyle(s).borderRadius === '50%');
+      })(),
+      institutionCardLayout: (() => {
+        const row = document.querySelector('.admin-row.inst-row');
+        if (!row) return { count: 0 };
+        const cs = getComputedStyle(row);
+        return {
+          count: document.querySelectorAll('.admin-row.inst-row').length,
+          flexDirection: cs.flexDirection,
+          isHorizontal: cs.flexDirection === 'row',
+          isVertical: cs.flexDirection === 'column',
+          hasDivider: !!row.querySelector('.inst-card-divider'),
+        };
+      })(),
+      institutionFolioAbsent: !document.querySelector('.inst-folio, .institutions-folio, [class*="inst"][class*="folio"]'),
     };
   });
 }

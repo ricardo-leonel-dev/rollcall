@@ -207,6 +207,17 @@ export interface InstitutionBranding {
   secondaryColor: string | null;
 }
 
+// Real counts per institution, attached by the backend findAll endpoint
+// (see backend_conteo_de_estudiantes_cursos_usuarios_por_instituci_n, #17).
+// Optional so existing Institution-shaped call sites stay type-safe until
+// the tab that actually renders them (admin Instituciones, feature 33)
+// explicitly opts in by reading inst.stats.
+export interface InstitutionStats {
+  students: number;
+  courses: number;
+  users: number;
+}
+
 export interface User {
   id: number;
   username: string;
@@ -226,6 +237,7 @@ export interface User {
 
 export interface Institution extends InstitutionBranding {
   isActive: boolean;
+  stats?: InstitutionStats;
 }
 
 export interface Role {
