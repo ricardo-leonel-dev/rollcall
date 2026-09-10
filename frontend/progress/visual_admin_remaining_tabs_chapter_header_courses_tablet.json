@@ -1,0 +1,153 @@
+{
+  "hasAdminRowQuarters": false,
+  "hasOldPanel": false,
+  "chipCount": 0,
+  "chips": [],
+  "adminRowAlignItems": "flex-start",
+  "adminRowDisplay": "flex",
+  "activeYearText": null,
+  "pills": [],
+  "sectionLabels": [],
+  "dialogDates": [],
+  "pendingBannerItems": [],
+  "timelineTrackRect": null,
+  "timelineSegments": [],
+  "timelineHoyRect": null,
+  "timelineHoyLabelRect": null,
+  "timelineHoyLabelClipping": {
+    "clipped": null,
+    "ancestorSelector": null,
+    "elementRect": null,
+    "ancestorRect": null
+  },
+  "timelineHoyClipping": {
+    "clipped": null,
+    "ancestorSelector": null,
+    "elementRect": null,
+    "ancestorRect": null
+  },
+  "timelineHoyAlignment": null,
+  "usersFolio": {
+    "present": false
+  },
+  "userSeals": [
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 32,
+        "h": 32
+      }
+    }
+  ],
+  "userSealCount": 1,
+  "userSealsAllCircular": true,
+  "userScopeLines": [],
+  "userCardLayout": {
+    "count": 0
+  },
+  "layoutMode": null,
+  "institutionEyebrow": {
+    "present": true,
+    "roman": "Capítulo II",
+    "sub": "Cursos",
+    "separator": "—",
+    "full": "admin_panel_settingsCapítulo II—Cursos"
+  },
+  "institutionTitle": "Cursos",
+  "institutionFiletePresent": true,
+  "institutionRowCount": 0,
+  "institutionStatsLines": [],
+  "institutionSeals": [],
+  "institutionSealsAllCircular": false,
+  "institutionCardLayout": {
+    "count": 0
+  },
+  "institutionFolioAbsent": true,
+  "coursesEyebrow": {
+    "present": true,
+    "roman": "Capítulo II",
+    "sub": "Cursos",
+    "separator": "—",
+    "full": "admin_panel_settingsCapítulo II—Cursos"
+  },
+  "coursesTitle": "Cursos",
+  "coursesFiletePresent": true,
+  "coursesFolioPresent": true,
+  "coursesFolio": {
+    "present": true,
+    "text": "Registros: 3 cursos",
+    "numberText": "3",
+    "numberIsBold": true,
+    "fileteInk": {
+      "height": "1px",
+      "background": "rgb(30, 27, 22)",
+      "opacity": "0.55"
+    },
+    "fileteBorder": {
+      "height": "1px",
+      "background": "rgb(231, 225, 211)"
+    }
+  },
+  "coursesFolioCount": 3,
+  "coursesFolioGrammar": {
+    "matches": true,
+    "rejectsOnePlural": true
+  },
+  "citationReasonsEyebrow": {
+    "present": true,
+    "roman": "Capítulo II",
+    "sub": "Cursos",
+    "separator": "—",
+    "full": "admin_panel_settingsCapítulo II—Cursos"
+  },
+  "citationReasonsTitle": "Cursos",
+  "citationReasonsFiletePresent": true,
+  "citationReasonsFolioPresent": false,
+  "citationReasonsFolio": {
+    "present": false
+  },
+  "citationReasonsFolioCount": null,
+  "citationReasonsFolioGrammar": {
+    "matches": null
+  },
+  "permissionsEyebrow": {
+    "present": true,
+    "roman": "Capítulo II",
+    "sub": "Cursos",
+    "separator": "—",
+    "full": "admin_panel_settingsCapítulo II—Cursos"
+  },
+  "permissionsTitle": "Cursos",
+  "permissionsFiletePresent": true,
+  "permissionsFolioAbsent": true,
+  "rosterEyebrow": {
+    "present": true,
+    "roman": "Capítulo II",
+    "sub": "Cursos",
+    "separator": "—",
+    "full": "admin_panel_settingsCapítulo II—Cursos"
+  },
+  "rosterTitle": "Cursos",
+  "rosterFiletePresent": true,
+  "rosterFolioAbsent": true,
+  "severityBadgeClassPreserved": {
+    "count": 0,
+    "hasF": false,
+    "hasAT": false,
+    "hasJ": false,
+    "all": false
+  },
+  "lateralSpine": {
+    "present": true,
+    "count": 3,
+    "allHaveSpine": true,
+    "allHaveSpineColor": true
+  },
+  "screenshot": "/home/rileo/ai-personal-worktrees/feature-29-cuaderno-institucional/frontend/progress/visual_admin_remaining_tabs_chapter_header_courses_tablet.png",
+  "viewport": {
+    "width": 900,
+    "height": 1024
+  }
+}
