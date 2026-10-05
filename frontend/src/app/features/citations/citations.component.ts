@@ -237,7 +237,7 @@ export class CitationsComponent implements OnInit {
     this.applyDefaultQuarter();
     const [courses] = await Promise.all([
       firstValueFrom(this.http.get<Course[]>('/api/courses')),
-      this.templateService.load(),
+      this.templateService.ensureLoaded(),
     ]);
     this.courses.set(courses);
     this.selYear = this.academicYearContext.selected()?.id ?? null;
@@ -341,15 +341,23 @@ export class CitationsComponent implements OnInit {
     return row.citations.find(c => c.status === 'pending') ?? row.citations[0] ?? null;
   }
 
-  notifyGuardian(row: CitationRosterRow): void {
+  async notifyGuardian(row: CitationRosterRow): Promise<void> {
     const target = this.resolveTargetCitation(row);
-    if (!row.whatsappLink || !target) return;
-    if (target.status === 'closed') { window.open(row.whatsappLink, '_blank'); return; }
-    const dateLabel = formatCitationDateLabelShort(target.date, target.time);
-    const message = this.templateService.getTemplate('citations')
-      .replace(/\{\{nombre\}\}/g, row.studentName)
-      .replace(/\{\{fecha\}\}/g, dateLabel);
-    window.open(`${row.whatsappLink}?text=${encodeURIComponent(message)}`, '_blank');
+    const whatsappLink = row.whatsappLink;
+    if (!whatsappLink || !target) return;
+    if (target.status === 'closed') { window.open(whatsappLink, '_blank'); return; }
+    const vars = { nombre: row.studentName, fecha: formatCitationDateLabelShort(target.date, target.time) };
+    const toUrl = (message: string) => `${whatsappLink}?text=${encodeURIComponent(message)}`;
+    if (this.templateService.hasTemplate('citations')) {
+      window.open(toUrl(this.templateService.renderTemplate('citations', vars)), '_blank');
+      return;
+    }
+    // window.open after an await falls outside the click gesture and gets popup-blocked:
+    // reserve the tab synchronously, then navigate it once the catalog retry settles.
+    const reserved = window.open('', '_blank');
+    await this.templateService.ensureLoaded();
+    const url = toUrl(this.templateService.renderTemplate('citations', vars));
+    if (reserved) reserved.location.href = url; else window.open(url, '_blank');
   }
 
   deleteCitation(row: CitationRosterRow): void {

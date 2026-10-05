@@ -1,0 +1,776 @@
+{
+  "ranAt": "2026-10-05T21:13:17.566Z",
+  "summary": {
+    "1": "PASS",
+    "2": "PASS",
+    "3": "PASS",
+    "4": "PASS",
+    "5": "PASS",
+    "6": "PASS",
+    "7": "PASS",
+    "8": "PASS",
+    "9": "PASS",
+    "10": "PASS",
+    "11": "PASS",
+    "12": "PASS",
+    "13": "PASS",
+    "14": "PASS",
+    "15": "PASS",
+    "16": "PASS",
+    "17": "PASS",
+    "18": "PASS"
+  },
+  "steps": {
+    "1": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "chapter header eyebrow",
+          "ok": true,
+          "eyebrow": "manage_accounts CUENTA PERSONAL · PREFERENCIAS Y MENSAJES"
+        },
+        {
+          "name": "chapter header has no h1 title",
+          "ok": true
+        },
+        {
+          "name": "h1 Mi perfil",
+          "ok": true
+        },
+        {
+          "name": "order chapter-header, page-header, tab-group",
+          "ok": true,
+          "order": [
+            "app-chapter-header",
+            "div.page-header",
+            "mat-tab-group"
+          ]
+        },
+        {
+          "name": "two tabs in order",
+          "ok": true,
+          "tabs": [
+            "person Mi cuenta",
+            "Mensajes de WhatsApp"
+          ]
+        },
+        {
+          "name": "Mi cuenta selected",
+          "ok": true
+        },
+        {
+          "name": "four account sections",
+          "ok": true,
+          "sections": [
+            "DATOS PERSONALES",
+            "FIRMA EN REPORTES",
+            "AVATAR",
+            "CONTRASEÑA"
+          ]
+        },
+        {
+          "name": "no Mensaje de notificación section",
+          "ok": true
+        }
+      ]
+    },
+    "2": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "URL has tab=mensajes",
+          "ok": true,
+          "url": "http://127.0.0.1:4343/profile?tab=mensajes"
+        },
+        {
+          "name": "no dialog on tab switch",
+          "ok": true
+        },
+        {
+          "name": "Back leaves /profile (replaceUrl)",
+          "ok": true,
+          "url": "http://127.0.0.1:4343/home"
+        },
+        {
+          "name": "Mensajes tab selected from ?tab=mensajes",
+          "ok": true
+        },
+        {
+          "name": "one card per item, same order",
+          "ok": true,
+          "cardTitles": [
+            "Faltas y atrasos",
+            "Citaciones"
+          ],
+          "labels": [
+            "Faltas y atrasos",
+            "Citaciones"
+          ]
+        },
+        {
+          "name": "absences description",
+          "ok": true
+        },
+        {
+          "name": "absences chips text+title+aria",
+          "ok": true,
+          "chipTexts": [
+            "{{nombre}}",
+            "{{fecha}}",
+            "{{tipo}}",
+            "{{curso}}"
+          ],
+          "titles": [
+            [
+              "Nombre del estudiante",
+              "Nombre del estudiante"
+            ],
+            [
+              "Fecha",
+              "Fecha"
+            ],
+            [
+              "Tipo (falta o atraso)",
+              "Tipo (falta o atraso)"
+            ],
+            [
+              "Curso",
+              "Curso"
+            ]
+          ]
+        },
+        {
+          "name": "citations description",
+          "ok": true
+        },
+        {
+          "name": "citations chips text+title+aria",
+          "ok": true,
+          "chipTexts": [
+            "{{nombre}}",
+            "{{fecha}}"
+          ],
+          "titles": [
+            [
+              "Nombre del estudiante",
+              "Nombre del estudiante"
+            ],
+            [
+              "Fecha y hora de la citación",
+              "Fecha y hora de la citación"
+            ]
+          ]
+        },
+        {
+          "name": "spinner Cargando mensajes… before cards",
+          "ok": true
+        }
+      ]
+    },
+    "3": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "Faltas y atrasos textarea = default",
+          "ok": true
+        },
+        {
+          "name": "Faltas y atrasos pill Predeterminado",
+          "ok": true
+        },
+        {
+          "name": "Faltas y atrasos save disabled",
+          "ok": true
+        },
+        {
+          "name": "Faltas y atrasos restore disabled",
+          "ok": true
+        },
+        {
+          "name": "Citaciones textarea = default",
+          "ok": true
+        },
+        {
+          "name": "Citaciones pill Predeterminado",
+          "ok": true
+        },
+        {
+          "name": "Citaciones save disabled",
+          "ok": true
+        },
+        {
+          "name": "Citaciones restore disabled",
+          "ok": true
+        },
+        {
+          "name": "preview uses samples",
+          "ok": true,
+          "prevAbs": "Estimado representante, le informamos que JUAN PÉREZ registró una falta el día 17 de junio de 2026 en el curso OCTAVO \"A\". Por favor comuníquese con la institución para más información."
+        }
+      ]
+    },
+    "4": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "Mensajes dirty dot appears",
+          "ok": true
+        },
+        {
+          "name": "dirty dot aria-label",
+          "ok": true
+        },
+        {
+          "name": "Mi cuenta has no dot",
+          "ok": true
+        },
+        {
+          "name": "no dialog switching to Mi cuenta",
+          "ok": true
+        },
+        {
+          "name": "edit survives tab switch",
+          "ok": true
+        }
+      ]
+    },
+    "5": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "token inserted at caret",
+          "ok": true,
+          "v5": "Estimado {{fecha}}apoderado, se ha registrado una citación para {{nombre}} el {{fecha}}. Por favor confirmar asistencia. Gracias."
+        },
+        {
+          "name": "caret after token + focused",
+          "ok": true,
+          "sel5": [
+            18,
+            18,
+            true
+          ]
+        },
+        {
+          "name": "selected word replaced",
+          "ok": true,
+          "v5b": "{{nombre}} {{fecha}}apoderado, se ha reg"
+        }
+      ]
+    },
+    "6": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "preview hidden when blank",
+          "ok": true
+        },
+        {
+          "name": "blank hint shown",
+          "ok": true
+        },
+        {
+          "name": "save disabled when blank",
+          "ok": true
+        }
+      ]
+    },
+    "7": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "Citaciones buttons disabled in flight",
+          "ok": true
+        },
+        {
+          "name": "Faltas buttons governed by own state in flight",
+          "ok": true
+        },
+        {
+          "name": "toast Mensaje guardado",
+          "ok": true
+        },
+        {
+          "name": "pill Personalizado",
+          "ok": true
+        },
+        {
+          "name": "save disabled after save",
+          "ok": true
+        },
+        {
+          "name": "dot gone once no card is dirty",
+          "ok": true
+        },
+        {
+          "name": "text persists after reload",
+          "ok": true
+        }
+      ]
+    },
+    "8": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "citations: custom text rendered, no reload",
+          "ok": true,
+          "t8": "Estimado apoderado, se ha registrado una citación para ARIAS SOLORZANO JORGE ANDRE el martes 1 de septiembre del 2026 a las 10:30 AM. Por favor confirmar asistencia. Gracias, saludos."
+        },
+        {
+          "name": "citations: opened directly (single window.open with final URL)",
+          "ok": true,
+          "o8": [
+            [
+              "https://wa.me/593982839069?text=Estimado%20apoderado%2C%20se%20ha%20registrado%20una%20citaci%C3%B3n%20para%20ARIAS%20SOLORZANO%20JORGE%20ANDRE%20el%20martes%201%20de%20septiembre%20del%202026%20a%20las%2010%3A30%20AM.%20Por%20favor%20confirmar%20asistencia.%20Gracias%2C%20saludos.",
+              "_blank"
+            ]
+          ]
+        },
+        {
+          "name": "no extra GET (cache served)",
+          "ok": true,
+          "before": 5,
+          "after": 5
+        },
+        {
+          "name": "absences: default text with vars filled",
+          "ok": true,
+          "t8b": "Estimado representante, le informamos que AJILA NARVAEZ  BIANCA VALENTINA registró un atraso el día 2026-09-17 en el curso 9NO \"D\"BS. Por favor comuníquese con la institución para más información.",
+          "absRowText": "AJILA NARVAEZ BIANCA VALENTINA 2026-09-17 Atrasado Pendiente case (iii) seed AT delete_outline more_vert",
+          "absRowCount": 7
+        },
+        {
+          "name": "absences: opened directly",
+          "ok": true,
+          "o8b": [
+            [
+              "https://wa.me/593994666404?text=Estimado%20representante%2C%20le%20informamos%20que%20AJILA%20NARVAEZ%20%20BIANCA%20VALENTINA%20registr%C3%B3%20un%20atraso%20el%20d%C3%ADa%202026-09-17%20en%20el%20curso%209NO%20%22D%22BS.%20Por%20favor%20comun%C3%ADquese%20con%20la%20instituci%C3%B3n%20para%20m%C3%A1s%20informaci%C3%B3n.",
+              "_blank"
+            ]
+          ]
+        }
+      ]
+    },
+    "9": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "confirm dialog copy",
+          "ok": true,
+          "dlg": "close restart_alt Restaurar mensaje predeterminado Se reemplazará tu mensaje personalizado de «Citaciones» por el texto predeterminado. Esta acción no se puede deshacer. Cancelar Restaurar"
+        },
+        {
+          "name": "Cancelar: nothing changes",
+          "ok": true
+        },
+        {
+          "name": "toast Mensaje restaurado",
+          "ok": true
+        },
+        {
+          "name": "text = default, pill Predeterminado",
+          "ok": true
+        },
+        {
+          "name": "one DELETE sent",
+          "ok": true
+        }
+      ]
+    },
+    "10": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "reverted instantly to default",
+          "ok": true
+        },
+        {
+          "name": "no dialog",
+          "ok": true
+        },
+        {
+          "name": "no network request",
+          "ok": true
+        }
+      ]
+    },
+    "11": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "save error toast",
+          "ok": true
+        },
+        {
+          "name": "save failure keeps text",
+          "ok": true
+        },
+        {
+          "name": "save failure keeps baseline (still dirty, pill default)",
+          "ok": true
+        },
+        {
+          "name": "restore error toast",
+          "ok": true
+        },
+        {
+          "name": "restore failure keeps text + pill",
+          "ok": true
+        },
+        {
+          "name": "error state + Reintentar",
+          "ok": true
+        },
+        {
+          "name": "Mi cuenta loaded with block on",
+          "ok": true,
+          "fullName": "Administrador de la Plataforma"
+        },
+        {
+          "name": "Mi cuenta saves with block on",
+          "ok": true
+        },
+        {
+          "name": "Reintentar shows cards",
+          "ok": true
+        }
+      ]
+    },
+    "12": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "Guardar y salir: navigation proceeds",
+          "ok": true,
+          "url": "http://127.0.0.1:4343/home"
+        },
+        {
+          "name": "Guardar y salir: one PUT sent",
+          "ok": true
+        },
+        {
+          "name": "text persisted",
+          "ok": true,
+          "dbA": "Estimado representante, le informamos que {{nombre}} registró {{tipo}} el día {{fecha}} en el curso {{curso}}. Por favor comuníquese con la institución para más información. [A custom]"
+        },
+        {
+          "name": "blank dirty card: warning toast",
+          "ok": true
+        },
+        {
+          "name": "blank dirty card: stays on /profile",
+          "ok": true
+        },
+        {
+          "name": "blank dirty card: no PUT sent",
+          "ok": true
+        }
+      ]
+    },
+    "13": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "B: no false Mi cuenta dirty dot (no avatar user)",
+          "ok": true
+        },
+        {
+          "name": "second GET for user B",
+          "ok": true,
+          "before": 7,
+          "after": 8
+        },
+        {
+          "name": "B sees B's templates (defaults), not A's",
+          "ok": true
+        },
+        {
+          "name": "B's absences notify uses B's text",
+          "ok": true,
+          "t13": "Estimado representante, le informamos que AJILA NARVAEZ  BIANCA VALENTINA registró un atraso el día 2026-09-17 en el curso 9NO \"D\"BS. Por favor comuníquese con la institución para más información."
+        }
+      ]
+    },
+    "14": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "absences page loads with catalog blocked",
+          "ok": true,
+          "rows": 7
+        },
+        {
+          "name": "retry GET at click time",
+          "ok": true,
+          "before": 9,
+          "after": 10
+        },
+        {
+          "name": "reserved tab first (window.open(\"\", \"_blank\"))",
+          "ok": true,
+          "o14": [
+            [
+              "",
+              "_blank"
+            ]
+          ]
+        },
+        {
+          "name": "popup navigated to wa.me with emergency text",
+          "ok": true,
+          "t14": "Estimado representante, le informamos que AJILA NARVAEZ  BIANCA VALENTINA registró un atraso el día 2026-09-17 en el curso 9NO \"D\"BS. Por favor comuníquese con la institución para más información."
+        },
+        {
+          "name": "one console.warn naming absences",
+          "ok": true,
+          "warns": [
+            "[NotificationTemplateService] catalog unavailable for \"absences\"; using emergency fallback text"
+          ]
+        },
+        {
+          "name": "no toast",
+          "ok": true
+        },
+        {
+          "name": "citations: retry GET + reserved tab",
+          "ok": true,
+          "o14b": [
+            [
+              "",
+              "_blank"
+            ]
+          ]
+        },
+        {
+          "name": "citations: emergency text",
+          "ok": true,
+          "t14b": "Estimado apoderado, se ha registrado una citación para ARIAS SOLORZANO JORGE ANDRE el martes 1 de septiembre del 2026 a las 10:30 AM. Por favor confirmar asistencia."
+        },
+        {
+          "name": "citations: one warn naming citations",
+          "ok": true,
+          "warns": [
+            "[NotificationTemplateService] catalog unavailable for \"citations\"; using emergency fallback text"
+          ]
+        },
+        {
+          "name": "citations: no toast",
+          "ok": true
+        },
+        {
+          "name": "profile: error state, no cards",
+          "ok": true
+        }
+      ]
+    },
+    "15": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "screenshots captured (inspect manually)",
+          "ok": true,
+          "chipColorDark": "rgb(129, 140, 248)"
+        }
+      ]
+    },
+    "16": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "empty state copy",
+          "ok": true
+        },
+        {
+          "name": "cards return after re-activation",
+          "ok": true
+        }
+      ]
+    },
+    "17": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "retry GET issued and succeeded",
+          "ok": true
+        },
+        {
+          "name": "reserved tab used",
+          "ok": true,
+          "o17": [
+            [
+              "",
+              "_blank"
+            ]
+          ]
+        },
+        {
+          "name": "custom text (not emergency copy)",
+          "ok": true,
+          "t17": "Estimado apoderado, se ha registrado una citación para ARIAS SOLORZANO JORGE ANDRE el martes 1 de septiembre del 2026 a las 10:30 AM. Por favor confirmar asistencia. C11"
+        },
+        {
+          "name": "no console warning",
+          "ok": true,
+          "warns": []
+        }
+      ]
+    },
+    "18": {
+      "pass": true,
+      "checks": [
+        {
+          "name": "closed citation: bare link, no ?text=",
+          "ok": true,
+          "url18": "https://wa.me/593939638508"
+        },
+        {
+          "name": "justified absence: bare link, no ?text=",
+          "ok": true,
+          "url18b": "https://wa.me/593968564789"
+        }
+      ]
+    }
+  },
+  "log": [
+    {
+      "afterStep": 8,
+      "url": "http://127.0.0.1:4343/inspectors/absences?tab=3&course=1&dateFrom=2026-09-01&dateTo=2026-09-30",
+      "pageerror": "Cannot read properties of null (reading 'fullName')",
+      "stack": "TypeError: Cannot read properties of null (reading 'fullName') |     at a.displayEnrollment [as displayWith] (http://127.0.0.1:4343/chunk-BA4EmOBq.js:55:46851) |     at a._getDisplayValue (http://127.0.0.1:4343/chunk-BA4EmOBq.js:55:7064) |     at a._assignOptionValue (http://127.0.0.1:4343/chunk-BA4EmOBq.js:55:7114)"
+    },
+    {
+      "afterStep": 10,
+      "url": "http://127.0.0.1:4343/profile?tab=mensajes",
+      "consoleError": "Failed to load resource: the server responded with a status of 504 (Gateway Timeout)"
+    },
+    {
+      "afterStep": 11,
+      "url": "http://127.0.0.1:4343/profile?tab=mensajes",
+      "consoleError": "Failed to load resource: the server responded with a status of 504 (Gateway Timeout)"
+    },
+    {
+      "afterStep": 11,
+      "url": "http://127.0.0.1:4343/profile?tab=mensajes",
+      "consoleError": "Failed to load resource: the server responded with a status of 504 (Gateway Timeout)"
+    },
+    {
+      "afterStep": 12,
+      "url": "http://127.0.0.1:4343/profile?tab=mensajes",
+      "consoleError": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "afterStep": 12,
+      "url": "http://127.0.0.1:4343/profile?tab=mensajes",
+      "pageerror": "ne",
+      "stack": ""
+    },
+    {
+      "afterStep": 12,
+      "url": "http://127.0.0.1:4343/login",
+      "consoleError": "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    },
+    {
+      "afterStep": 12,
+      "url": "http://127.0.0.1:4343/login",
+      "pageerror": "ne",
+      "stack": ""
+    },
+    {
+      "afterStep": 13,
+      "url": "http://127.0.0.1:4343/inspectors/absences?tab=3&course=1&dateFrom=2026-09-01&dateTo=2026-09-30",
+      "pageerror": "Cannot read properties of null (reading 'fullName')",
+      "stack": "TypeError: Cannot read properties of null (reading 'fullName') |     at a.displayEnrollment [as displayWith] (http://127.0.0.1:4343/chunk-BA4EmOBq.js:55:46851) |     at a._getDisplayValue (http://127.0.0.1:4343/chunk-BA4EmOBq.js:55:7064) |     at a._assignOptionValue (http://127.0.0.1:4343/chunk-BA4EmOBq.js:55:7114)"
+    },
+    {
+      "afterStep": 13,
+      "url": "http://127.0.0.1:4343/login",
+      "consoleError": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "afterStep": 13,
+      "url": "http://127.0.0.1:4343/login",
+      "pageerror": "ne",
+      "stack": ""
+    },
+    {
+      "afterStep": 13,
+      "url": "http://127.0.0.1:4343/login",
+      "consoleError": "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    },
+    {
+      "afterStep": 13,
+      "url": "http://127.0.0.1:4343/login",
+      "pageerror": "ne",
+      "stack": ""
+    },
+    {
+      "afterStep": 13,
+      "url": "http://127.0.0.1:4343/inspectors/absences?tab=3&course=1&dateFrom=2026-09-01&dateTo=2026-09-30",
+      "consoleError": "Failed to load resource: the server responded with a status of 504 (Gateway Timeout)"
+    },
+    {
+      "afterStep": 13,
+      "url": "http://127.0.0.1:4343/inspectors/absences?tab=3&course=1&dateFrom=2026-09-01&dateTo=2026-09-30",
+      "pageerror": "Cannot read properties of null (reading 'fullName')",
+      "stack": "TypeError: Cannot read properties of null (reading 'fullName') |     at a.displayEnrollment [as displayWith] (http://127.0.0.1:4343/chunk-BA4EmOBq.js:55:46851) |     at a._getDisplayValue (http://127.0.0.1:4343/chunk-BA4EmOBq.js:55:7064) |     at a._assignOptionValue (http://127.0.0.1:4343/chunk-BA4EmOBq.js:55:7114)"
+    },
+    {
+      "afterStep": 14,
+      "url": "http://127.0.0.1:4343/inspectors/absences?tab=3&course=1&dateFrom=2026-09-01&dateTo=2026-09-30",
+      "consoleError": "Failed to load resource: the server responded with a status of 504 (Gateway Timeout)"
+    },
+    {
+      "afterStep": 14,
+      "url": "http://127.0.0.1:4343/inspectors/citations",
+      "consoleError": "Failed to load resource: the server responded with a status of 504 (Gateway Timeout)"
+    },
+    {
+      "afterStep": 14,
+      "url": "http://127.0.0.1:4343/inspectors/citations",
+      "consoleError": "Failed to load resource: the server responded with a status of 504 (Gateway Timeout)"
+    },
+    {
+      "afterStep": 14,
+      "url": "http://127.0.0.1:4343/profile?tab=mensajes",
+      "consoleError": "Failed to load resource: the server responded with a status of 504 (Gateway Timeout)"
+    },
+    {
+      "afterStep": 16,
+      "url": "http://127.0.0.1:4343/inspectors/citations",
+      "consoleError": "Failed to load resource: the server responded with a status of 504 (Gateway Timeout)"
+    },
+    {
+      "afterStep": 18,
+      "url": "http://127.0.0.1:4343/inspectors/absences?tab=3&course=1&dateFrom=2026-07-01&dateTo=2026-07-10",
+      "pageerror": "Cannot read properties of null (reading 'fullName')",
+      "stack": "TypeError: Cannot read properties of null (reading 'fullName') |     at a.displayEnrollment [as displayWith] (http://127.0.0.1:4343/chunk-BA4EmOBq.js:55:46851) |     at a._getDisplayValue (http://127.0.0.1:4343/chunk-BA4EmOBq.js:55:7064) |     at a._assignOptionValue (http://127.0.0.1:4343/chunk-BA4EmOBq.js:55:7114)"
+    }
+  ],
+  "requests": [
+    "GET /api/notification-templates",
+    "GET /api/notification-templates",
+    "GET /api/notification-templates",
+    "GET /api/notification-templates",
+    "PUT /api/notification-templates",
+    "GET /api/notification-templates",
+    "PUT /api/notification-templates",
+    "DELETE /api/notification-templates/citations",
+    "PUT /api/notification-templates",
+    "PUT /api/notification-templates",
+    "DELETE /api/notification-templates/citations",
+    "GET /api/notification-templates",
+    "GET /api/notification-templates",
+    "PUT /api/notification-templates",
+    "GET /api/notification-templates",
+    "GET /api/notification-templates",
+    "GET /api/notification-templates",
+    "GET /api/notification-templates",
+    "GET /api/notification-templates",
+    "GET /api/notification-templates",
+    "GET /api/notification-templates",
+    "GET /api/notification-templates",
+    "GET /api/notification-templates",
+    "GET /api/notification-templates",
+    "GET /api/notification-templates"
+  ]
+}
