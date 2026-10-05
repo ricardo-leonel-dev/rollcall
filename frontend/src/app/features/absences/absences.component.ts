@@ -778,7 +778,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
 
     const [courses] = await Promise.all([
       firstValueFrom(this.http.get<Course[]>('/api/courses')),
-      this.templateService.load(),
+      this.templateService.ensureLoaded(),
     ]);
     this.courses.set(courses);
     this.selYear = this.academicYearContext.selected()?.id ?? null;
@@ -1197,20 +1197,25 @@ export class AbsencesComponent implements OnInit, OnDestroy {
     }
   }
 
-  notifyGuardian(whatsappLink: string, studentName: string, date: string, type: 'F' | 'AT', course: string, isJustified?: boolean): void {
+  async notifyGuardian(whatsappLink: string, studentName: string, date: string, type: 'F' | 'AT', course: string, isJustified?: boolean): Promise<void> {
     if (isJustified) {
       // Ya justificada: abrir el chat vacío, igual que en el listado de estudiantes —
       // no tiene sentido mandar el mensaje con el formato de falta pendiente.
       window.open(whatsappLink, '_blank');
       return;
     }
-    const label = type === 'F' ? 'una falta' : 'un atraso';
-    const message = this.templateService.getTemplate('absences')
-      .replace(/\{\{nombre\}\}/g, studentName)
-      .replace(/\{\{fecha\}\}/g, date)
-      .replace(/\{\{tipo\}\}/g, label)
-      .replace(/\{\{curso\}\}/g, course);
-    window.open(`${whatsappLink}?text=${encodeURIComponent(message)}`, '_blank');
+    const vars = { nombre: studentName, fecha: date, tipo: type === 'F' ? 'una falta' : 'un atraso', curso: course };
+    const toUrl = (message: string) => `${whatsappLink}?text=${encodeURIComponent(message)}`;
+    if (this.templateService.hasTemplate('absences')) {
+      window.open(toUrl(this.templateService.renderTemplate('absences', vars)), '_blank');
+      return;
+    }
+    // window.open after an await falls outside the click gesture and gets popup-blocked:
+    // reserve the tab synchronously, then navigate it once the catalog retry settles.
+    const reserved = window.open('', '_blank');
+    await this.templateService.ensureLoaded();
+    const url = toUrl(this.templateService.renderTemplate('absences', vars));
+    if (reserved) reserved.location.href = url; else window.open(url, '_blank');
   }
 
   openManualAdd(name: string): void {

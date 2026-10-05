@@ -322,9 +322,19 @@ export interface PhotoAbsencePreview {
   total:    number;
 }
 
-export interface NotificationTemplate {
-  actionKey: string;
-  template:  string;
+export interface NotificationTemplatePlaceholder {
+  key:   string;
+  label: string;
+}
+
+export interface NotificationTemplateItem {
+  actionKey:       string;
+  label:           string;
+  description:     string | null;
+  placeholders:    NotificationTemplatePlaceholder[];
+  defaultTemplate: string;
+  template:        string;
+  isCustom:        boolean;
 }
 
 export interface CitationAttachment {
