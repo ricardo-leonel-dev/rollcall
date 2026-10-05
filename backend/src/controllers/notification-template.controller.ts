@@ -11,4 +11,8 @@ router.put('/', async (req, res) => {
   res.json(await svc.upsert(req.user!.id, req.body.actionKey, req.body.template));
 });
 
+router.delete('/:actionKey', async (req, res) => {
+  res.json(await svc.restoreDefault(req.user!.id, req.params.actionKey));
+});
+
 export default router;

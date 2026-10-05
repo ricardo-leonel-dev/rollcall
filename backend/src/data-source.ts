@@ -19,6 +19,7 @@ import { Institution } from './entities/Institution';
 import { UserCourse } from './entities/UserCourse';
 import { UserModule } from './entities/UserModule';
 import { UserMessageTemplate } from './entities/UserMessageTemplate';
+import { MessageTemplateAction } from './entities/MessageTemplateAction';
 import { CitationReason } from './entities/CitationReason';
 import { Citation } from './entities/Citation';
 import { CitationCitationReason } from './entities/CitationCitationReason';
@@ -61,6 +62,7 @@ export const AppDataSource = new DataSource({
     UserCourse,
     UserModule,
     UserMessageTemplate,
+    MessageTemplateAction,
     CitationReason,
     Citation,
     CitationCitationReason,
