@@ -5,7 +5,6 @@ import path from 'path';
 import { startTestApp, stopTestApp } from './helpers/test-app';
 import {
   createTestUser,
-  deleteTestUser,
   deleteTestUsersByPrefix,
   getTestUser,
 } from './helpers/test-users';
@@ -14,7 +13,9 @@ import {
   getTemplateForUserAction,
   getTemplatesForUser,
 } from './helpers/test-templates';
+import { deleteTestActions as deleteTestCatalogActions } from './helpers/test-template-actions';
 import { AppDataSource } from '../src/data-source';
+import { MessageTemplateAction } from '../src/entities/MessageTemplateAction';
 
 let baseUrl = '';
 let close: () => Promise<void>;
@@ -29,12 +30,14 @@ before(async () => {
 
 after(async () => {
   await deleteTestTemplates();
+  await deleteTestCatalogActions();
   await deleteTestUsersByPrefix(TEST_PREFIX);
   await stopTestApp(close);
 });
 
 beforeEach(async () => {
   await deleteTestTemplates();
+  await deleteTestCatalogActions();
   await deleteTestUsersByPrefix(TEST_PREFIX);
 });
 
@@ -68,14 +71,23 @@ test('T9.a: GET /api/notification-templates returns 401 without token', async ()
   assert.equal(res.status, 401);
 });
 
-test('T9.b: GET /api/notification-templates returns 200 with [] for a user with no templates', async () => {
+test('T9.b: GET returns one item per active catalog row, all isCustom=false, for a fresh user', async () => {
   const { token } = await createTestUser({});
   const res = await authedGet('/api/notification-templates', token);
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, []);
+  assert.ok(Array.isArray(res.body));
+
+  const activeKeys = (await AppDataSource.getRepository(MessageTemplateAction)
+    .find({ where: { active: true } })).map(a => a.actionKey);
+  const returnedKeys = res.body.map((r: any) => r.actionKey);
+  assert.equal(returnedKeys.length, activeKeys.length);
+  for (const k of activeKeys) assert.ok(returnedKeys.includes(k), `missing ${k}`);
+  for (const item of res.body) {
+    assert.equal(item.isCustom, false);
+  }
 });
 
-test('T9.c: GET /api/notification-templates returns only the requester own rows when other users have rows too', async () => {
+test('T9.c: GET returns only the requester own custom rows when other users have rows too', async () => {
   const a = await createTestUser({});
   const b = await createTestUser({});
 
@@ -85,18 +97,18 @@ test('T9.c: GET /api/notification-templates returns only the requester own rows 
 
   const aRes = await authedGet('/api/notification-templates', a.token);
   assert.equal(aRes.status, 200);
-  assert.equal(aRes.body.length, 2);
-  const aKeys = aRes.body.map((r: any) => r.actionKey).sort();
-  assert.deepEqual(aKeys, ['absences', 'citations']);
-  for (const row of aRes.body) {
+  const aCustom = aRes.body.filter((r: any) => r.isCustom === true);
+  assert.equal(aCustom.length, 2);
+  for (const row of aCustom) {
     assert.ok(row.template.startsWith('A '), `expected A prefix, got ${row.template}`);
   }
 
   const bRes = await authedGet('/api/notification-templates', b.token);
   assert.equal(bRes.status, 200);
-  assert.equal(bRes.body.length, 1);
-  assert.equal(bRes.body[0].actionKey, 'absences');
-  assert.equal(bRes.body[0].template, 'B absences');
+  const bCustom = bRes.body.filter((r: any) => r.isCustom === true);
+  assert.equal(bCustom.length, 1);
+  assert.equal(bCustom[0].actionKey, 'absences');
+  assert.equal(bCustom[0].template, 'B absences');
 });
 
 // ─────────────────────────────────────────────────────────────────────
@@ -108,17 +120,22 @@ test('T10: PUT first call creates a row; second call with same actionKey updates
 
   const first = await authedPut('/api/notification-templates', token, { actionKey: 'absences', template: 'first version' });
   assert.equal(first.status, 200);
-  assert.deepEqual(first.body, { actionKey: 'absences', template: 'first version' });
+  assert.equal(first.body.actionKey, 'absences');
+  assert.equal(first.body.template, 'first version');
+  assert.equal(first.body.isCustom, true);
 
   const second = await authedPut('/api/notification-templates', token, { actionKey: 'absences', template: 'second version' });
   assert.equal(second.status, 200);
-  assert.deepEqual(second.body, { actionKey: 'absences', template: 'second version' });
+  assert.equal(second.body.actionKey, 'absences');
+  assert.equal(second.body.template, 'second version');
+  assert.equal(second.body.isCustom, true);
 
   const list = await authedGet('/api/notification-templates', token);
   assert.equal(list.status, 200);
-  assert.equal(list.body.length, 1);
-  assert.equal(list.body[0].actionKey, 'absences');
-  assert.equal(list.body[0].template, 'second version');
+  const custom = list.body.filter((r: any) => r.isCustom === true);
+  assert.equal(custom.length, 1);
+  assert.equal(custom[0].actionKey, 'absences');
+  assert.equal(custom[0].template, 'second version');
 });
 
 // ─────────────────────────────────────────────────────────────────────
@@ -169,7 +186,9 @@ test('T13: PUT with userId and id in body still targets the authenticated reques
     id: b.id,
   });
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, { actionKey: 'citations', template: 'for a' });
+  assert.equal(res.body.actionKey, 'citations');
+  assert.equal(res.body.template, 'for a');
+  assert.equal(res.body.isCustom, true);
 
   const aRows = await getTemplatesForUser(a.id);
   assert.equal(aRows.length, 1);

@@ -25,8 +25,6 @@ export const MODULE_KEYS = [
   'citation-reasons',
 ];
 
-export const NOTIFICATION_ACTION_KEYS = ['absences', 'citations'];
-
 async function assertRoleAssignable(roleId: number | undefined, isActorSuperAdmin: boolean) {
   if (!roleId) return;
   const role = await AppDataSource.getRepository(Role).findOne({ where: { id: roleId } });

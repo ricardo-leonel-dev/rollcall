@@ -15,7 +15,11 @@ rm -rf /tmp/test-build
   --rootDir . \
   --outDir /tmp/test-build \
   tests/notification-templates.test.ts \
+  tests/message-template-catalog.test.ts \
   tests/helpers/test-app.ts \
   tests/helpers/test-users.ts \
-  tests/helpers/test-templates.ts
-NODE_PATH="$(pwd)/node_modules" exec node --test /tmp/test-build/tests/notification-templates.test.js
+  tests/helpers/test-templates.ts \
+  tests/helpers/test-template-actions.ts
+NODE_PATH="$(pwd)/node_modules" exec node --test --test-concurrency=1 \
+  /tmp/test-build/tests/notification-templates.test.js \
+  /tmp/test-build/tests/message-template-catalog.test.js
