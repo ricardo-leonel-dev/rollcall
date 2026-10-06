@@ -1,0 +1,22 @@
+{
+  "tag": "student-report-desktop",
+  "route": "/inspectors/student-report",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "screenshot": "/home/rileo/ai-personal-worktrees/feature-38-students-report-chapter-header/frontend/progress/visual_feature38_student_report_desktop.png",
+  "chapterHeaderPresent": true,
+  "eyebrowFullText": "summarizeInspectoría·Exportación de informes",
+  "eyebrowRoman": "Inspectoría",
+  "eyebrowSub": "Exportación de informes",
+  "eyebrowIconName": "summarize",
+  "doubleFiletePresent": true,
+  "pageTitleText": "Informe estudiantil",
+  "eyebrowsContainsEstudiantes": false,
+  "eyebrowsContainsNominaPorCurso": false,
+  "eyebrowsContainsInspectoria": true,
+  "eyebrowsContainsExportacionDeInformes": true,
+  "srCardCount": 5,
+  "dataTablePresent": false
+}

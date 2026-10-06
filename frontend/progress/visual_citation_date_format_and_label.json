@@ -1,0 +1,18 @@
+{
+  "hasAdminRowQuarters": false,
+  "hasOldPanel": false,
+  "chipCount": 0,
+  "chips": [],
+  "activeYearText": null,
+  "pills": [
+    "lunes 1 de junio del 2026 – martes 2 de junio del 2026 a las 07:45 AM"
+  ],
+  "sectionLabels": [],
+  "dialogDates": [],
+  "pendingBannerItems": [],
+  "screenshot": "/home/rileo/ai-personal-worktrees/feature-27-citation-date-format-and-label/frontend/progress/visual_citation_date_format_and_label.png",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  }
+}

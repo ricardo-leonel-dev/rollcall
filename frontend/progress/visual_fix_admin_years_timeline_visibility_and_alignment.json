@@ -1,0 +1,135 @@
+{
+  "hasAdminRowQuarters": true,
+  "hasOldPanel": false,
+  "chipCount": 0,
+  "chips": [],
+  "adminRowQuartersDisplay": "flex",
+  "adminRowQuartersFlexDirection": "row",
+  "adminRowQuartersGap": "normal",
+  "adminRowQuartersAlignItems": "normal",
+  "adminRowAlignItems": "flex-start",
+  "adminRowDisplay": "flex",
+  "activeYearText": "Año Lectivo 2026",
+  "pills": [],
+  "sectionLabels": [],
+  "dialogDates": [],
+  "pendingBannerItems": [],
+  "timelineTrackRect": {
+    "x": 509.0625,
+    "y": 298,
+    "width": 661.9375,
+    "height": 28,
+    "top": 298,
+    "right": 1171,
+    "bottom": 326,
+    "left": 509.0625
+  },
+  "timelineSegments": [
+    {
+      "title": "T1 · 2026-01-05 → 2026-03-20",
+      "rect": {
+        "x": 517.53125,
+        "y": 299,
+        "width": 138.34375,
+        "height": 26,
+        "top": 299,
+        "right": 655.875,
+        "bottom": 325,
+        "left": 517.53125
+      },
+      "left": "7.46875px",
+      "width": "138.344px"
+    },
+    {
+      "title": "T2 · 2026-04-15 → 2026-09-30",
+      "rect": {
+        "x": 704.484375,
+        "y": 299,
+        "width": 314.0625,
+        "height": 26,
+        "top": 299,
+        "right": 1018.546875,
+        "bottom": 325,
+        "left": 704.484375
+      },
+      "left": "194.422px",
+      "width": "314.062px"
+    },
+    {
+      "title": "T3 · 2026-10-01 → 2026-12-15",
+      "rect": {
+        "x": 1020.4375,
+        "y": 299,
+        "width": 140.203125,
+        "height": 26,
+        "top": 299,
+        "right": 1160.640625,
+        "bottom": 325,
+        "left": 1020.4375
+      },
+      "left": "510.375px",
+      "width": "140.203px"
+    }
+  ],
+  "timelineHoyRect": {
+    "x": 977.4375,
+    "y": 293,
+    "width": 2,
+    "height": 38,
+    "top": 293,
+    "right": 979.4375,
+    "bottom": 331,
+    "left": 977.4375
+  },
+  "timelineHoyLabelRect": {
+    "x": 963.3515625,
+    "y": 277,
+    "width": 32.171875,
+    "height": 15.5,
+    "top": 277,
+    "right": 995.5234375,
+    "bottom": 292.5,
+    "left": 963.3515625
+  },
+  "timelineHoyLabelClipping": {
+    "clipped": false,
+    "ancestorSelector": null,
+    "elementRect": {
+      "x": 963.3515625,
+      "y": 277,
+      "width": 32.171875,
+      "height": 15.5,
+      "top": 277,
+      "right": 995.5234375,
+      "bottom": 292.5,
+      "left": 963.3515625
+    },
+    "ancestorRect": null
+  },
+  "timelineHoyClipping": {
+    "clipped": false,
+    "ancestorSelector": null,
+    "elementRect": {
+      "x": 977.4375,
+      "y": 293,
+      "width": 2,
+      "height": 38,
+      "top": 293,
+      "right": 979.4375,
+      "bottom": 331,
+      "left": 977.4375
+    },
+    "ancestorRect": null
+  },
+  "timelineHoyAlignment": {
+    "hoyLeft": 977.4375,
+    "t2Left": 704.484375,
+    "t2Right": 1018.546875,
+    "hoyWithinT2": true
+  },
+  "screenshot": "/home/rileo/ai-personal-worktrees/feature-29-cuaderno-institucional/frontend/progress/visual_fix_admin_years_timeline_visibility_and_alignment.png",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  }
+}

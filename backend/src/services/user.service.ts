@@ -21,6 +21,8 @@ export const MODULE_KEYS = [
   'students',
   'admin', 'admin:users', 'admin:courses', 'admin:years', 'admin:permissions', 'admin:roster',
   'student-report',
+  'citations',
+  'citation-reasons',
 ];
 
 async function assertRoleAssignable(roleId: number | undefined, isActorSuperAdmin: boolean) {

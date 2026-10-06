@@ -1,0 +1,84 @@
+{
+  "hasAdminRowQuarters": false,
+  "hasOldPanel": false,
+  "chipCount": 0,
+  "chips": [],
+  "adminRowAlignItems": "flex-start",
+  "adminRowDisplay": "flex",
+  "activeYearText": null,
+  "pills": [],
+  "sectionLabels": [],
+  "dialogDates": [],
+  "pendingBannerItems": [],
+  "timelineTrackRect": null,
+  "timelineSegments": [],
+  "timelineHoyRect": null,
+  "timelineHoyLabelRect": null,
+  "timelineHoyLabelClipping": {
+    "clipped": null,
+    "ancestorSelector": null,
+    "elementRect": null,
+    "ancestorRect": null
+  },
+  "timelineHoyClipping": {
+    "clipped": null,
+    "ancestorSelector": null,
+    "elementRect": null,
+    "ancestorRect": null
+  },
+  "timelineHoyAlignment": null,
+  "institutionEyebrow": {
+    "present": true,
+    "roman": "Capítulo VII",
+    "sub": "Instituciones del sistema",
+    "separator": "—",
+    "full": "admin_panel_settingsCapítulo VII—Instituciones del sistema"
+  },
+  "institutionTitle": "Instituciones",
+  "institutionFiletePresent": true,
+  "institutionRowCount": 2,
+  "institutionStatsLines": [
+    {
+      "text": "248 estudiantes ·12 cursos ·34 usuarios",
+      "boldCount": 3,
+      "boldValuesAllBold": true,
+      "matchesSingularForOne": false,
+      "matchesPluralForMany": true,
+      "separatorCount": 2
+    },
+    {
+      "text": "1 estudiante ·1 curso ·1 usuario",
+      "boldCount": 3,
+      "boldValuesAllBold": true,
+      "matchesSingularForOne": true,
+      "matchesPluralForMany": false,
+      "separatorCount": 2
+    }
+  ],
+  "institutionSeals": [
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true
+    },
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true
+    }
+  ],
+  "institutionSealsAllCircular": true,
+  "institutionCardLayout": {
+    "count": 2,
+    "flexDirection": "column",
+    "isHorizontal": false,
+    "isVertical": true,
+    "hasDivider": true
+  },
+  "institutionFolioAbsent": true,
+  "screenshot": "/home/rileo/ai-personal-worktrees/feature-29-cuaderno-institucional/frontend/progress/visual_admin_institutions_cuaderno_seal_mobile.png",
+  "viewport": {
+    "width": 414,
+    "height": 800
+  }
+}

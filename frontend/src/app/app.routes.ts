@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { moduleGuard } from './core/guards/module.guard';
+import { profileCanDeactivateGuard } from './core/guards/profile-can-deactivate.guard';
 
 const placeholder = (title: string) => ({
   loadComponent: () => import('./shared/components/placeholder/placeholder.component').then(m => m.PlaceholderComponent),
@@ -39,7 +40,7 @@ export const routes: Routes = [
           { path: 'absences/edit/:id', loadComponent: () => import('./features/absences/absence-edit.component').then(m => m.AbsenceEditComponent), canActivate: [moduleGuard], data: { module: 'absences' } },
           { path: 'justifications', loadComponent: () => import('./features/justifications/justifications.component').then(m => m.JustificationsComponent), canActivate: [moduleGuard], data: { module: 'justifications' } },
           { path: 'student-report', loadComponent: () => import('./features/student-report/student-report.component').then(m => m.StudentReportComponent), canActivate: [moduleGuard], data: { module: 'student-report' } },
-          { path: 'citations',      ...placeholder('Administración de citaciones') },
+          { path: 'citations',      loadComponent: () => import('./features/citations/citations.component').then(m => m.CitationsComponent), canActivate: [moduleGuard], data: { module: 'citations' } },
           { path: '',               redirectTo: 'dashboard', pathMatch: 'full' },
         ],
       },
@@ -60,6 +61,10 @@ export const routes: Routes = [
       // Single-route sections
       { path: 'calendar', loadComponent: () => import('./features/calendar/calendar.component').then(m => m.CalendarComponent), canActivate: [moduleGuard], data: { module: 'calendar' } },
       { path: 'admin',    loadComponent: () => import('./features/admin/admin.component').then(m => m.AdminComponent), canActivate: [moduleGuard], data: { module: 'admin' } },
+
+      // Profile — reachable by every authenticated user (no moduleGuard).
+      // canDeactivate prompts for unsaved edits before navigation away.
+      { path: 'profile', loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent), canDeactivate: [profileCanDeactivateGuard] },
 
       // Backward-compat redirects
       { path: 'inicio',         redirectTo: 'home',                       pathMatch: 'full' },

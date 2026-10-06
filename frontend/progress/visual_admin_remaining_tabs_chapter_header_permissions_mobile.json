@@ -1,0 +1,136 @@
+{
+  "hasAdminRowQuarters": false,
+  "hasOldPanel": false,
+  "chipCount": 0,
+  "chips": [],
+  "activeYearText": null,
+  "pills": [],
+  "sectionLabels": [],
+  "dialogDates": [],
+  "pendingBannerItems": [],
+  "timelineTrackRect": null,
+  "timelineSegments": [],
+  "timelineHoyRect": null,
+  "timelineHoyLabelRect": null,
+  "timelineHoyLabelClipping": {
+    "clipped": null,
+    "ancestorSelector": null,
+    "elementRect": null,
+    "ancestorRect": null
+  },
+  "timelineHoyClipping": {
+    "clipped": null,
+    "ancestorSelector": null,
+    "elementRect": null,
+    "ancestorRect": null
+  },
+  "timelineHoyAlignment": null,
+  "usersFolio": {
+    "present": false
+  },
+  "userSeals": [
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 32,
+        "h": 32
+      }
+    }
+  ],
+  "userSealCount": 1,
+  "userSealsAllCircular": true,
+  "userScopeLines": [],
+  "userCardLayout": {
+    "count": 0
+  },
+  "layoutMode": null,
+  "institutionEyebrow": {
+    "present": true,
+    "roman": "Capítulo IV",
+    "sub": "Permisos",
+    "separator": "—",
+    "full": "admin_panel_settingsCapítulo IV—Permisos"
+  },
+  "institutionTitle": "Permisos",
+  "institutionFiletePresent": true,
+  "institutionRowCount": 0,
+  "institutionStatsLines": [],
+  "institutionSeals": [],
+  "institutionSealsAllCircular": false,
+  "institutionCardLayout": {
+    "count": 0
+  },
+  "institutionFolioAbsent": true,
+  "coursesEyebrow": {
+    "present": true,
+    "roman": "Capítulo IV",
+    "sub": "Permisos",
+    "separator": "—",
+    "full": "admin_panel_settingsCapítulo IV—Permisos"
+  },
+  "coursesTitle": "Permisos",
+  "coursesFiletePresent": true,
+  "coursesFolioPresent": false,
+  "coursesFolio": {
+    "present": false
+  },
+  "coursesFolioCount": null,
+  "coursesFolioGrammar": {
+    "matches": null
+  },
+  "citationReasonsEyebrow": {
+    "present": true,
+    "roman": "Capítulo IV",
+    "sub": "Permisos",
+    "separator": "—",
+    "full": "admin_panel_settingsCapítulo IV—Permisos"
+  },
+  "citationReasonsTitle": "Permisos",
+  "citationReasonsFiletePresent": true,
+  "citationReasonsFolioPresent": false,
+  "citationReasonsFolio": {
+    "present": false
+  },
+  "citationReasonsFolioCount": null,
+  "citationReasonsFolioGrammar": {
+    "matches": null
+  },
+  "permissionsEyebrow": {
+    "present": true,
+    "roman": "Capítulo IV",
+    "sub": "Permisos",
+    "separator": "—",
+    "full": "admin_panel_settingsCapítulo IV—Permisos"
+  },
+  "permissionsTitle": "Permisos",
+  "permissionsFiletePresent": true,
+  "permissionsFolioAbsent": true,
+  "rosterEyebrow": {
+    "present": true,
+    "roman": "Capítulo IV",
+    "sub": "Permisos",
+    "separator": "—",
+    "full": "admin_panel_settingsCapítulo IV—Permisos"
+  },
+  "rosterTitle": "Permisos",
+  "rosterFiletePresent": true,
+  "rosterFolioAbsent": true,
+  "severityBadgeClassPreserved": {
+    "count": 0,
+    "hasF": false,
+    "hasAT": false,
+    "hasJ": false,
+    "all": false
+  },
+  "lateralSpine": {
+    "present": false,
+    "count": 0
+  },
+  "screenshot": "/home/rileo/ai-personal-worktrees/feature-29-cuaderno-institucional/frontend/progress/visual_admin_remaining_tabs_chapter_header_permissions_mobile.png",
+  "viewport": {
+    "width": 375,
+    "height": 812
+  }
+}

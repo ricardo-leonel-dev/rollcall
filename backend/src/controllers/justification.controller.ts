@@ -27,7 +27,7 @@ const uploadAttachments = multer({
   limits: { fileSize: 8 * 1024 * 1024, files: 5 },
   fileFilter: (_req, file, cb) => {
     if (!ALLOWED_MIME.includes(file.mimetype)) {
-      cb(new Error('Solo se permiten imágenes (JPG/PNG/WEBP), PDF o Word (.doc/.docx)'));
+      cb(Object.assign(new Error('Solo se permiten imágenes (JPG/PNG/WEBP), PDF o Word (.doc/.docx)'), { status: 400 }));
       return;
     }
     cb(null, true);

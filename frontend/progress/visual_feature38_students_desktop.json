@@ -1,0 +1,22 @@
+{
+  "tag": "students-desktop",
+  "route": "/students/manage",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "screenshot": "/home/rileo/ai-personal-worktrees/feature-38-students-report-chapter-header/frontend/progress/visual_feature38_students_desktop.png",
+  "chapterHeaderPresent": true,
+  "eyebrowFullText": "groupsEstudiantes·Nómina por curso",
+  "eyebrowRoman": "Estudiantes",
+  "eyebrowSub": "Nómina por curso",
+  "eyebrowIconName": "groups",
+  "doubleFiletePresent": true,
+  "pageTitleText": "Administración de estudiantes",
+  "eyebrowsContainsEstudiantes": true,
+  "eyebrowsContainsNominaPorCurso": true,
+  "eyebrowsContainsInspectoria": false,
+  "eyebrowsContainsExportacionDeInformes": false,
+  "srCardCount": 0,
+  "dataTablePresent": false
+}

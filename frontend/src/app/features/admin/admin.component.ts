@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, signal, inject, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, computed, inject, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -11,59 +11,153 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { firstValueFrom, map } from 'rxjs';
-import { AcademicYear, Course, User, Role, RolePermission, Institution, Quarter } from '../../core/models/index';
+import { AcademicYear, Course, User, Role, RolePermission, Institution, Quarter, CitationReason } from '../../core/models/index';
 import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { QuarterService } from '../../core/services/quarter.service';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
+import { SealAvatarComponent } from '../../shared/components/seal-avatar/seal-avatar.component';
+import { CITATION_REASON_SEVERITY_OPTIONS, citationReasonSeverityBadgeClass } from '../../shared/utils/citation-reason.util';
+import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
 import { InstitutionDialogComponent } from './institution-dialog.component';
 import { AcademicYearDialogComponent, AcademicYearDialogResult } from './academic-year-dialog.component';
 import { QuartersDialogComponent, QuartersDialogResult } from './quarters-dialog.component';
 import { CourseDialogComponent } from './course-dialog.component';
+import { CitationReasonDialogComponent, CitationReasonDialogData } from './citation-reason-dialog.component';
 import { UserDialogComponent } from './user-dialog.component';
 import { UserPermissionsDialogComponent } from './user-permissions-dialog.component';
 import { RoleDialogComponent } from './role-dialog.component';
 import { MODULE_KEYS } from '../../core/nav-items';
 
+export const ADMIN_TAB_CHAPTER_NUMERAL: Record<string, string> = {
+  users: 'I',
+  courses: 'II',
+  years: 'III',
+  permissions: 'IV',
+  'citation-reasons': 'V',
+  roster: 'VI',
+  institutions: 'VII',
+};
+
+export const ADMIN_TAB_EYEBROW_SUFFIX: Record<string, string> = {
+  users: 'Gestión de personal',
+  courses: 'Cursos',
+  years: 'Calendario académico',
+  permissions: 'Permisos',
+  'citation-reasons': 'Motivos de citación',
+  roster: 'Importar nómina',
+  institutions: 'Instituciones del sistema',
+};
+
+export const ADMIN_TAB_TITLE: Record<string, string> = {
+  users: 'Usuarios',
+  courses: 'Cursos',
+  years: 'Años lectivos',
+  permissions: 'Permisos',
+  'citation-reasons': 'Motivos de citación',
+  roster: 'Importar nómina',
+  institutions: 'Instituciones',
+};
+
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatFormFieldModule, MatSelectModule,
-            MatInputModule, MatButtonModule, MatIconModule, MatCheckboxModule],
+            MatInputModule, MatButtonModule, MatIconModule, MatCheckboxModule,
+            ChapterHeaderComponent, SealAvatarComponent],
   styles: [`
     .tab-content { padding: 20px; }
     .admin-row {
       display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
-      padding: 12px 16px; background: var(--paper); border-radius: 12px; border: 1px solid var(--border);
+      padding: 12px 16px; background: var(--paper); border-radius: 12px;
+      border-top: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      border-left: 4px solid var(--muted);
       margin-bottom: 8px;
     }
+    .admin-row.is-active { border-left-color: var(--accent); }
     .admin-row-actions { display: flex; align-items: center; gap: 8px; }
     .admin-row-quarters {
       display: flex; flex-direction: row; justify-content: center;
       flex: 1; min-width: 0;
     }
-    .quarter-chip-list {
-      display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
-      min-width: 0;
-    }
-    .period-chip {
-      display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px;
-      max-width: 100%; min-width: 0; box-sizing: border-box;
+    /* Cuaderno años-lectivos timeline (feature 31): segments positioned by
+       each quarter's real calendar offset from y.startDate, as a % of the
+       full [y.startDate, y.endDate] range. The quarter chip-list pattern is
+       gone for active years; the empty-state CTA below is kept verbatim —
+       only its containing .quarter-chip-list wrapper is removed (it lived
+       inside this same container before).
+
+       feature 41 fix: segments and the HOY marker share one coordinate
+       system (see yearPct() in the component) so real gaps between
+       quarters (recesses/vacations — quarters are validated as
+       non-overlapping, NOT contiguous, see quarters-dialog.component.ts)
+       render as visible empty track instead of being packed away, and HOY
+       always lands inside the segment whose real date range contains today.
+       .timeline-track no longer clips (overflow: hidden removed) so the
+       HOY marker + its "HOY" label, which both intentionally extend beyond
+       the track's box (-6px/-16px), render in full. Segments are clipped to
+       the track's rounded corners by the inner .timeline-segments wrapper
+       instead, which is a sibling of .timeline-hoy and shares its
+       border-radius via inherit — this keeps the rounded-corner look for
+       segments without clipping the marker that sits outside the wrapper. */
+    .timeline-track {
+      position: relative;
+      height: 28px;
+      border-radius: 6px;
       background: var(--paper-deep);
       border: 1px solid var(--border-soft);
-      border-left: 2px solid var(--accent);
-      border-radius: var(--radius-sm);
+      flex: 1;
+      min-width: 0;
     }
-    .period-chip-name {
-      font-family: 'Nunito', sans-serif; font-weight: 600; font-size: 13px;
+    .timeline-segments {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      overflow: hidden;
+    }
+    .timeline-segment {
+      position: absolute;
+      top: 0; bottom: 0;
+      padding: 6px 8px;
+      display: flex; align-items: center;
+      background: var(--accent-soft);
+      border-right: 1px solid var(--paper);
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .timeline-segment:last-child { border-right: none; }
+    .timeline-segment-name {
+      font-family: 'Nunito', sans-serif; font-size: 11px; font-weight: 700;
       color: var(--ink);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+      letter-spacing: 0.04em; text-transform: uppercase;
+      white-space: nowrap; text-overflow: ellipsis; overflow: hidden;
+      min-width: 0;
     }
-    .period-chip-range {
-      font-family: 'Nunito', sans-serif; font-weight: 400; font-size: 11px;
-      color: var(--muted-strong); white-space: nowrap;
+    .timeline-hoy {
+      position: absolute;
+      top: -6px; bottom: -6px;
+      border-left: 2px solid var(--ink);
+      pointer-events: none;
+    }
+    .timeline-hoy-label {
+      position: absolute;
+      top: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--ink);
+      color: var(--paper);
+      font-family: 'Nunito', sans-serif;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      padding: 1px 5px;
+      border-radius: 3px;
+      white-space: nowrap;
     }
     .period-chip-empty {
       font-family: 'Nunito', sans-serif; font-weight: 400; font-size: 12px;
@@ -79,22 +173,193 @@ import { MODULE_KEYS } from '../../core/nav-items';
       .admin-row-actions { flex-wrap: wrap; width: 100%; }
       .admin-row-quarters { width: 100%; }
     }
+    /* Cuaderno user card (feature 30): the spec calls for a horizontal
+       "fila-tarjeta" on tablet — seal | scope | divider | actions side by
+       side — so the user-row variant overrides the generic .admin-row
+       column break at 1280px and only stacks vertically on very small
+       phones (<600px) where horizontal doesn't fit. The vertical divider
+       between the identity and actions blocks is visible whenever the
+       card is horizontal, hidden on the smallest phones where stacking
+       makes it meaningless. */
+    .admin-row.user-row,
+    .admin-row.inst-row {
+      flex-direction: row;
+      align-items: center;
+      flex-wrap: nowrap;
+      gap: 12px;
+    }
+    .admin-row.user-row > div:first-child,
+    .admin-row.inst-row > div:first-child {
+      flex: 1;
+      min-width: 0;
+    }
+    .admin-row.user-row .admin-row-actions,
+    .admin-row.inst-row .admin-row-actions {
+      width: auto;
+      flex-shrink: 0;
+    }
     .user-avatar {
       width: 36px; height: 36px; border-radius: 9px;
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: white; display: flex; align-items: center; justify-content: center;
       font-size: 14px; font-weight: 700; flex-shrink: 0;
     }
+    /* Cuaderno folio (feature 30): right-aligned "Registros: NNN" with the
+       same double-filete treatment chapter-header uses (ink .55 + border) so
+       every list in the Cuaderno system opens with the same register-count
+       rhythm. The rules are duplicated here (rather than imported from
+       chapter-header.component) so the folio stays self-contained inside
+       the users tab and can move independently of the page-level header. */
+    .users-folio {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+    .users-folio .filete-ink {
+      height: 1px;
+      background: var(--ink);
+      opacity: .55;
+    }
+    .users-folio .filete-border {
+      height: 1px;
+      background: var(--border);
+    }
+    .users-folio-text {
+      font-family: 'Nunito', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted-strong);
+      padding-top: 4px;
+      text-align: right;
+    }
+    .users-folio-text b {
+      color: var(--ink);
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 0;
+    }
+    /* Cuaderno folio for Cursos tab (feature 34): same double-filete +
+       right-aligned register-count rhythm as .users-folio, but kept
+       self-contained so the Cursos list can move independently of the
+       Usuarios list. .courses-folio / .citation-reasons-folio / .users-folio
+       share the same geometry — comma-grouped below so we don't pay the
+       CSS budget three times over for identical rules. Each wrapper class
+       is still its own scope (no users-folio reuse), so each list can
+       move independently. Severity badges in Motivos (this tab) stay on
+       .badge-F/.badge-AT/.badge-J — NOT replaced by a folio class. */
+    .courses-folio,
+    .citation-reasons-folio {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+    .courses-folio .filete-ink,
+    .citation-reasons-folio .filete-ink {
+      height: 1px;
+      background: var(--ink);
+      opacity: .55;
+    }
+    .courses-folio .filete-border,
+    .citation-reasons-folio .filete-border {
+      height: 1px;
+      background: var(--border);
+    }
+    .courses-folio-text,
+    .citation-reasons-folio-text {
+      font-family: 'Nunito', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted-strong);
+      padding-top: 4px;
+      text-align: right;
+    }
+    .courses-folio-text b,
+    .citation-reasons-folio-text b {
+      color: var(--ink);
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 0;
+    }
+    /* Cuaderno institution card (feature 33): horizontal "ficha" on tablet/desktop
+       — seal | identity (name + stats) | divider | actions. Stats line uses real
+       counts from institution_stats_backend (#17); falls back to muted italic
+       placeholder when stats absent so we never invent numbers. Mirrors the
+       .user-row (feature 30) tarjeta rhythm intentionally. */
+    /* Cuaderno vertical divider (features 30 + 33): hairline between identity
+       and actions in both user and institution cards; selectors grouped
+       because geometry is identical. */
+    .user-card-divider,
+    .inst-card-divider {
+      width: 1px;
+      align-self: stretch;
+      background: var(--border);
+      flex-shrink: 0;
+      min-height: 24px;
+    }
+    .inst-stats {
+      font-family: 'Nunito', sans-serif;
+      font-size: 12px;
+      color: var(--muted-strong);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .inst-stats b {
+      color: var(--ink);
+      font-weight: 800;
+    }
+    .inst-stats .inst-stats-sep {
+      color: var(--border);
+      margin: 0 6px;
+      font-weight: 700;
+    }
+    .inst-stats-empty {
+      color: var(--muted);
+      font-style: italic;
+    }
+    @media (max-width: 600px) {
+      .admin-row.user-row,
+      .admin-row.inst-row {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .admin-row.user-row > div:first-child,
+      .admin-row.inst-row > div:first-child {
+        width: 100%;
+      }
+      .admin-row.user-row .admin-row-actions,
+      .admin-row.inst-row .admin-row-actions {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+      .user-card-divider,
+      .inst-card-divider { display: none; }
+      .inst-stats { white-space: normal; }
+    }
     .hidden-mobile { display: block; }
     .hidden-desktop { display: none; }
-    @media (max-width: 768px) {
+    /* Tablet range (768-1024px) also uses the card variant so the table
+       doesn't squeeze into a portrait-tablet viewport. See feature 29. */
+    @media (max-width: 1024px) {
       .hidden-mobile { display: none; }
       .hidden-desktop { display: block; }
     }
   `],
   template: `
     <div class="page-header">
-      <h1 class="page-title">Administración</h1>
+      <app-chapter-header
+        icon="admin_panel_settings"
+        [eyebrowPrefix]="chapterEyebrowPrefix()"
+        eyebrowSeparator="—"
+        [eyebrowSuffix]="chapterEyebrowSuffix()"
+        [title]="chapterTitle()" />
       @if (auth.isSuperAdmin()) {
         <button mat-stroked-button (click)="openQueueMonitor()"
           style="display:flex;align-items:center;gap:6px;font-size:13px">
@@ -115,17 +380,43 @@ import { MODULE_KEYS } from '../../core/nav-items';
             </button>
           </div>
           @for (inst of institutionContext.institutions(); track inst.id) {
-            <div class="admin-row">
-              <div style="display:flex;align-items:center;gap:12px">
-                <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
-                  @if (inst.logoUrl) {
-                    <img [src]="inst.logoUrl" alt="" style="width:100%;height:100%;object-fit:cover">
-                  } @else {
-                    <mat-icon style="color:var(--accent)">corporate_fare</mat-icon>
-                  }
+            <div class="admin-row inst-row">
+              <div style="display:flex;align-items:center;gap:12px;min-width:0">
+                <!-- Cuaderno institution seal (feature 33): logoUrl real when
+                     present, otherwise initials of the institution name —
+                     same feature-base double-ring seal the rest of the
+                     system uses. -->
+                @if (inst.logoUrl) {
+                  <app-seal-avatar [size]="40" [src]="inst.logoUrl" [bgColor]="'transparent'" alt="" />
+                } @else {
+                  <app-seal-avatar [size]="40" [initials]="(inst.name || '?')[0].toUpperCase()" />
+                }
+                <div style="min-width:0">
+                  <div style="font-weight:600">{{inst.name}}</div>
+                  <!-- Cuaderno stats line (feature 33): real counts from
+                       institution_stats_backend (feature #17). Singular/plural
+                       matches feature 30's grammar pattern — never "1
+                       estudiantes". The separator dots sit on --border so
+                       they read as soft punctuation, not as data. -->
+                  <div class="inst-stats">
+                    @if (inst.stats) {
+                      <b>{{ inst.stats.students }}</b> {{ inst.stats.students === 1 ? 'estudiante' : 'estudiantes' }}
+                      <span class="inst-stats-sep">·</span>
+                      <b>{{ inst.stats.courses }}</b> {{ inst.stats.courses === 1 ? 'curso' : 'cursos' }}
+                      <span class="inst-stats-sep">·</span>
+                      <b>{{ inst.stats.users }}</b> {{ inst.stats.users === 1 ? 'usuario' : 'usuarios' }}
+                    } @else {
+                      <span class="inst-stats-empty">Sin estadísticas disponibles</span>
+                    }
+                  </div>
                 </div>
-                <div style="font-weight:600">{{inst.name}}</div>
               </div>
+              <!-- Cuaderno vertical divider (feature 33): separates the
+                   identity block from the actions block on the
+                   horizontal tarjeta layout. Hidden when the card stacks
+                   on the smallest phones (<600px) via the media query
+                   above. -->
+              <div class="inst-card-divider"></div>
               <div class="admin-row-actions">
                 <button mat-icon-button style="color:var(--muted-strong)" (click)="openInstitutionDialog(inst)"><mat-icon>edit</mat-icon></button>
                 <input type="color" title="Color primario" [value]="inst.primaryColor || '#6366f1'"
@@ -154,33 +445,44 @@ import { MODULE_KEYS } from '../../core/nav-items';
             </button>
           </div>
           @for (y of years(); track y.id) {
-            <div class="admin-row">
+            <div class="admin-row" [class.is-active]="y.isActive">
               <div style="display:flex;align-items:center;gap:12px">
-                <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center">
-                  <mat-icon style="color:var(--accent)">calendar_today</mat-icon>
-                </div>
+                <app-seal-avatar [size]="36" icon="calendar_today" />
                 <div>
                   <div style="font-weight:600">{{y.name}}</div>
                   <div style="font-size:12px;color:var(--muted)">{{y.startDate ?? '—'}} → {{y.endDate ?? '—'}}</div>
                 </div>
               </div>
               @if (y.isActive) {
-                @let rows = quarterRowsFor(y.id);
-                <div class="admin-row-quarters">
-                  <div class="quarter-chip-list">
-                    @for (q of rows; track q.id) {
-                      <span class="period-chip" title="{{q.name}} · {{q.startDate ?? '—'}} → {{q.endDate ?? '—'}}">
-                        <span class="period-chip-name">{{q.name}}</span>
-                        <span class="period-chip-range">{{q.startDate ?? '—'}} → {{q.endDate ?? '—'}}</span>
-                      </span>
-                    } @empty {
-                      <span class="period-chip-empty">
-                        Sin períodos configurados.
-                        <a class="period-chip-cta" (click)="openQuartersDialog(y)">Configurar trimestres</a>
-                      </span>
-                    }
+                @let segments = timelineSegmentsFor(y);
+                @if (segments.length > 0) {
+                  <div class="admin-row-quarters">
+                    <div class="timeline-track">
+                      <div class="timeline-segments">
+                        @for (q of segments; track q.id) {
+                          <div class="timeline-segment"
+                               [style.left]="segmentLeft(q, y)"
+                               [style.width]="segmentWidth(q, y)"
+                               title="{{q.name}} · {{q.startDate ?? '—'}} → {{q.endDate ?? '—'}}">
+                            <span class="timeline-segment-name">{{q.name}}</span>
+                          </div>
+                        }
+                      </div>
+                      @if (timelineHoy(y, segments); as pct) {
+                        <div class="timeline-hoy" [style.left]="pct">
+                          <span class="timeline-hoy-label">HOY</span>
+                        </div>
+                      }
+                    </div>
                   </div>
-                </div>
+                } @else {
+                  <div class="admin-row-quarters">
+                    <span class="period-chip-empty">
+                      Sin períodos configurados.
+                      <a class="period-chip-cta" (click)="openQuartersDialog(y)">Configurar trimestres</a>
+                    </span>
+                  </div>
+                }
               }
               <div class="admin-row-actions">
                 <span [class]="y.isActive ? 'badge-J' : 'badge-gray'">{{y.isActive ? 'Activo' : 'Inactivo'}}</span>
@@ -201,10 +503,24 @@ import { MODULE_KEYS } from '../../core/nav-items';
       <!-- CURSOS -->
       @if (activeTab() === 'courses') {
         <div class="tab-content">
-          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+          <!-- Cuaderno folio (feature 34): "Registros: N cursos" on the right,
+               real count from /api/courses, with the same double filete
+               (ink .55 + border) the chapter-header uses for the page-level
+               title. Mirrors feature 30's users-folio pattern so every
+               list in the Cuaderno system opens with the same register-count
+               rhythm. Singular/plural grammar matches feature 30/33
+               (1 curso / N cursos, never "1 cursos"). -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;gap:12px;flex-wrap:wrap">
             <button mat-flat-button color="primary" (click)="openCourseDialog()">
               <mat-icon>add</mat-icon> Agregar curso
             </button>
+            <div class="courses-folio">
+              <div class="filete-ink"></div>
+              <div class="filete-border"></div>
+              <div class="courses-folio-text">
+                Registros: <b>{{ courses().length }}</b> {{ courses().length === 1 ? 'curso' : 'cursos' }}
+              </div>
+            </div>
           </div>
           <div class="data-table-wrap hidden md:block">
             <table class="data-table">
@@ -243,13 +559,80 @@ import { MODULE_KEYS } from '../../core/nav-items';
         </div>
       }
 
+      <!-- MOTIVOS DE CITACIÓN -->
+      @if (activeTab() === 'citation-reasons') {
+        <div class="tab-content">
+          <!-- Cuaderno folio (feature 34): "Registros: N motivos" on the right,
+               real count from /api/citation-reasons, with the same double
+               filete (ink .55 + border) the chapter-header uses. Severity
+               badges (.badge-F/.badge-AT/.badge-J) below the folio are
+               untouched. Singular/plural grammar matches feature 30/33. -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;gap:12px;flex-wrap:wrap">
+            <button mat-flat-button color="primary" (click)="openCitationReasonDialog()">
+              <mat-icon>add</mat-icon> Agregar motivo
+            </button>
+            <div class="citation-reasons-folio">
+              <div class="filete-ink"></div>
+              <div class="filete-border"></div>
+              <div class="citation-reasons-folio-text">
+                Registros: <b>{{ citationReasons().length }}</b> {{ citationReasons().length === 1 ? 'motivo' : 'motivos' }}
+              </div>
+            </div>
+          </div>
+          <div class="data-table-wrap hidden md:block">
+            <table class="data-table">
+              <thead><tr><th>Nombre</th><th>Severidad</th><th>Descripción</th><th></th></tr></thead>
+              <tbody>
+                @for (r of citationReasons(); track r.id) {
+                  <tr>
+                    <td style="font-weight:500">{{r.name}}</td>
+                    <td><span [class]="severityBadgeClass(r.severity)">{{severityLabel(r.severity)}}</span></td>
+                    <td style="color:var(--muted-strong)">{{r.description || '—'}}</td>
+                    <td>
+                      <button mat-icon-button style="color:var(--muted-strong)" (click)="openCitationReasonDialog(r)"><mat-icon>edit</mat-icon></button>
+                      <button mat-icon-button style="color:#b91c1c" (click)="deleteCitationReason(r.id)"><mat-icon>delete_outline</mat-icon></button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="md:hidden">
+            @for (r of citationReasons(); track r.id) {
+              <div class="admin-row">
+                <div>
+                  <div style="font-weight:600">{{r.name}}</div>
+                  <span [class]="severityBadgeClass(r.severity)" style="margin-top:4px;display:inline-block">{{severityLabel(r.severity)}}</span>
+                  <div style="font-size:12px;color:var(--muted);margin-top:4px">{{r.description || '—'}}</div>
+                </div>
+                <div class="admin-row-actions">
+                  <button mat-icon-button style="color:var(--muted-strong)" (click)="openCitationReasonDialog(r)"><mat-icon>edit</mat-icon></button>
+                  <button mat-icon-button style="color:#b91c1c" (click)="deleteCitationReason(r.id)"><mat-icon>delete_outline</mat-icon></button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
       <!-- USUARIOS -->
       @if (activeTab() === 'users') {
         <div class="tab-content">
-          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;gap:12px;flex-wrap:wrap">
             <button mat-flat-button color="primary" (click)="openUserDialog()">
               <mat-icon>person_add</mat-icon> Nuevo usuario
             </button>
+            <!-- Cuaderno folio (feature 30): real count from the API, rendered
+                 above the table with the same double filete (ink .55 + border)
+                 the chapter-header uses for the page-level title — keeps the
+                 Cuaderno "every list opens with a register count" rhythm. -->
+            <div class="users-folio">
+              <div class="filete-ink"></div>
+              <div class="filete-border"></div>
+              <div class="users-folio-text">
+                Registros: <b>{{ users().length }}</b>
+              </div>
+            </div>
           </div>
 
           <!-- Desktop table -->
@@ -268,11 +651,23 @@ import { MODULE_KEYS } from '../../core/nav-items';
                     <td style="color:var(--muted);width:36px">{{i+1}}</td>
                     <td>
                       <div style="display:flex;align-items:center;gap:10px">
-                        <div class="user-avatar">{{(u.fullName || u.username)[0].toUpperCase()}}</div>
+                        <app-seal-avatar [size]="36" [initials]="(u.fullName || u.username)[0].toUpperCase()" />
                         <div>
                           <div style="font-weight:600">{{u.fullName || u.username}}</div>
                           <div style="font-size:12px;color:var(--muted)">
                             @if (u.moduleKeys?.length) { <span class="badge-gray" style="margin-right:4px">Acceso limitado</span> }
+                          </div>
+                          <!-- Cuaderno scope line (feature 30): real
+                               courseIds.length, with "Todos los cursos" as the
+                               null/empty fallback (same meaning as
+                               req.courseIds in the permissions middleware —
+                               "no scope restriction", NOT "zero courses"). -->
+                          <div style="font-size:12px;color:var(--muted-strong);margin-top:2px">
+                            @if (u.courseIds && u.courseIds.length > 0) {
+                              <b>{{ u.courseIds.length }}</b> {{ u.courseIds.length === 1 ? 'curso asignado' : 'cursos asignados' }}
+                            } @else {
+                              Todos los cursos
+                            }
                           </div>
                         </div>
                       </div>
@@ -313,17 +708,36 @@ import { MODULE_KEYS } from '../../core/nav-items';
           <!-- Mobile cards -->
           <div class="hidden-desktop">
             @for (u of users(); track u.id) {
-              <div class="admin-row">
+              <div class="admin-row user-row">
                 <div style="display:flex;align-items:center;gap:12px">
-                  <div class="user-avatar">{{(u.fullName || u.username)[0].toUpperCase()}}</div>
+                  <app-seal-avatar [size]="36" [initials]="(u.fullName || u.username)[0].toUpperCase()" />
                   <div>
                     <div style="font-weight:600">{{u.fullName || u.username}}</div>
                     <div style="font-size:12px;color:var(--muted)">@{{u.username}} · <span style="color:var(--accent)">{{u.roleName}}</span></div>
+                    <!-- Cuaderno scope line (feature 30): same null/empty
+                         semantics as the desktop cell. Sits below the @user
+                         line so the card reads top-down: name → handle+role →
+                         scope. -->
+                    <div style="font-size:12px;color:var(--muted-strong);margin-top:2px">
+                      @if (u.courseIds && u.courseIds.length > 0) {
+                        <b>{{ u.courseIds.length }}</b> {{ u.courseIds.length === 1 ? 'curso asignado' : 'cursos asignados' }}
+                      } @else {
+                        Todos los cursos
+                      }
+                    </div>
                     @if (u.signatureLabel) {
                       <div style="font-size:11px;color:var(--muted)">{{u.signatureLabel}}</div>
                     }
                   </div>
                 </div>
+                <!-- Cuaderno vertical divider (feature 30): separates the
+                     identity block from the actions block on the
+                     tarjeta-horizontal layout that takes over at 1280px and
+                     below. On the smallest phones the whole .admin-row
+                     flexes to a vertical stack so the divider is purely
+                     decorative, but keeping it preserves the rhythm in
+                     landscape and tablet portrait. -->
+                <div class="user-card-divider"></div>
                 <div class="admin-row-actions">
                   @if (u.roleName !== 'superadmin') {
                     <button mat-icon-button style="color:var(--muted-strong)" (click)="openUserDialog(u)"><mat-icon>edit</mat-icon></button>
@@ -459,6 +873,7 @@ export class AdminComponent implements OnInit {
 
   readonly years = this.academicYearContext.years;
   readonly courses = signal<Course[]>([]);
+  readonly citationReasons = signal<CitationReason[]>([]);
   readonly users = signal<User[]>([]);
   readonly roles = signal<Role[]>([]);
   readonly permissions = signal<RolePermission[]>([]);
@@ -491,12 +906,85 @@ export class AdminComponent implements OnInit {
     this._quartersByYear.set(next);
   }
 
+  // Timeline support (feature 31). All dates are 'YYYY-MM-DD' strings; the
+  // existing date.util helpers parse them in the local time zone, so day
+  // differences are measured in whole local days and string comparison on the
+  // ISO form matches chronological order.
+  todayStr(): string {
+    return dateToDateString(new Date());
+  }
+
+  daysBetween(start: string, end: string): number | null {
+    const a = dateStringToDate(start);
+    const b = dateStringToDate(end);
+    if (!a || !b) return null;
+    return Math.round((b.getTime() - a.getTime()) / 86400000);
+  }
+
+  // Quarters eligible for the timeline: requires both the academic year and
+  // the quarter to have non-null start/end dates so left/width can be
+  // computed. The empty-state CTA is the natural fallback when this returns
+  // an empty list (no quarters configured, or any year missing dates).
+  timelineSegmentsFor(y: AcademicYear): readonly Quarter[] {
+    if (!y.startDate || !y.endDate) return [];
+    return this.quarterRowsFor(y.id).filter(q => !!q.startDate && !!q.endDate);
+  }
+
+  // Shared calendar coordinate system (feature 41): % offset of `dateStr`
+  // from y.startDate, as a fraction of the full [y.startDate, y.endDate]
+  // range. Both segment positioning (segmentLeft/segmentWidth) and the HOY
+  // marker (timelineHoy) go through this single function so they can never
+  // drift apart — quarters are validated as non-overlapping but NOT
+  // contiguous (see quarters-dialog.component.ts), so real gaps between them
+  // must be reflected as empty track space rather than packed away.
+  private yearPct(dateStr: string | null, y: AcademicYear): number | null {
+    if (!dateStr || !y.startDate || !y.endDate) return null;
+    const yDays = this.daysBetween(y.startDate, y.endDate);
+    if (yDays === null || yDays <= 0) return null;
+    const offsetDays = this.daysBetween(y.startDate, dateStr);
+    if (offsetDays === null) return null;
+    let pct = (offsetDays / yDays) * 100;
+    if (pct < 0) pct = 0;
+    if (pct > 100) pct = 100;
+    return pct;
+  }
+
+  segmentLeft(q: Quarter, y: AcademicYear): string {
+    const pct = this.yearPct(q.startDate, y);
+    return pct === null ? '0%' : `${pct}%`;
+  }
+
+  segmentWidth(q: Quarter, y: AcademicYear): string {
+    const left = this.yearPct(q.startDate, y);
+    const right = this.yearPct(q.endDate, y);
+    if (left === null || right === null) return '0%';
+    return `${Math.max(0, right - left)}%`;
+  }
+
+  // HOY marker percentage position. Only emitted when today falls inside both
+  // [y.startDate, y.endDate] AND at least one configured segment covers today
+  // — covers the "no aparece si no cae dentro de ningún trimestre configurado"
+  // acceptance criterion by gating on a quarter, not just the year range.
+  timelineHoy(y: AcademicYear, segments: readonly Quarter[]): string | null {
+    if (!y.startDate || !y.endDate) return null;
+    const today = this.todayStr();
+    if (today < y.startDate || today > y.endDate) return null;
+    const inSegment = segments.some(q => q.startDate && q.endDate && q.startDate <= today && today <= q.endDate);
+    if (!inSegment) return null;
+    const pct = this.yearPct(today, y);
+    return pct === null ? null : `${pct}%`;
+  }
+
   selRole: number | null = null;
 
   readonly activeTab = toSignal(
     this.route.queryParamMap.pipe(map(p => p.get('tab') ?? 'users')),
     { initialValue: this.route.snapshot.queryParamMap.get('tab') ?? 'users' }
   );
+
+  readonly chapterEyebrowPrefix = computed(() => `Capítulo ${ADMIN_TAB_CHAPTER_NUMERAL[this.activeTab()] ?? ''}`);
+  readonly chapterEyebrowSuffix = computed(() => ADMIN_TAB_EYEBROW_SUFFIX[this.activeTab()] ?? '');
+  readonly chapterTitle = computed(() => ADMIN_TAB_TITLE[this.activeTab()] ?? '');
 
   readonly moduleKeys = MODULE_KEYS;
 
@@ -526,13 +1014,15 @@ export class AdminComponent implements OnInit {
     if (!noInstitutionYet) await this.academicYearContext.load();
     const yearId = this.academicYearContext.selectedId();
     const usersUrl = yearId ? `/api/users?academic_year_id=${yearId}` : '/api/users';
-    const [courses, users, roles, quarters] = await Promise.all([
+    const [courses, users, roles, quarters, citationReasons] = await Promise.all([
       noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<Course[]>('/api/courses')).catch(() => []),
       noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<User[]>(usersUrl)).catch(() => []),
       firstValueFrom(this.http.get<Role[]>('/api/roles')),
       noInstitutionYet ? Promise.resolve([] as Quarter[]) : this.quarterService.getAll().catch(() => [] as Quarter[]),
+      noInstitutionYet ? Promise.resolve([] as CitationReason[]) : firstValueFrom(this.http.get<CitationReason[]>('/api/citation-reasons')).catch(() => [] as CitationReason[]),
     ]);
     this.courses.set(courses);
+    this.citationReasons.set(citationReasons);
     this.users.set(users); this.roles.set(roles);
     if (!noInstitutionYet && yearId !== null) {
       this.setQuartersForYear(yearId, quarters);
@@ -691,6 +1181,40 @@ export class AdminComponent implements OnInit {
       if (!ok) return;
       await firstValueFrom(this.http.delete(`/api/courses/${id}`));
       await this.loadAll();
+    });
+  }
+
+  severityBadgeClass(severity: string): string {
+    return citationReasonSeverityBadgeClass(severity);
+  }
+
+  severityLabel(severity: string): string {
+    return CITATION_REASON_SEVERITY_OPTIONS.find(o => o.value === severity)?.label ?? severity;
+  }
+
+  openCitationReasonDialog(reason?: CitationReason): void {
+    const data: CitationReasonDialogData = { mode: reason ? 'edit' : 'create', reason };
+    this.dialog.open(CitationReasonDialogComponent, {
+      width: '420px',
+      data,
+    }).afterClosed().subscribe(async ok => {
+      if (ok) await this.loadAll();
+    });
+  }
+
+  deleteCitationReason(id: number): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: { title: 'Eliminar motivo de citación', message: '¿Eliminar este motivo de citación? Esta acción no se puede deshacer.' },
+    }).afterClosed().subscribe(async ok => {
+      if (!ok) return;
+      try {
+        await firstValueFrom(this.http.delete(`/api/citation-reasons/${id}`));
+        this.notify.success('Motivo eliminado');
+        await this.loadAll();
+      } catch (err: any) {
+        this.notify.error(err?.error?.error ?? 'Error al eliminar');
+      }
     });
   }
 

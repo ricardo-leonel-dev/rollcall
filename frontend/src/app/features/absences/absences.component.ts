@@ -21,12 +21,13 @@ import { AcademicYearContextService } from '../../core/services/academic-year-co
 import { NotificationService } from '../../core/services/notification.service';
 import { QuarterContextService } from '../../core/services/quarter-context.service';
 import { QuarterSelectorComponent } from '../../shared/components/quarter-selector/quarter-selector.component';
-import { DEFAULT_NOTIFICATION_TEMPLATE } from '../../shared/components/profile-dialog/profile-dialog.component';
+import { NotificationTemplateService } from '../../core/services/notification-template.service';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AbsenceRangeDialogComponent, AbsenceRangeDialogResult } from './absence-range-dialog.component';
 import { AbsenceDialogComponent } from './absence-dialog.component';
 import { AbsenceSaveResultDialogComponent } from './absence-save-result-dialog.component';
+import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
 
 interface VoiceLog {
   id: number;
@@ -73,7 +74,8 @@ interface StudentFilter {
   imports: [FormsModule, MatTabsModule, MatFormFieldModule, MatSelectModule, MatInputModule,
             MatButtonModule, MatIconModule, MatTooltipModule, MatMenuModule, MatDatepickerModule,
             MatAutocompleteModule,
-            WhatsappIconComponent, QuarterSelectorComponent, DecimalPipe, DatePipe, SlicePipe],
+            WhatsappIconComponent, QuarterSelectorComponent, DecimalPipe, DatePipe, SlicePipe,
+            ChapterHeaderComponent],
   styles: [`
     .tab-content { padding: 20px 0; }
     @keyframes pulse-mic {
@@ -151,6 +153,11 @@ interface StudentFilter {
     .student-filter-chip strong { color: var(--ink); font-weight: 600; }
   `],
   template: `
+    <app-chapter-header
+      icon="event_busy"
+      eyebrowPrefix="Inspectoría"
+      eyebrowSuffix="Registro de asistencia" />
+
     <div class="page-header">
       <h1 class="page-title">Inasistencias</h1>
     </div>
@@ -745,6 +752,7 @@ export class AbsencesComponent implements OnInit, OnDestroy {
 
   private readonly _pendingHighlight = signal<PendingHighlight | null>(null);
   readonly studentFilter = signal<StudentFilter | null>(null);
+  private readonly templateService = inject(NotificationTemplateService);
 
   selectedTabIndex = 0;
   private currentVoiceJobId: string | null = null;
@@ -759,7 +767,6 @@ export class AbsencesComponent implements OnInit, OnDestroy {
   filterType = '';
   studentSearch = '';
   manualSearch = '';
-  private notificationTemplate = DEFAULT_NOTIFICATION_TEMPLATE;
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
   private voiceTimer: ReturnType<typeof setInterval> | null = null;
@@ -769,13 +776,12 @@ export class AbsencesComponent implements OnInit, OnDestroy {
     const hasUrlDates = params.has('dateFrom') || params.has('dateTo');
     if (!hasUrlDates) this.applyDefaultQuarter();
 
-    const [courses, me] = await Promise.all([
+    const [courses] = await Promise.all([
       firstValueFrom(this.http.get<Course[]>('/api/courses')),
-      firstValueFrom(this.http.get<{ notificationTemplate: string | null }>('/api/auth/me')),
+      this.templateService.ensureLoaded(),
     ]);
     this.courses.set(courses);
     this.selYear = this.academicYearContext.selected()?.id ?? null;
-    if (me.notificationTemplate) this.notificationTemplate = me.notificationTemplate;
 
     // Round-trip restore: si la URL trae cualquier filtro preservable, rehidratar
     // el estado desde los params en vez de aplicar el comportamiento legacy.
@@ -1191,20 +1197,25 @@ export class AbsencesComponent implements OnInit, OnDestroy {
     }
   }
 
-  notifyGuardian(whatsappLink: string, studentName: string, date: string, type: 'F' | 'AT', course: string, isJustified?: boolean): void {
+  async notifyGuardian(whatsappLink: string, studentName: string, date: string, type: 'F' | 'AT', course: string, isJustified?: boolean): Promise<void> {
     if (isJustified) {
       // Ya justificada: abrir el chat vacío, igual que en el listado de estudiantes —
       // no tiene sentido mandar el mensaje con el formato de falta pendiente.
       window.open(whatsappLink, '_blank');
       return;
     }
-    const label = type === 'F' ? 'una falta' : 'un atraso';
-    const message = this.notificationTemplate
-      .replace(/\{\{nombre\}\}/g, studentName)
-      .replace(/\{\{fecha\}\}/g, date)
-      .replace(/\{\{tipo\}\}/g, label)
-      .replace(/\{\{curso\}\}/g, course);
-    window.open(`${whatsappLink}?text=${encodeURIComponent(message)}`, '_blank');
+    const vars = { nombre: studentName, fecha: date, tipo: type === 'F' ? 'una falta' : 'un atraso', curso: course };
+    const toUrl = (message: string) => `${whatsappLink}?text=${encodeURIComponent(message)}`;
+    if (this.templateService.hasTemplate('absences')) {
+      window.open(toUrl(this.templateService.renderTemplate('absences', vars)), '_blank');
+      return;
+    }
+    // window.open after an await falls outside the click gesture and gets popup-blocked:
+    // reserve the tab synchronously, then navigate it once the catalog retry settles.
+    const reserved = window.open('', '_blank');
+    await this.templateService.ensureLoaded();
+    const url = toUrl(this.templateService.renderTemplate('absences', vars));
+    if (reserved) reserved.location.href = url; else window.open(url, '_blank');
   }
 
   openManualAdd(name: string): void {

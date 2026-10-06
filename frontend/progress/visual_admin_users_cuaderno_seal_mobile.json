@@ -1,0 +1,243 @@
+{
+  "hasAdminRowQuarters": false,
+  "hasOldPanel": false,
+  "chipCount": 0,
+  "chips": [],
+  "adminRowAlignItems": "flex-start",
+  "adminRowDisplay": "flex",
+  "activeYearText": null,
+  "pills": [],
+  "sectionLabels": [],
+  "dialogDates": [],
+  "pendingBannerItems": [],
+  "timelineTrackRect": null,
+  "timelineSegments": [],
+  "timelineHoyRect": null,
+  "timelineHoyLabelRect": null,
+  "timelineHoyLabelClipping": {
+    "clipped": null,
+    "ancestorSelector": null,
+    "elementRect": null,
+    "ancestorRect": null
+  },
+  "timelineHoyClipping": {
+    "clipped": null,
+    "ancestorSelector": null,
+    "elementRect": null,
+    "ancestorRect": null
+  },
+  "timelineHoyAlignment": null,
+  "usersFolio": {
+    "present": true,
+    "text": "Registros: 6",
+    "numberText": "6",
+    "numberIsBold": true,
+    "fileteInk": {
+      "height": "1px",
+      "background": "rgb(30, 27, 22)",
+      "opacity": "0.55"
+    },
+    "fileteBorder": {
+      "height": "1px",
+      "background": "rgb(231, 225, 211)"
+    }
+  },
+  "userSeals": [
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 0,
+        "h": 0
+      }
+    },
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 0,
+        "h": 0
+      }
+    },
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 0,
+        "h": 0
+      }
+    },
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 0,
+        "h": 0
+      }
+    },
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 0,
+        "h": 0
+      }
+    },
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 0,
+        "h": 0
+      }
+    },
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 36,
+        "h": 36
+      }
+    },
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 36,
+        "h": 36
+      }
+    },
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 36,
+        "h": 36
+      }
+    },
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 36,
+        "h": 36
+      }
+    },
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 36,
+        "h": 36
+      }
+    },
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 36,
+        "h": 36
+      }
+    }
+  ],
+  "userSealCount": 12,
+  "userSealsAllCircular": true,
+  "userScopeLines": [
+    {
+      "text": "Todos los cursos",
+      "numberIsBold": null,
+      "matchesAllCourses": true,
+      "matchesCounted": false
+    },
+    {
+      "text": "1 curso asignado",
+      "numberIsBold": true,
+      "matchesAllCourses": false,
+      "matchesCounted": true
+    },
+    {
+      "text": "2 cursos asignados",
+      "numberIsBold": true,
+      "matchesAllCourses": false,
+      "matchesCounted": true
+    },
+    {
+      "text": "Todos los cursos",
+      "numberIsBold": null,
+      "matchesAllCourses": true,
+      "matchesCounted": false
+    },
+    {
+      "text": "1 curso asignado",
+      "numberIsBold": true,
+      "matchesAllCourses": false,
+      "matchesCounted": true
+    },
+    {
+      "text": "Todos los cursos",
+      "numberIsBold": null,
+      "matchesAllCourses": true,
+      "matchesCounted": false
+    },
+    {
+      "text": "Todos los cursos",
+      "numberIsBold": null,
+      "matchesAllCourses": true,
+      "matchesCounted": false
+    },
+    {
+      "text": "1 curso asignado",
+      "numberIsBold": true,
+      "matchesAllCourses": false,
+      "matchesCounted": true
+    },
+    {
+      "text": "2 cursos asignados",
+      "numberIsBold": true,
+      "matchesAllCourses": false,
+      "matchesCounted": true
+    },
+    {
+      "text": "Todos los cursos",
+      "numberIsBold": null,
+      "matchesAllCourses": true,
+      "matchesCounted": false
+    },
+    {
+      "text": "1 curso asignado",
+      "numberIsBold": true,
+      "matchesAllCourses": false,
+      "matchesCounted": true
+    },
+    {
+      "text": "Todos los cursos",
+      "numberIsBold": null,
+      "matchesAllCourses": true,
+      "matchesCounted": false
+    }
+  ],
+  "userCardLayout": {
+    "count": 6,
+    "flexDirection": "column",
+    "isHorizontal": false,
+    "isVertical": true
+  },
+  "layoutMode": "mobile-or-tablet-cards",
+  "screenshot": "/home/rileo/ai-personal/frontend/progress/visual_admin_users_cuaderno_seal_mobile.png",
+  "viewport": {
+    "width": 375,
+    "height": 812
+  }
+}

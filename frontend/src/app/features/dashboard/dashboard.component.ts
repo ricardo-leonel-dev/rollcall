@@ -15,6 +15,7 @@ import { Chart, registerables } from 'chart.js';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { QuarterContextService } from '../../core/services/quarter-context.service';
 import { QuarterSelectorComponent } from '../../shared/components/quarter-selector/quarter-selector.component';
+import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
 import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
 
 Chart.register(...registerables);
@@ -24,7 +25,7 @@ type PeriodPreset = 'today' | 'yesterday' | '7d' | '15d' | '30d' | 'full' | 'cus
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatSelectModule, MatFormFieldModule, MatIconModule, MatButtonModule, MatInputModule, MatDatepickerModule, MatTooltipModule, FormsModule, QuarterSelectorComponent],
+  imports: [MatSelectModule, MatFormFieldModule, MatIconModule, MatButtonModule, MatInputModule, MatDatepickerModule, MatTooltipModule, FormsModule, QuarterSelectorComponent, ChapterHeaderComponent],
   styles: [`
     .stat-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
     .stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px -8px rgba(15,23,42,.15) !important; }
@@ -44,6 +45,10 @@ type PeriodPreset = 'today' | 'yesterday' | '7d' | '15d' | '30d' | 'full' | 'cus
     }
   `],
   template: `
+    <app-chapter-header
+      icon="dashboard"
+      eyebrowPrefix="Inspectoría"
+      eyebrowSuffix="Resumen del período" />
     <div class="page-header">
       <h1 class="page-title">Dashboard</h1>
       <span style="color:var(--muted);font-size:13px">{{today}}</span>

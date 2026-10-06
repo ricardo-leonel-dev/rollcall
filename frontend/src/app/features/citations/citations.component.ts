@@ -1,0 +1,413 @@
+import { Component, ChangeDetectionStrategy, signal, inject, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { FormsModule } from '@angular/forms';
+import { MatSelectModule } from '@angular/material/select';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
+import { MatDialog } from '@angular/material/dialog';
+import { firstValueFrom } from 'rxjs';
+import { Course, Citation, CitationRosterRow, Quarter } from '../../core/models/index';
+import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
+import { NotificationService } from '../../core/services/notification.service';
+import { QuarterContextService } from '../../core/services/quarter-context.service';
+import { NotificationTemplateService } from '../../core/services/notification-template.service';
+import { QuarterSelectorComponent } from '../../shared/components/quarter-selector/quarter-selector.component';
+import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
+import { formatCitationDateLabelShort } from '../../shared/utils/citation-date.util';
+import { CitationHistoryDialogComponent } from './citation-history-dialog.component';
+import { CitationDialogComponent } from './citation-dialog.component';
+
+@Component({
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [FormsModule, MatSelectModule, MatFormFieldModule, MatButtonModule, MatIconModule,
+            MatTooltipModule, MatMenuModule, WhatsappIconComponent, QuarterSelectorComponent,
+            ChapterHeaderComponent],
+  styles: [`
+    .manual-search {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 10px 5px 8px;
+      background: var(--paper); border: 1px solid var(--border-soft); border-radius: 10px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .manual-search:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+    .manual-search input {
+      border: none; outline: none; background: transparent;
+      font-family: Nunito, sans-serif; font-size: 13px; color: var(--ink-soft);
+      width: 150px;
+    }
+    .manual-search input::placeholder { color: var(--muted); }
+    .manual-search .ms-clear {
+      display: flex; align-items: center; cursor: pointer;
+      padding: 0; background: none; border: none; color: var(--muted); line-height: 1;
+    }
+    .manual-search .ms-clear:hover { color: var(--ink-soft); }
+    .pills-cell { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .pill {
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 999px;
+      line-height: 1.2;
+    }
+    .pill-more {
+      background: var(--paper-deep);
+      color: var(--muted-strong);
+      border: 1px dashed var(--border);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 999px;
+      line-height: 1.2;
+    }
+    .pill-more:hover { background: var(--border-soft); color: var(--ink-soft); }
+    .mat-mdc-menu-panel .citations-menu-panel { padding: 6px; }
+    .citations-menu-item .badge { display: inline-flex; pointer-events: none; }
+  `],
+  template: `
+    <app-chapter-header
+      icon="campaign"
+      eyebrowPrefix="Inspectoría"
+      eyebrowSuffix="Registro de citaciones" />
+
+    <div class="page-header">
+      <h1 class="page-title">Citaciones</h1>
+    </div>
+
+    <div class="filter-bar">
+      <app-quarter-selector (quarterChange)="onQuarterChange($event)" />
+      <mat-form-field appearance="outline" style="width:220px">
+        <mat-label>Curso</mat-label>
+        <mat-select [(ngModel)]="selCourse" (ngModelChange)="onCourseChange()">
+          <mat-option [value]="null">— Seleccionar —</mat-option>
+          @for (c of courses(); track c.id) { <mat-option [value]="c.id">{{c.name}}</mat-option> }
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    @if (!selCourse) {
+      <div class="empty-state" style="padding:40px">
+        <mat-icon style="font-size:40px;width:40px;height:40px;color:var(--border)">campaign</mat-icon>
+        <div style="margin-top:8px;color:var(--ink-soft)">Selecciona un curso para ver las citaciones</div>
+      </div>
+    } @else if (rosterLoading()) {
+      <div class="spinner-center">
+        <div class="spinner"></div>
+      </div>
+    } @else {
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px;background:var(--paper-deep);border-bottom:1px solid var(--border)">
+        <span style="font-size:12px;color:var(--muted-strong);white-space:nowrap">
+          @if (manualSearch) {
+            <strong style="color:var(--ink-soft)">{{filteredRoster().length}}</strong> de {{roster().length}}
+          } @else {
+            {{roster().length}} estudiantes
+          }
+        </span>
+        <div class="manual-search">
+          <mat-icon style="font-size:16px;width:16px;height:16px;color:var(--muted);flex-shrink:0">search</mat-icon>
+          <input [(ngModel)]="manualSearch" placeholder="Buscar por nombre...">
+          @if (manualSearch) {
+            <button class="ms-clear" (click)="manualSearch = ''" tabindex="-1">
+              <mat-icon style="font-size:16px;width:16px;height:16px">close</mat-icon>
+            </button>
+          }
+        </div>
+      </div>
+      @if (!filteredRoster().length) {
+        <div class="empty-state" style="padding:32px">
+          @if (manualSearch) {
+            <mat-icon style="font-size:36px;width:36px;height:36px;color:var(--border)">search_off</mat-icon>
+            <div style="margin-top:8px;color:var(--ink-soft)">Ningún estudiante coincide con "<strong>{{manualSearch}}</strong>"</div>
+          } @else {
+            <mat-icon style="font-size:40px;width:40px;height:40px;color:var(--border)">campaign</mat-icon>
+            <div style="margin-top:8px;color:var(--ink-soft)">Sin citaciones registradas en este curso</div>
+          }
+        </div>
+      } @else {
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Estudiante</th>
+                <th>Citaciones el:</th>
+                <th style="text-align:right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of filteredRoster(); track row.enrollmentId) {
+                <tr>
+                  <td style="font-weight:500">{{row.studentName}}</td>
+                  <td>
+                    @if (scopedCitations(row).length === 0) {
+                      <span style="color:var(--muted)">—</span>
+                    } @else {
+                      <div class="pills-cell">
+                        @if (latestCitation(row); as latest) {
+                          <button class="pill badge" [style]="pillStyle(latest)" (click)="onPillClick(row, latest)">
+                            {{pillLabel(latest)}}
+                          </button>
+                          @if (extraCitations(row).length > 0) {
+                            <button class="pill-more"
+                                    type="button"
+                                    [matMenuTriggerFor]="moreMenu"
+                                    #moreTrigger="matMenuTrigger"
+                                    (mouseenter)="openOverflowMenu(moreTrigger)"
+                                    (mouseleave)="scheduleCloseOverflowMenu(moreTrigger)"
+                                    [matTooltip]="extraCitationsTooltip(row)">
+                              +{{ extraCitations(row).length }}
+                            </button>
+                            <mat-menu #moreMenu="matMenu" class="citations-menu-panel" [hasBackdrop]="false"
+                                      (mouseenter)="openOverflowMenu(moreTrigger)"
+                                      (mouseleave)="scheduleCloseOverflowMenu(moreTrigger)">
+                              @for (c of extraCitations(row); track c.id) {
+                                <button mat-menu-item class="citations-menu-item" (click)="onPillClick(row, c)">
+                                  <span class="badge" [style]="pillStyle(c)">{{pillLabel(c)}}</span>
+                                </button>
+                              }
+                            </mat-menu>
+                          }
+                        }
+                      </div>
+                    }
+                  </td>
+                  <td style="white-space:nowrap;text-align:right">
+                    @if (resolveTargetCitation(row); as target) {
+                      @if (row.whatsappLink) {
+                        <button mat-icon-button style="color:#16a34a" (click)="notifyGuardian(row)" matTooltip="Notificar por WhatsApp">
+                          <app-whatsapp-icon [size]="20" />
+                        </button>
+                      }
+                      <button mat-icon-button style="color:#b91c1c" (click)="deleteCitation(row)" matTooltip="Eliminar">
+                        <mat-icon>delete_outline</mat-icon>
+                      </button>
+                    }
+                    <button mat-icon-button (click)="onAddCitation(row)" matTooltip="Agregar citación">
+                      <mat-icon>add_circle_outline</mat-icon>
+                    </button>
+                    <button mat-icon-button [matMenuTriggerFor]="rowMenu" matTooltip="Más acciones">
+                      <mat-icon>more_vert</mat-icon>
+                    </button>
+                    <mat-menu #rowMenu="matMenu">
+                      <button mat-menu-item (click)="openHistory(row)">
+                        <mat-icon>history</mat-icon> Ver historial completo
+                      </button>
+                    </mat-menu>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  `,
+})
+export class CitationsComponent implements OnInit {
+  private readonly http = inject(HttpClient);
+  private readonly notify = inject(NotificationService);
+  private readonly dialog = inject(MatDialog);
+  readonly academicYearContext = inject(AcademicYearContextService);
+  private readonly quarterContext = inject(QuarterContextService);
+  private readonly templateService = inject(NotificationTemplateService);
+
+  readonly courses = signal<Course[]>([]);
+  readonly roster = signal<CitationRosterRow[]>([]);
+  readonly rosterLoading = signal(false);
+
+  selCourse: number | null = null;
+  selYear: number | null = null;
+  manualSearch = '';
+  private scopeStart: string | null = null;
+  private scopeEnd: string | null = null;
+
+  async ngOnInit(): Promise<void> {
+    this.applyDefaultQuarter();
+    const [courses] = await Promise.all([
+      firstValueFrom(this.http.get<Course[]>('/api/courses')),
+      this.templateService.ensureLoaded(),
+    ]);
+    this.courses.set(courses);
+    this.selYear = this.academicYearContext.selected()?.id ?? null;
+  }
+
+  private applyDefaultQuarter(): void {
+    const id = this.quarterContext.defaultQuarterId();
+    if (id === null) return;
+    const q = this.quarterContext.quarters().find(qq => qq.id === id);
+    if (!q || !q.startDate || !q.endDate) return;
+    this.scopeStart = q.startDate;
+    this.scopeEnd = q.endDate;
+  }
+
+  async onCourseChange(): Promise<void> {
+    await this.loadRoster();
+  }
+
+  private async loadRoster(): Promise<void> {
+    if (!this.selCourse || !this.selYear) { this.roster.set([]); return; }
+    this.rosterLoading.set(true);
+    try {
+      const data = await firstValueFrom(
+        this.http.get<CitationRosterRow[]>(
+          `/api/citations?course_id=${this.selCourse}&academic_year_id=${this.selYear}`
+        )
+      );
+      this.roster.set(data);
+    } catch (err: any) {
+      this.notify.error(err?.error?.error ?? err?.message ?? 'No se pudieron cargar las citaciones');
+      this.roster.set([]);
+    } finally {
+      this.rosterLoading.set(false);
+    }
+  }
+
+  filteredRoster(): CitationRosterRow[] {
+    const q = this.manualSearch.trim().toLowerCase();
+    if (!q) return this.roster();
+    return this.roster().filter(r => r.studentName.toLowerCase().includes(q));
+  }
+
+  scopedCitations(row: CitationRosterRow): Citation[] {
+    if (!this.scopeStart || !this.scopeEnd) return row.citations;
+    return row.citations.filter(c => c.date >= this.scopeStart! && c.date <= this.scopeEnd!);
+  }
+
+  private sortedScopedCitations(row: CitationRosterRow): Citation[] {
+    return [...this.scopedCitations(row)].sort(
+      (a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`)
+    );
+  }
+
+  latestCitation(row: CitationRosterRow): Citation | null {
+    return this.sortedScopedCitations(row)[0] ?? null;
+  }
+
+  extraCitations(row: CitationRosterRow): Citation[] {
+    return this.sortedScopedCitations(row).slice(1);
+  }
+
+  extraCitationsTooltip(row: CitationRosterRow): string {
+    const n = this.extraCitations(row).length;
+    return n === 1 ? '1 citación más' : `${n} citaciones más`;
+  }
+
+  private overflowMenuCloseTimer: ReturnType<typeof setTimeout> | null = null;
+
+  openOverflowMenu(trigger: MatMenuTrigger): void {
+    if (this.overflowMenuCloseTimer) {
+      clearTimeout(this.overflowMenuCloseTimer);
+      this.overflowMenuCloseTimer = null;
+    }
+    trigger.openMenu();
+  }
+
+  scheduleCloseOverflowMenu(trigger: MatMenuTrigger): void {
+    if (this.overflowMenuCloseTimer) {
+      clearTimeout(this.overflowMenuCloseTimer);
+    }
+    this.overflowMenuCloseTimer = setTimeout(() => trigger.closeMenu(), 200);
+  }
+
+  onQuarterChange(q: Quarter | null): void {
+    if (!q || !q.startDate || !q.endDate) return;
+    this.scopeStart = q.startDate;
+    this.scopeEnd = q.endDate;
+  }
+
+  pillLabel(c: Citation): string {
+    return formatCitationDateLabelShort(c.date, c.time);
+  }
+
+  pillStyle(c: Citation): string {
+    return c.status === 'pending'
+      ? 'background:#fef9c3;color:#92400e'
+      : 'background:#f1f5f9;color:#64748b';
+  }
+
+  resolveTargetCitation(row: CitationRosterRow): Citation | null {
+    return row.citations.find(c => c.status === 'pending') ?? row.citations[0] ?? null;
+  }
+
+  async notifyGuardian(row: CitationRosterRow): Promise<void> {
+    const target = this.resolveTargetCitation(row);
+    const whatsappLink = row.whatsappLink;
+    if (!whatsappLink || !target) return;
+    if (target.status === 'closed') { window.open(whatsappLink, '_blank'); return; }
+    const vars = { nombre: row.studentName, fecha: formatCitationDateLabelShort(target.date, target.time) };
+    const toUrl = (message: string) => `${whatsappLink}?text=${encodeURIComponent(message)}`;
+    if (this.templateService.hasTemplate('citations')) {
+      window.open(toUrl(this.templateService.renderTemplate('citations', vars)), '_blank');
+      return;
+    }
+    // window.open after an await falls outside the click gesture and gets popup-blocked:
+    // reserve the tab synchronously, then navigate it once the catalog retry settles.
+    const reserved = window.open('', '_blank');
+    await this.templateService.ensureLoaded();
+    const url = toUrl(this.templateService.renderTemplate('citations', vars));
+    if (reserved) reserved.location.href = url; else window.open(url, '_blank');
+  }
+
+  deleteCitation(row: CitationRosterRow): void {
+    const target = this.resolveTargetCitation(row);
+    if (!target) return;
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: {
+        title: 'Eliminar citación',
+        message: '¿Eliminar esta citación? Esta acción no se puede deshacer.',
+      },
+    }).afterClosed().subscribe(async ok => {
+      if (!ok) return;
+      try {
+        await firstValueFrom(this.http.delete(`/api/citations/${target.id}`));
+        await this.loadRoster();
+      } catch (err: any) {
+        this.notify.error(err?.error?.error ?? err?.message ?? 'No se pudo eliminar la citación');
+      }
+    });
+  }
+
+  openHistory(row: CitationRosterRow): void {
+    this.dialog.open(CitationHistoryDialogComponent, {
+      width: '480px',
+      data: { studentName: row.studentName, citations: row.citations },
+    });
+  }
+
+  onPillClick(row: CitationRosterRow, c: Citation): void {
+    this.openCitationEditor(row, c);
+  }
+
+  onAddCitation(row: CitationRosterRow): void {
+    this.openCitationEditor(row);
+  }
+
+  private openCitationEditor(row: CitationRosterRow, citation?: Citation): void {
+    this.dialog.open(CitationDialogComponent, {
+      width: '560px',
+      data: {
+        enrollmentId: row.enrollmentId,
+        studentName: row.studentName,
+        whatsappLink: row.whatsappLink,
+        pendingCitations: citation ? [] : row.citations.filter(c => c.status === 'pending'),
+        citation,
+      },
+    }).afterClosed().subscribe(async saved => {
+      if (!saved) return;
+      await this.loadRoster();
+    });
+  }
+}

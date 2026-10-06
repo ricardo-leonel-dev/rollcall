@@ -1,0 +1,136 @@
+{
+  "hasAdminRowQuarters": false,
+  "hasOldPanel": false,
+  "chipCount": 0,
+  "chips": [],
+  "activeYearText": null,
+  "pills": [],
+  "sectionLabels": [],
+  "dialogDates": [],
+  "pendingBannerItems": [],
+  "timelineTrackRect": null,
+  "timelineSegments": [],
+  "timelineHoyRect": null,
+  "timelineHoyLabelRect": null,
+  "timelineHoyLabelClipping": {
+    "clipped": null,
+    "ancestorSelector": null,
+    "elementRect": null,
+    "ancestorRect": null
+  },
+  "timelineHoyClipping": {
+    "clipped": null,
+    "ancestorSelector": null,
+    "elementRect": null,
+    "ancestorRect": null
+  },
+  "timelineHoyAlignment": null,
+  "usersFolio": {
+    "present": false
+  },
+  "userSeals": [
+    {
+      "borderRadius": "50%",
+      "isCircular": true,
+      "hasDoubleRing": true,
+      "size": {
+        "w": 32,
+        "h": 32
+      }
+    }
+  ],
+  "userSealCount": 1,
+  "userSealsAllCircular": true,
+  "userScopeLines": [],
+  "userCardLayout": {
+    "count": 0
+  },
+  "layoutMode": null,
+  "institutionEyebrow": {
+    "present": true,
+    "roman": "Inspectoría",
+    "sub": "Historial de justificaciones",
+    "separator": "·",
+    "full": "task_altInspectoría·Historial de justificaciones"
+  },
+  "institutionTitle": null,
+  "institutionFiletePresent": true,
+  "institutionRowCount": 0,
+  "institutionStatsLines": [],
+  "institutionSeals": [],
+  "institutionSealsAllCircular": false,
+  "institutionCardLayout": {
+    "count": 0
+  },
+  "institutionFolioAbsent": true,
+  "coursesEyebrow": {
+    "present": true,
+    "roman": "Inspectoría",
+    "sub": "Historial de justificaciones",
+    "separator": "·",
+    "full": "task_altInspectoría·Historial de justificaciones"
+  },
+  "coursesTitle": null,
+  "coursesFiletePresent": true,
+  "coursesFolioPresent": false,
+  "coursesFolio": {
+    "present": false
+  },
+  "coursesFolioCount": null,
+  "coursesFolioGrammar": {
+    "matches": null
+  },
+  "citationReasonsEyebrow": {
+    "present": true,
+    "roman": "Inspectoría",
+    "sub": "Historial de justificaciones",
+    "separator": "·",
+    "full": "task_altInspectoría·Historial de justificaciones"
+  },
+  "citationReasonsTitle": null,
+  "citationReasonsFiletePresent": true,
+  "citationReasonsFolioPresent": false,
+  "citationReasonsFolio": {
+    "present": false
+  },
+  "citationReasonsFolioCount": null,
+  "citationReasonsFolioGrammar": {
+    "matches": null
+  },
+  "permissionsEyebrow": {
+    "present": true,
+    "roman": "Inspectoría",
+    "sub": "Historial de justificaciones",
+    "separator": "·",
+    "full": "task_altInspectoría·Historial de justificaciones"
+  },
+  "permissionsTitle": null,
+  "permissionsFiletePresent": true,
+  "permissionsFolioAbsent": true,
+  "rosterEyebrow": {
+    "present": true,
+    "roman": "Inspectoría",
+    "sub": "Historial de justificaciones",
+    "separator": "·",
+    "full": "task_altInspectoría·Historial de justificaciones"
+  },
+  "rosterTitle": null,
+  "rosterFiletePresent": true,
+  "rosterFolioAbsent": true,
+  "severityBadgeClassPreserved": {
+    "count": 0,
+    "hasF": false,
+    "hasAT": false,
+    "hasJ": false,
+    "all": false
+  },
+  "lateralSpine": {
+    "present": false,
+    "count": 0
+  },
+  "screenshot": "/home/rileo/ai-personal-worktrees/feature-29-cuaderno-institucional/frontend/progress/visual_absences_justifications_chapter_header_justifications_mobile.png",
+  "viewport": {
+    "width": 375,
+    "height": 667
+  }
+}

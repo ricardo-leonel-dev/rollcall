@@ -37,7 +37,7 @@ export const SECTIONS: SectionItem[] = [
       { route: '/inspectors/absences',       icon: 'event_busy', label: 'Administración de faltas',         moduleKey: 'absences' },
       { route: '/inspectors/justifications', icon: 'task_alt',   label: 'Administración de justificaciones', moduleKey: 'justifications' },
       { route: '/inspectors/student-report',  icon: 'summarize',  label: 'Informe estudiantil',              moduleKey: 'student-report' },
-      { route: '/inspectors/citations',      icon: 'campaign',   label: 'Administración de citaciones',     placeholder: true },
+      { route: '/inspectors/citations',      icon: 'campaign',   label: 'Administración de citaciones',     moduleKey: 'citations' },
     ],
   },
   {
@@ -72,6 +72,7 @@ export const SECTIONS: SectionItem[] = [
       { route: '/admin', icon: 'class',           label: 'Cursos',         moduleKey: 'admin', queryParams: { tab: 'courses' } },
       { route: '/admin', icon: 'calendar_today',  label: 'Años lectivos',  moduleKey: 'admin', queryParams: { tab: 'years' } },
       { route: '/admin', icon: 'security',        label: 'Permisos',       moduleKey: 'admin', queryParams: { tab: 'permissions' } },
+      { route: '/admin', icon: 'rule',            label: 'Motivos de citación', moduleKey: 'admin', queryParams: { tab: 'citation-reasons' } },
       { route: '/admin', icon: 'upload_file',     label: 'Importar nómina', moduleKey: 'admin', queryParams: { tab: 'roster' } },
       { route: '/admin', icon: 'corporate_fare',  label: 'Instituciones',  moduleKey: 'admin', queryParams: { tab: 'institutions' }, superAdminOnly: true },
     ],
@@ -108,6 +109,10 @@ export const MODULE_TREE: ModuleNode[] = [
     label: 'Informe estudiantil',
   },
   {
+    key: 'citations',
+    label: 'Citaciones',
+  },
+  {
     key: 'students',
     label: 'Estudiantes',
   },
@@ -123,6 +128,7 @@ export const MODULE_TREE: ModuleNode[] = [
       { key: 'admin:courses',     label: 'Cursos' },
       { key: 'admin:years',       label: 'Años lectivos' },
       { key: 'admin:permissions', label: 'Permisos de rol' },
+      { key: 'admin:citation-reasons', label: 'Motivos de citación' },
       { key: 'admin:roster',      label: 'Importar nómina' },
     ],
   },
@@ -137,6 +143,7 @@ export const MODULE_KEYS: { key: string; label: string }[] = [
   { key: 'absences:photo',        label: '↳ Foto OCR' },
   { key: 'justifications',        label: 'Justificaciones' },
   { key: 'student-report',        label: 'Informe estudiantil' },
+  { key: 'citations',             label: 'Citaciones' },
   { key: 'students',              label: 'Estudiantes' },
   { key: 'calendar',              label: 'Calendario' },
   { key: 'admin',                 label: 'Administración' },
@@ -144,5 +151,6 @@ export const MODULE_KEYS: { key: string; label: string }[] = [
   { key: 'admin:courses',         label: '↳ Cursos' },
   { key: 'admin:years',           label: '↳ Años lectivos' },
   { key: 'admin:permissions',     label: '↳ Permisos de rol' },
+  { key: 'admin:citation-reasons', label: '↳ Motivos de citación' },
   { key: 'admin:roster',          label: '↳ Importar nómina' },
 ];

@@ -12,6 +12,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { Enrollment, Course, Student } from '../../core/models/index';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
+import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -24,8 +25,14 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
   imports: [
     FormsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatButtonModule,
     MatIconModule, MatMenuModule, MatDividerModule, WhatsappIconComponent,
+    ChapterHeaderComponent,
   ],
   template: `
+    <app-chapter-header
+      icon="groups"
+      eyebrowPrefix="Estudiantes"
+      eyebrowSuffix="Nómina por curso" />
+
     <div class="page-header">
       <h1 class="page-title">Administración de estudiantes</h1>
       <button mat-flat-button color="primary" (click)="openNew()">

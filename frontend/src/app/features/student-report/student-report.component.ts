@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialog } from '@angular/material/dialog';
+import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
 import { ExportConfigDialogComponent } from './export-config-dialog.component';
 import { ExcelExportDialogComponent } from './excel-export-dialog.component';
 
@@ -65,7 +66,7 @@ const REPORT_CARDS = [
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatIconModule],
+  imports: [MatIconModule, ChapterHeaderComponent],
   styles: [`
     .sr-grid {
       display: grid;
@@ -176,6 +177,11 @@ const REPORT_CARDS = [
     }
   `],
   template: `
+    <app-chapter-header
+      icon="summarize"
+      eyebrowPrefix="Inspectoría"
+      eyebrowSuffix="Exportación de informes" />
+
     <div class="page-header">
       <h1 class="page-title">Informe estudiantil</h1>
     </div>

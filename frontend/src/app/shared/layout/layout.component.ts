@@ -1,11 +1,10 @@
-import { Component, ChangeDetectionStrategy, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, OnInit, signal, computed, inject, effect } from '@angular/core';
 import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSelectModule } from '@angular/material/select';
-import { MatDialog } from '@angular/material/dialog';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
@@ -14,13 +13,15 @@ import { InstitutionContextService } from '../../core/services/institution-conte
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
 import { QuarterContextService } from '../../core/services/quarter-context.service';
 import { ThemeService } from '../../core/services/theme.service';
-import { ProfileDialogComponent, resolveAvatarPreset } from '../components/profile-dialog/profile-dialog.component';
+import { resolveAvatarPreset } from '../../features/profile/profile.component';
 import { SECTIONS, SubNavItem } from '../../core/nav-items';
+import { SealAvatarComponent } from '../components/seal-avatar/seal-avatar.component';
 
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, FormsModule, MatIconModule, MatButtonModule, MatTooltipModule, MatSelectModule],
+  imports: [RouterOutlet, RouterLink, FormsModule, MatIconModule, MatButtonModule,
+            MatTooltipModule, MatSelectModule, SealAvatarComponent],
   styles: [`
     :host { display: flex; height: 100vh; overflow: hidden; }
 
@@ -128,19 +129,6 @@ import { SECTIONS, SubNavItem } from '../../core/nav-items';
       padding: 10px 12px;
       border-radius: 10px;
     }
-    .avatar {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
     .user-info { overflow: hidden; }
     .user-name { color: #f5f0e8; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .user-role { color: #8a7c6e; font-size: 11px; white-space: nowrap; }
@@ -237,15 +225,13 @@ import { SECTIONS, SubNavItem } from '../../core/nav-items';
 
       <div class="user-area">
         <div class="user-card">
-          <div class="avatar" [style.background]="isUploadedAvatar() ? 'transparent' : (avatarPreset()?.color ?? null)">
-            @if (isUploadedAvatar()) {
-              <img [src]="auth.currentUser()?.avatarUrl" style="width:100%;height:100%;border-radius:8px;object-fit:cover">
-            } @else if (avatarPreset()) {
-              <mat-icon style="font-size:18px;width:18px;height:18px">{{avatarPreset()!.icon}}</mat-icon>
-            } @else {
-              {{initials()}}
-            }
-          </div>
+          <app-seal-avatar
+            [size]="32"
+            [src]="isUploadedAvatar() ? (auth.currentUser()?.avatarUrl ?? null) : null"
+            [icon]="avatarPreset()?.icon ?? null"
+            [initials]="initials()"
+            [bgColor]="avatarPreset()?.color ?? null"
+            surface="dark" />
           @if (!collapsed() || isMobile()) {
             <div class="user-info">
               <div class="user-name">{{auth.currentUser()?.fullName ?? auth.currentUser()?.username}}</div>
@@ -317,7 +303,20 @@ export class LayoutComponent implements OnInit {
   readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
   private readonly bp = inject(BreakpointObserver);
-  private readonly dialog = inject(MatDialog);
+
+  constructor() {
+    // Auto-collapse on entering the tablet range. We don't gate on a
+    // "user-toggled" flag because the spec wants the *default* to be
+    // collapsed, even on re-entry: leaving the range preserves whatever
+    // state the user left (mobile slide-out / desktop expanded), and coming
+    // back resets to collapsed. The manual toggle still works inside the
+    // range — see `toggleMenu()`.
+    effect(() => {
+      if (this.isTablet()) {
+        this.collapsed.set(true);
+      }
+    });
+  }
 
   // Superadmin requests need the X-Institution-Id header, which the auth
   // interceptor only attaches once institutionContext has picked one — gate
@@ -352,7 +351,7 @@ export class LayoutComponent implements OnInit {
   }
 
   openProfile(): void {
-    this.dialog.open(ProfileDialogComponent, { width: '520px' });
+    this.router.navigate(['/profile']);
   }
 
   readonly avatarPreset = () => resolveAvatarPreset(this.auth.currentUser()?.avatarUrl);
@@ -360,6 +359,15 @@ export class LayoutComponent implements OnInit {
 
   readonly isMobile = toSignal(
     this.bp.observe('(max-width: 767px)').pipe(map(r => r.matches)),
+    { initialValue: false }
+  );
+
+  // Tablet range (768-1024px): sidebar starts collapsed by default so a
+  // portrait tablet has room for the table/card content instead of the full
+  // 240px sidebar eating half the viewport. Manual toggle still works inside
+  // the range — see `effect` below and `toggleMenu()`.
+  readonly isTablet = toSignal(
+    this.bp.observe('(min-width: 768px) and (max-width: 1024px)').pipe(map(r => r.matches)),
     { initialValue: false }
   );
 

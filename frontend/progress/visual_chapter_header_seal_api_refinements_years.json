@@ -1,0 +1,107 @@
+{
+  "hasAdminRowQuarters": true,
+  "hasOldPanel": false,
+  "chipCount": 3,
+  "chips": [
+    {
+      "text": "T12026-03-01 → 2026-05-30",
+      "rect": {
+        "x": 746.421875,
+        "y": 298,
+        "width": 188.21875,
+        "height": 29.5,
+        "top": 298,
+        "right": 934.640625,
+        "bottom": 327.5,
+        "left": 746.421875
+      },
+      "background": "rgb(250, 248, 243)",
+      "borderLeft": "2px solid rgb(99, 102, 241)",
+      "borderRadius": "10px",
+      "padding": "4px 8px",
+      "ordinalFont": null,
+      "nameFont": {
+        "weight": "600",
+        "size": "13px",
+        "color": "rgb(30, 27, 22)"
+      },
+      "rangeFont": {
+        "weight": "400",
+        "size": "11px",
+        "color": "rgb(120, 113, 108)"
+      }
+    },
+    {
+      "text": "T22026-06-01 → 2026-08-31",
+      "rect": {
+        "x": 746.421875,
+        "y": 333.5,
+        "width": 188.21875,
+        "height": 29.5,
+        "top": 333.5,
+        "right": 934.640625,
+        "bottom": 363,
+        "left": 746.421875
+      },
+      "background": "rgb(250, 248, 243)",
+      "borderLeft": "2px solid rgb(99, 102, 241)",
+      "borderRadius": "10px",
+      "padding": "4px 8px",
+      "ordinalFont": null,
+      "nameFont": {
+        "weight": "600",
+        "size": "13px",
+        "color": "rgb(30, 27, 22)"
+      },
+      "rangeFont": {
+        "weight": "400",
+        "size": "11px",
+        "color": "rgb(120, 113, 108)"
+      }
+    },
+    {
+      "text": "T32026-09-01 → 2026-12-15",
+      "rect": {
+        "x": 746.421875,
+        "y": 369,
+        "width": 188.21875,
+        "height": 29.5,
+        "top": 369,
+        "right": 934.640625,
+        "bottom": 398.5,
+        "left": 746.421875
+      },
+      "background": "rgb(250, 248, 243)",
+      "borderLeft": "2px solid rgb(99, 102, 241)",
+      "borderRadius": "10px",
+      "padding": "4px 8px",
+      "ordinalFont": null,
+      "nameFont": {
+        "weight": "600",
+        "size": "13px",
+        "color": "rgb(30, 27, 22)"
+      },
+      "rangeFont": {
+        "weight": "400",
+        "size": "11px",
+        "color": "rgb(120, 113, 108)"
+      }
+    }
+  ],
+  "adminRowQuartersDisplay": "flex",
+  "adminRowQuartersFlexDirection": "row",
+  "adminRowQuartersGap": "normal",
+  "adminRowQuartersAlignItems": "normal",
+  "adminRowAlignItems": "flex-start",
+  "adminRowDisplay": "flex",
+  "activeYearText": "Año Lectivo 2026",
+  "pills": [],
+  "sectionLabels": [],
+  "dialogDates": [],
+  "pendingBannerItems": [],
+  "screenshot": "/home/rileo/ai-personal-worktrees/feature-29-cuaderno-institucional/frontend/progress/visual_chapter_header_seal_api_refinements_years.png",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  }
+}

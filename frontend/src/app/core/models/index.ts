@@ -29,6 +29,20 @@ export interface Course {
   isActive: boolean;
 }
 
+export type CitationReasonSeverity = 'low' | 'medium' | 'high';
+
+export interface CitationReason {
+  id: number;
+  institutionId: number;
+  name: string;
+  severity: CitationReasonSeverity;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
 export interface CourseAcademicYear {
   id: number;
   courseId: number;
@@ -193,6 +207,17 @@ export interface InstitutionBranding {
   secondaryColor: string | null;
 }
 
+// Real counts per institution, attached by the backend findAll endpoint
+// (see backend_conteo_de_estudiantes_cursos_usuarios_por_instituci_n, #17).
+// Optional so existing Institution-shaped call sites stay type-safe until
+// the tab that actually renders them (admin Instituciones, feature 33)
+// explicitly opts in by reading inst.stats.
+export interface InstitutionStats {
+  students: number;
+  courses: number;
+  users: number;
+}
+
 export interface User {
   id: number;
   username: string;
@@ -212,6 +237,7 @@ export interface User {
 
 export interface Institution extends InstitutionBranding {
   isActive: boolean;
+  stats?: InstitutionStats;
 }
 
 export interface Role {
@@ -294,4 +320,54 @@ export interface PhotoAbsencePreview {
   matched:  PhotoAbsenceItem[];
   notFound: string[];
   total:    number;
+}
+
+export interface NotificationTemplatePlaceholder {
+  key:   string;
+  label: string;
+}
+
+export interface NotificationTemplateItem {
+  actionKey:       string;
+  label:           string;
+  description:     string | null;
+  placeholders:    NotificationTemplatePlaceholder[];
+  defaultTemplate: string;
+  template:        string;
+  isCustom:        boolean;
+}
+
+export interface CitationAttachment {
+  id: number;
+  fileName: string;
+  originalName: string;
+  mimeType: string;
+  url: string;
+  createdAt: string;
+}
+
+export interface Citation {
+  id: number;
+  date: string;
+  time: string;
+  guardianId: number | null;
+  status: 'pending' | 'closed';
+  observations: string | null;
+  closedAt: string | null;
+  closedByUserId: number | null;
+  createdByUserId: number;
+  createdAt: string;
+  reasonIds: number[];
+  attachments: CitationAttachment[];
+}
+
+export interface CitationRosterRow {
+  enrollmentId: number;
+  rosterNumber: number | null;
+  studentName: string;
+  guardianId: number | null;
+  guardianName: string | null;
+  guardianPhone: string | null;
+  whatsappLink: string | null;
+  citations: Citation[];
 }

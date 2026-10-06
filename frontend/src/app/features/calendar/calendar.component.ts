@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { firstValueFrom } from 'rxjs';
 import { Course, Absence } from '../../core/models/index';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
+import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
 
 interface DayCell {
   iso: string;
@@ -23,8 +24,13 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 @Component({
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatFormFieldModule, MatSelectModule, MatIconModule],
+  imports: [FormsModule, MatFormFieldModule, MatSelectModule, MatIconModule, ChapterHeaderComponent],
   template: `
+    <app-chapter-header
+      icon="calendar_month"
+      eyebrowPrefix="Calendario"
+      eyebrowSuffix="Vista mensual de asistencia" />
+
     <div class="page-header">
       <h1 class="page-title">Calendario de Asistencia</h1>
     </div>
