@@ -27,7 +27,7 @@ const TEST_PREFIX = 'testuser_';
 const ABSENCES_DEFAULT =
   'Estimado representante, le informamos que {{nombre}} registró {{tipo}} el día {{fecha}} en el curso {{curso}}. Por favor comuníquese con la institución para más información.';
 const CITATIONS_DEFAULT =
-  'Estimado apoderado, se ha registrado una citación para {{nombre}} el {{fecha}}. Por favor confirmar asistencia.';
+  'Estimado representante, se le cita a la institución el {{fecha}} a las {{hora}} para tratar un asunto relacionado con {{nombre}}. Por favor confirmar asistencia.';
 
 before(async () => {
   const app = await startTestApp();
@@ -66,10 +66,10 @@ async function authedRequest(
   return { status: res.status, body: respBody };
 }
 
-function migrationPath(): string {
+function migrationPath(filename: string): string {
   const candidates = [
-    path.resolve(__dirname, '..', '..', 'postgres', '24_message_template_actions.sql'),
-    path.resolve(process.cwd(), '..', 'postgres', '24_message_template_actions.sql'),
+    path.resolve(__dirname, '..', '..', 'postgres', filename),
+    path.resolve(process.cwd(), '..', 'postgres', filename),
   ];
   const p = candidates.find(p => fs.existsSync(p));
   if (!p) throw new Error(`migration SQL not found in any of: ${candidates.join(', ')}`);
@@ -81,7 +81,7 @@ function migrationPath(): string {
 // ─────────────────────────────────────────────────────────────────────
 
 test('T10: migration 24 runs twice without error and seeds exactly one row per action_key', async () => {
-  const sql = fs.readFileSync(migrationPath(), 'utf-8');
+  const sql = fs.readFileSync(migrationPath('24_message_template_actions.sql'), 'utf-8');
   await AppDataSource.query(sql);
   await AppDataSource.query(sql); // idempotency
 
@@ -106,7 +106,7 @@ test('T10: migration 24 runs twice without error and seeds exactly one row per a
   assert.equal(citations!.defaultTemplate, CITATIONS_DEFAULT);
   assert.deepEqual(
     citations!.placeholders.map(p => p.key),
-    ['nombre', 'fecha'],
+    ['nombre', 'fecha', 'hora'],
   );
   for (const ph of citations!.placeholders) {
     assert.equal(typeof ph.label, 'string');
@@ -447,4 +447,173 @@ test('T23: FK rejects unknown action_key and the constraint exists in informatio
     "  AND constraint_type = 'FOREIGN KEY'",
   );
   assert.equal(fk.length, 1, 'FK fk_user_message_templates_action must exist');
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// T24 (acceptance A, B) — migration 25 rewrites citations catalog state,
+// absences row is byte-identical, running twice is idempotent.
+// ─────────────────────────────────────────────────────────────────────
+
+test('T24: migration 25 rewrites citations catalog state, leaves absences untouched, and runs twice cleanly', async () => {
+  // Snapshot the absences row before the migration so we can prove it is
+  // byte-identical afterwards.
+  const absencesBefore = await AppDataSource.getRepository(MessageTemplateAction)
+    .findOneOrFail({ where: { actionKey: 'absences' } });
+  const absencesTemplateBefore = absencesBefore.defaultTemplate;
+  const absencesPlaceholdersBefore = JSON.stringify(absencesBefore.placeholders);
+
+  const sql = fs.readFileSync(migrationPath('25_citation_template_hora.sql'), 'utf-8');
+
+  // First apply.
+  await AppDataSource.query(sql);
+  // Second apply — must not error, must be a no-op on user_message_templates
+  // (every row that matched the WHERE already has {{hora}} after the first run).
+  await AppDataSource.query(sql);
+
+  // Catalog state: citations has the new placeholders + default.
+  const citations = await AppDataSource.getRepository(MessageTemplateAction)
+    .findOneOrFail({ where: { actionKey: 'citations' } });
+  assert.deepEqual(
+    citations.placeholders.map(p => p.key),
+    ['nombre', 'fecha', 'hora'],
+  );
+  assert.equal(citations.defaultTemplate, CITATIONS_DEFAULT);
+  // placeholder labels per the acceptance contract.
+  const phLabels: Record<string, string> = {};
+  for (const p of citations.placeholders) phLabels[p.key] = p.label;
+  assert.equal(phLabels.nombre, 'Nombre del estudiante');
+  assert.equal(phLabels.fecha, 'Fecha de la citación');
+  assert.equal(phLabels.hora, 'Hora de la citación');
+
+  // absences row is byte-identical.
+  const absencesAfter = await AppDataSource.getRepository(MessageTemplateAction)
+    .findOneOrFail({ where: { actionKey: 'absences' } });
+  assert.equal(absencesAfter.defaultTemplate, absencesTemplateBefore);
+  assert.equal(JSON.stringify(absencesAfter.placeholders), absencesPlaceholdersBefore);
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// T25 (acceptance C) — user_message_templates citations row containing
+// `{{fecha}}` but not `{{hora}}` is rewritten to `{{fecha}} a las {{hora}}`;
+// user rows for other action_keys are not touched.
+// ─────────────────────────────────────────────────────────────────────
+
+test('T25: migration 25 rewrites legacy citations user rows to append ` a las {{hora}}` and leaves absences rows alone', async () => {
+  const { id: userAId } = await createTestUser({});
+  const { id: userBId } = await createTestUser({});
+
+  // Legacy citations row: contains {{fecha}}, not {{hora}} — must be rewritten.
+  await AppDataSource.getRepository(UserMessageTemplate).save({
+    userId: userAId,
+    actionKey: 'citations',
+    template: 'Estimado apoderado, {{nombre}} el {{fecha}}.',
+  });
+  // absences row: must not be touched at all.
+  await AppDataSource.getRepository(UserMessageTemplate).save({
+    userId: userBId,
+    actionKey: 'absences',
+    template: 'Mi ausencia {{nombre}} el {{fecha}} en {{curso}}.',
+  });
+
+  const sql = fs.readFileSync(migrationPath('25_citation_template_hora.sql'), 'utf-8');
+  await AppDataSource.query(sql);
+
+  const aRow = await AppDataSource.getRepository(UserMessageTemplate)
+    .findOneOrFail({ where: { userId: userAId, actionKey: 'citations' } });
+  assert.equal(
+    aRow.template,
+    'Estimado apoderado, {{nombre}} el {{fecha}} a las {{hora}}.',
+    'legacy citations row must be rewritten with ` a las {{hora}}` appended after {{fecha}}',
+  );
+
+  const bRow = await AppDataSource.getRepository(UserMessageTemplate)
+    .findOneOrFail({ where: { userId: userBId, actionKey: 'absences' } });
+  assert.equal(
+    bRow.template,
+    'Mi ausencia {{nombre}} el {{fecha}} en {{curso}}.',
+    'absences user row must not be touched by the citations migration',
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// T26 (acceptance C idempotency / acceptance D) — a row that already
+// contained `{{hora}}` is left untouched; running the migration a second
+// time does not re-modify any row.
+// ─────────────────────────────────────────────────────────────────────
+
+test('T26: a citations row that already uses {{hora}} is preserved; a second apply does not re-rewrite any row', async () => {
+  const { id: legacyId } = await createTestUser({});
+  const { id: modernId } = await createTestUser({});
+
+  // Legacy row: needs rewrite.
+  const legacyBefore = 'Hola {{nombre}}, el {{fecha}}.';
+  await AppDataSource.getRepository(UserMessageTemplate).save({
+    userId: legacyId,
+    actionKey: 'citations',
+    template: legacyBefore,
+  });
+  // Modern row: already uses {{hora}} — must be preserved verbatim.
+  const modernBefore = 'Hola {{nombre}}, el {{fecha}} a las {{hora}}.';
+  await AppDataSource.getRepository(UserMessageTemplate).save({
+    userId: modernId,
+    actionKey: 'citations',
+    template: modernBefore,
+  });
+
+  const sql = fs.readFileSync(migrationPath('25_citation_template_hora.sql'), 'utf-8');
+
+  // First apply.
+  await AppDataSource.query(sql);
+  const legacyAfter1 = await AppDataSource.getRepository(UserMessageTemplate)
+    .findOneOrFail({ where: { userId: legacyId, actionKey: 'citations' } });
+  assert.equal(legacyAfter1.template, 'Hola {{nombre}}, el {{fecha}} a las {{hora}}.');
+
+  const modernAfter1 = await AppDataSource.getRepository(UserMessageTemplate)
+    .findOneOrFail({ where: { userId: modernId, actionKey: 'citations' } });
+  assert.equal(modernAfter1.template, modernBefore, 'modern row must be preserved verbatim');
+
+  // Second apply — must not modify any row.
+  await AppDataSource.query(sql);
+  const legacyAfter2 = await AppDataSource.getRepository(UserMessageTemplate)
+    .findOneOrFail({ where: { userId: legacyId, actionKey: 'citations' } });
+  const modernAfter2 = await AppDataSource.getRepository(UserMessageTemplate)
+    .findOneOrFail({ where: { userId: modernId, actionKey: 'citations' } });
+  assert.equal(legacyAfter2.template, legacyAfter1.template, 'second apply must not re-rewrite legacy row');
+  assert.equal(modernAfter2.template, modernBefore, 'second apply must not touch modern row');
+
+  // Belt-and-braces: no row in the table currently has `{{fecha}}` without
+  // ` a las {{hora}}` right after it — proof the migration is idempotent.
+  const stillLegacy = await AppDataSource.query(
+    "SELECT template FROM user_message_templates " +
+    "WHERE action_key = 'citations' " +
+    "  AND template LIKE '%{{fecha}}%' " +
+    "  AND template NOT LIKE '%{{hora}}%'",
+  );
+  assert.equal(stillLegacy.length, 0, 'no citations row should still have {{fecha}} without {{hora}} after the second apply');
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// T27 (acceptance E) — GET /api/notification-templates reflects the new
+// citations catalog state (placeholders keys/default, isCustom=false).
+// ─────────────────────────────────────────────────────────────────────
+
+test('T27: GET /api/notification-templates returns the new citations shape for a fresh user', async () => {
+  // Ensure migration 25 is applied (T24 already applied it, but be defensive
+  // in case test order changes or someone runs this file in isolation).
+  const sql = fs.readFileSync(migrationPath('25_citation_template_hora.sql'), 'utf-8');
+  await AppDataSource.query(sql);
+
+  const { token } = await createTestUser({});
+  const res = await authedRequest('GET', '/api/notification-templates', token);
+  assert.equal(res.status, 200);
+
+  const citations = res.body.find((r: any) => r.actionKey === 'citations');
+  assert.ok(citations, 'citations item must be present in GET response');
+  assert.equal(citations.isCustom, false);
+  assert.equal(citations.defaultTemplate, CITATIONS_DEFAULT);
+  assert.equal(citations.template, CITATIONS_DEFAULT);
+  assert.deepEqual(
+    citations.placeholders.map((p: any) => p.key),
+    ['nombre', 'fecha', 'hora'],
+  );
 });
