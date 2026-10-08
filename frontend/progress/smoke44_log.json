@@ -1,0 +1,70 @@
+{
+  "ranAt": "2026-10-06T00:16:00.000Z",
+  "driver": "Playwright 1.62.1 / Chromium 1234 (headless), script at /tmp/smoke44/check.mjs",
+  "summary": {
+    "preview-label-CSS": "PASS",
+    "class-coverage-child": "PASS",
+    "class-coverage-parent": "PASS (page-header/page-title are global in src/styles.css)"
+  },
+  "scope": "Focused re-smoke covering the reviewer's CHANGES_REQUESTED. The reviewer flagged that the .preview-label CSS class was missing from the new child component (referenced in template lines 130 and 159). This run verifies the fix and checks for any other dropped classes during the extraction. Not a re-run of the 18-step smoke from feature 43 — same stack-availability constraints apply (live backend does not have feature 18; the throwaway-container setup is not part of the project).",
+  "checks": {
+    "preview-label-CSS": {
+      "rationale": "Render a minimal HTML page mirroring the card body with the new child's .preview-label rule applied (Angular emulated-encapsulation selector [_ngcontent-1] included, CSS custom properties matching the original tokens). Verify computed styles on both .preview-label elements ('Plantilla' and 'Vista previa') match the original rule's expectations.",
+      "pass": true,
+      "elements": [
+        {
+          "text": "Plantilla",
+          "fontSize": "11px",
+          "fontWeight": "700",
+          "textTransform": "uppercase",
+          "letterSpacing": "0.88px (11px x 0.08em)",
+          "color": "rgb(100, 116, 139) = #64748b = var(--muted)",
+          "marginBottom": "6px"
+        },
+        {
+          "text": "Vista previa",
+          "fontSize": "11px",
+          "fontWeight": "700",
+          "textTransform": "uppercase",
+          "letterSpacing": "0.88px (11px x 0.08em)",
+          "color": "rgb(100, 116, 139) = #64748b = var(--muted)",
+          "marginBottom": "6px"
+        }
+      ],
+      "screenshot": "frontend/progress/smoke44_preview_label.png"
+    },
+    "class-coverage-child": {
+      "rationale": "Programmatic class-coverage audit on the new child component: every class used in the template must have a matching selector in the inline styles block.",
+      "pass": true,
+      "templateClasses": 20,
+      "cssClasses": 20,
+      "missing": []
+    },
+    "class-coverage-parent": {
+      "rationale": "Programmatic class-coverage audit on profile.component.ts (post-refactor): every class used in the template must have a matching selector in the inline styles block OR be defined globally in src/styles.css.",
+      "pass": true,
+      "templateClasses": 18,
+      "cssClasses": 17,
+      "missing": ["page-header", "page-title"],
+      "missingExplanation": "Both are defined globally in src/styles.css lines 340 and 343, and were never inline in profile.component.ts (even before this refactor). No regression."
+    },
+    "build": {
+      "pass": true,
+      "exitCode": 0,
+      "profileComponentCss": "2.09 kB / 5 kB error budget",
+      "childComponentCss": "2.86 kB / 5 kB error budget (2.73 before the .preview-label rule was added back, +130 bytes for the 1-line rule)",
+      "buildWarnings": "Pre-existing in the codebase (bundle initial 554.86 kB > 500 kB; multiple components over the 2 kB warning threshold). Profile.component.ts is still over the 2 kB warning but well under the 5 kB error budget per the contract's parenthetical clarification."
+    },
+    "behavior-preservation-greps": {
+      "rationale": "Carry over the grep checks from feature 43 to confirm the refactor did not reintroduce forbidden patterns.",
+      "pass": true,
+      "R12_DEFAULT_TEMPLATES": "empty",
+      "R2_legacy_NotificationTemplate": "empty",
+      "R22_apiUrl_in_profile": "empty",
+      "R23_actionPlaceholderLiterals_in_profile": "empty",
+      "R47_FALLBACK_TEMPLATES_lines": 3,
+      "R47_renderTemplate_consoleWarn": "unchanged in notification-template.service.ts",
+      "template_util_ts": "untouched"
+    }
+  }
+}
