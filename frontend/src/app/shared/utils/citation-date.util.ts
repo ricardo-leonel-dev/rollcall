@@ -42,3 +42,13 @@ export function formatCitationCreatedAtLabel(createdAt: string): string {
   const d = new Date(createdAt);
   return `Registrada el ${formatLongDateEsFromDate(d)} a las ${formatTime12hFromParts(d.getHours(), d.getMinutes())}`;
 }
+
+/** Date-only fragment, e.g. `'miércoles 17 de junio del 2026'` — used for the `{{fecha}}` placeholder. */
+export function formatCitationDateOnly(date: string): string {
+  return formatLongDateEs(date);
+}
+
+/** Time-only fragment, e.g. `'10:30 AM'` — used for the `{{hora}}` placeholder. */
+export function formatCitationTimeOnly(time: string): string {
+  return formatTime12h(time);
+}
