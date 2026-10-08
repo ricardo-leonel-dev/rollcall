@@ -18,7 +18,7 @@ import { QuarterSelectorComponent } from '../../shared/components/quarter-select
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
-import { formatCitationDateLabelShort } from '../../shared/utils/citation-date.util';
+import { formatCitationDateLabelShort, formatCitationDateOnly, formatCitationTimeOnly } from '../../shared/utils/citation-date.util';
 import { CitationHistoryDialogComponent } from './citation-history-dialog.component';
 import { CitationDialogComponent } from './citation-dialog.component';
 
@@ -346,7 +346,11 @@ export class CitationsComponent implements OnInit {
     const whatsappLink = row.whatsappLink;
     if (!whatsappLink || !target) return;
     if (target.status === 'closed') { window.open(whatsappLink, '_blank'); return; }
-    const vars = { nombre: row.studentName, fecha: formatCitationDateLabelShort(target.date, target.time) };
+    const vars = {
+      nombre: row.studentName,
+      fecha: formatCitationDateOnly(target.date),
+      hora: formatCitationTimeOnly(target.time),
+    };
     const toUrl = (message: string) => `${whatsappLink}?text=${encodeURIComponent(message)}`;
     if (this.templateService.hasTemplate('citations')) {
       window.open(toUrl(this.templateService.renderTemplate('citations', vars)), '_blank');
