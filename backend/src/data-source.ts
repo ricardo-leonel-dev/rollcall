@@ -21,6 +21,7 @@ import { UserModule } from './entities/UserModule';
 import { UserMessageTemplate } from './entities/UserMessageTemplate';
 import { MessageTemplateAction } from './entities/MessageTemplateAction';
 import { CitationReason } from './entities/CitationReason';
+import { WithdrawalReason } from './entities/WithdrawalReason';
 import { Citation } from './entities/Citation';
 import { CitationCitationReason } from './entities/CitationCitationReason';
 import { CitationAttachment } from './entities/CitationAttachment';
@@ -64,6 +65,7 @@ export const AppDataSource = new DataSource({
     UserMessageTemplate,
     MessageTemplateAction,
     CitationReason,
+    WithdrawalReason,
     Citation,
     CitationCitationReason,
     CitationAttachment,

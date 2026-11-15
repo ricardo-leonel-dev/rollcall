@@ -25,6 +25,7 @@ import jobsRouter            from '../controllers/jobs.controller';
 import notificationTemplateRouter from '../controllers/notification-template.controller';
 import citationReasonRouter    from '../controllers/citation-reason.controller';
 import citationRouter           from '../controllers/citation.controller';
+import withdrawalReasonRouter   from '../controllers/withdrawal-reason.controller';
 
 const router = Router();
 
@@ -60,5 +61,6 @@ router.use('/jobs',                 jobsRouter);
 router.use('/notification-templates', notificationTemplateRouter);
 router.use('/citation-reasons',      citationReasonRouter);
 router.use('/citations',             citationRouter);
+router.use('/withdrawal-reasons',    withdrawalReasonRouter);
 
 export default router;
