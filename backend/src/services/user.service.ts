@@ -20,6 +20,7 @@ export const MODULE_KEYS = [
   'justifications',
   'students',
   'admin', 'admin:users', 'admin:courses', 'admin:years', 'admin:permissions', 'admin:roster',
+  'admin:withdrawal-reasons',
   'admin:citation-reasons',
   'student-report',
   'citations',

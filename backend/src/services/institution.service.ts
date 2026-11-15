@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { AppDataSource } from '../data-source';
 import { Institution } from '../entities/Institution';
+import { seedDefaults } from './withdrawal-reason.service';
 
 const repo = () => AppDataSource.getRepository(Institution);
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
@@ -78,13 +79,17 @@ export async function findById(id: number) {
 
 export async function create(data: { name: string; primaryColor?: string | null; secondaryColor?: string | null }) {
   assertValidColors(data);
-  const inst = repo().create({
-    name: data.name,
-    isActive: true,
-    primaryColor: data.primaryColor ?? null,
-    secondaryColor: data.secondaryColor ?? null,
+  return AppDataSource.transaction(async (manager) => {
+    const inst = manager.getRepository(Institution).create({
+      name: data.name,
+      isActive: true,
+      primaryColor: data.primaryColor ?? null,
+      secondaryColor: data.secondaryColor ?? null,
+    });
+    const saved = await manager.getRepository(Institution).save(inst);
+    await seedDefaults(manager, saved.id);
+    return saved;
   });
-  return repo().save(inst);
 }
 
 export async function update(id: number, data: Partial<{ name: string; isActive: boolean; primaryColor: string | null; secondaryColor: string | null }>) {
