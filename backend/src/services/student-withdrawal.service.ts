@@ -1,5 +1,6 @@
 import { AppDataSource } from '../data-source';
 import { recordEvents, LOCAL_TIME_ZONE } from './domain-event.service';
+import { isStatsVisibility, StatsVisibility } from './enrollment-withdrawal';
 
 const MAX_NOTES_LENGTH = 1000;
 
@@ -23,6 +24,7 @@ export interface WithdrawalItem {
   withdrawalDate: string;
   reason: { id: number; name: string };
   notes: string | null;
+  statsVisibility: StatsVisibility;
   withdrawnAt: string;
   withdrawnBy: WithdrawalActor | null;
   revertedAt: string | null;
@@ -59,6 +61,7 @@ type WithdrawalSnapshot = {
   reasonId: number;
   withdrawalDate: string;
   notes: string | null;
+  statsVisibility: StatsVisibility;
   revertedAt: string | null;
 };
 
@@ -147,6 +150,7 @@ function toItem(row: any): WithdrawalItem {
     withdrawalDate: row.withdrawal_date,
     reason: { id: Number(row.reason_id), name: row.reason_name },
     notes: row.notes ?? null,
+    statsVisibility: row.stats_visibility,
     withdrawnAt: toIso(row.created_at)!,
     withdrawnBy: row.withdrawn_by_id === null || row.withdrawn_by_id === undefined
       ? null
@@ -161,7 +165,7 @@ function toItem(row: any): WithdrawalItem {
 const ITEM_SELECT = `
   SELECT w.id, w.enrollment_id, w.reason_id,
          to_char(w.withdrawal_date, 'YYYY-MM-DD') AS withdrawal_date,
-         w.notes, w.created_at, w.reverted_at,
+         w.notes, w.stats_visibility, w.created_at, w.reverted_at,
          e.student_id, e.course_id, e.academic_year_id,
          s.name AS student_name, s.id_number,
          c.name AS course_name,
@@ -200,6 +204,7 @@ function snapshotOf(row: any, revertedAt: string | null): WithdrawalSnapshot {
     reasonId: Number(row.reason_id),
     withdrawalDate: row.withdrawal_date,
     notes: row.notes ?? null,
+    statsVisibility: row.stats_visibility,
     revertedAt,
   };
 }
@@ -236,6 +241,12 @@ export async function withdraw(
     const trimmed = data.notes.trim();
     if (trimmed.length > MAX_NOTES_LENGTH) throw badRequest('Las observaciones no pueden superar 1000 caracteres');
     notes = trimmed.length ? trimmed : null;
+  }
+
+  let statsVisibility: StatsVisibility = 'until_withdrawal';
+  if (data.statsVisibility !== undefined) {
+    if (!isStatsVisibility(data.statsVisibility)) throw badRequest('statsVisibility inválido');
+    statsVisibility = data.statsVisibility;
   }
 
   const [todayRow] = await AppDataSource.query(
@@ -277,9 +288,9 @@ export async function withdraw(
   try {
     withdrawalId = await AppDataSource.transaction(async (em) => {
       const inserted = rowsOf(await em.query(
-        `INSERT INTO student_withdrawals (institution_id, enrollment_id, reason_id, withdrawal_date, notes, withdrawn_by_user_id)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-        [institutionId, enrollmentId, reasonId, withdrawalDate, notes, actorUserId],
+        `INSERT INTO student_withdrawals (institution_id, enrollment_id, reason_id, withdrawal_date, notes, stats_visibility, withdrawn_by_user_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [institutionId, enrollmentId, reasonId, withdrawalDate, notes, statsVisibility, actorUserId],
       ));
       const id = Number(inserted[0].id);
 
@@ -292,6 +303,7 @@ export async function withdraw(
         reasonId,
         withdrawalDate,
         notes,
+        statsVisibility,
         revertedAt: null,
       };
 
@@ -332,7 +344,7 @@ export async function revert(
   const rows = await AppDataSource.query(
     `SELECT w.id, w.enrollment_id, w.reason_id,
             to_char(w.withdrawal_date, 'YYYY-MM-DD') AS withdrawal_date,
-            w.notes, w.reverted_at,
+            w.notes, w.stats_visibility, w.reverted_at,
             e.student_id, e.course_id, e.academic_year_id
        FROM student_withdrawals w
        JOIN enrollments e ON e.id = w.enrollment_id AND e.deleted_at IS NULL
@@ -367,6 +379,72 @@ export async function revert(
     }]);
 
     return revertedAt;
+  });
+
+  const items = await fetchItems(
+    [institutionId, Number(id)],
+    [...BASE_CONDITIONS, 'w.id = $2'],
+    'w.id DESC',
+  );
+  return items[0];
+}
+
+export async function updateStatsVisibility(
+  institutionId: number,
+  courseIds: number[] | null,
+  actorUserId: number | null,
+  id: number,
+  data: { statsVisibility?: unknown },
+): Promise<WithdrawalItem> {
+  if (!isPositiveInt(id)) throw notFound('Retiro no encontrado');
+
+  const rows = await AppDataSource.query(
+    `SELECT w.id, w.enrollment_id, w.reason_id,
+            to_char(w.withdrawal_date, 'YYYY-MM-DD') AS withdrawal_date,
+            w.notes, w.stats_visibility, w.reverted_at,
+            e.student_id, e.course_id, e.academic_year_id
+       FROM student_withdrawals w
+       JOIN enrollments e ON e.id = w.enrollment_id AND e.deleted_at IS NULL
+      WHERE w.id = $1 AND w.institution_id = $2`,
+    [id, institutionId],
+  );
+  const row = rows[0];
+  if (!row) throw notFound('Retiro no encontrado');
+  if (courseIds !== null && !courseIds.includes(Number(row.course_id))) {
+    throw notFound('Retiro no encontrado');
+  }
+  if (row.reverted_at !== null) throw conflict('El retiro ya fue revertido');
+
+  if (!isStatsVisibility(data.statsVisibility)) throw badRequest('statsVisibility inválido');
+  const statsVisibility = data.statsVisibility;
+
+  const before = snapshotOf(row, null);
+
+  if (before.statsVisibility === statsVisibility) {
+    const items = await fetchItems(
+      [institutionId, Number(id)],
+      [...BASE_CONDITIONS, 'w.id = $2'],
+      'w.id DESC',
+    );
+    return items[0];
+  }
+
+  await AppDataSource.transaction(async (em) => {
+    const updated = rowsOf(await em.query(
+      `UPDATE student_withdrawals SET stats_visibility = $2
+        WHERE id = $1 AND reverted_at IS NULL RETURNING id`,
+      [id, statsVisibility],
+    ));
+    if (!updated.length) throw conflict('El retiro ya fue revertido');
+
+    await recordEvents(em, [{
+      institutionId,
+      eventType: 'WithdrawalVisibilityChanged',
+      entityType: 'student_withdrawal',
+      entityId: Number(id),
+      actorUserId,
+      payload: { before, after: { ...before, statsVisibility } },
+    }]);
   });
 
   const items = await fetchItems(

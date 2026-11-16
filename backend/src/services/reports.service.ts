@@ -1,4 +1,5 @@
 import { AppDataSource } from '../data-source';
+import { visibleRecordSql } from './enrollment-withdrawal';
 
 export interface StudentReportItem {
   id: number;
@@ -49,10 +50,12 @@ export async function getStudentSummary(
        AND a.deleted_at     IS NULL
        AND a.institution_id = $1
        AND a.date BETWEEN $4 AND $5
+       AND ${visibleRecordSql('a.enrollment_id', 'a.date')}
      WHERE m.deleted_at     IS NULL
        AND m.institution_id = $1
        AND m.academic_year_id = $2
        AND m.course_id = ANY($3)
+       AND ${visibleRecordSql('m.id', '$4::date')}
      GROUP BY c.id, c.name, e.id, e.name, m.roster_number
      ORDER BY c.name, m.roster_number NULLS LAST, e.name`,
     [institutionId, academicYearId, courseIdsToQuery, dateFrom, dateTo],

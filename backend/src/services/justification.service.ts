@@ -8,6 +8,7 @@ import { JustificationAttachment } from '../entities/JustificationAttachment';
 import { Absence } from '../entities/Absence';
 import { Enrollment } from '../entities/Enrollment';
 import { recordEvents } from './domain-event.service';
+import { notWithdrawnSql, visibleRecordSql, assertEnrollmentNotWithdrawn } from './enrollment-withdrawal';
 
 const repo = () => AppDataSource.getRepository(Justification);
 const jaRepo = () => AppDataSource.getRepository(JustificationAbsence);
@@ -81,6 +82,7 @@ export async function findAll(
       JOIN absences a ON a.id = ja.absence_id
       WHERE ja.justification_id = j.id
         AND a.deleted_at IS NULL
+        AND ${visibleRecordSql('j.enrollment_id', 'a.date')}
         ${dateFromIdx ? `AND a.date >= $${dateFromIdx}` : ''}
         ${dateToIdx   ? `AND a.date <= $${dateToIdx}`   : ''}
     )`;
@@ -108,13 +110,16 @@ export async function findAll(
       COALESCE((
         SELECT json_agg(ja.absence_id)
         FROM justification_absences ja
+        JOIN absences a ON a.id = ja.absence_id
         WHERE ja.justification_id = j.id
+          AND ${visibleRecordSql('j.enrollment_id', 'a.date')}
       ), '[]') AS "absenceIds",
       COALESCE((
         SELECT json_agg(json_build_object('id', a.id, 'date', a.date) ORDER BY a.date)
         FROM justification_absences ja
         JOIN absences a ON a.id = ja.absence_id
         WHERE ja.justification_id = j.id
+          AND ${visibleRecordSql('j.enrollment_id', 'a.date')}
       ), '[]') AS "absenceDates",
       COALESCE((
         SELECT json_agg(json_build_object(
@@ -132,6 +137,12 @@ export async function findAll(
     JOIN students s ON s.id = e.student_id
     JOIN courses c ON c.id = e.course_id
     WHERE j.institution_id = $1 AND j.deleted_at IS NULL
+    AND (${notWithdrawnSql('j', 'enrollment_id')} OR EXISTS (
+      SELECT 1 FROM justification_absences ja
+      JOIN absences av ON av.id = ja.absence_id
+      WHERE ja.justification_id = j.id AND av.deleted_at IS NULL
+        AND ${visibleRecordSql('j.enrollment_id', 'av.date')}
+    ))
     ${dateFilter}
     ${courseFilter}
     ${specificCourseFilter}
@@ -178,6 +189,7 @@ export async function create(institutionId: number, courseIds: number[] | null, 
   }
 
   await assertEnrollmentInScope(institutionId, courseIds, data.enrollmentId);
+  await assertEnrollmentNotWithdrawn(data.enrollmentId);
 
   for (const absId of data.absenceIds) {
     const abs = await absRepo().findOne({ where: { id: absId, institutionId, deletedAt: IsNull() } });
@@ -227,6 +239,7 @@ export async function update(institutionId: number, courseIds: number[] | null, 
   reason?: string; notifiedBy?: string; absenceIds?: number[];
 }) {
   const j = await findById(institutionId, courseIds, id);
+  await assertEnrollmentNotWithdrawn(j.enrollmentId);
 
   if (data.reason) j.reason = data.reason;
   if (data.notifiedBy !== undefined) j.notifiedBy = data.notifiedBy;
@@ -248,6 +261,7 @@ export async function update(institutionId: number, courseIds: number[] | null, 
 
 export async function remove(institutionId: number, courseIds: number[] | null, id: number, actorUserId: number | null = null) {
   const j = await findById(institutionId, courseIds, id);
+  await assertEnrollmentNotWithdrawn(j.enrollmentId);
 
   // Los adjuntos (justification_attachments) se preservan intactos a propósito:
   // borrar una justificación nunca debe destruir la evidencia que la respaldaba.
@@ -283,7 +297,15 @@ export async function addAttachments(
   justificationId: number,
   files: Express.Multer.File[],
 ) {
-  await findById(institutionId, courseIds, justificationId);
+  const j = await findById(institutionId, courseIds, justificationId);
+
+  try {
+    await assertEnrollmentNotWithdrawn(j.enrollmentId);
+  } catch (err) {
+    // The upload is already on disk; a refused write must not leave it there.
+    for (const f of files) fs.unlink(path.join(ATTACHMENTS_DIR, f.filename), () => {});
+    throw err;
+  }
 
   const rows = files.map(f => attRepo().create({
     justificationId,
@@ -301,7 +323,8 @@ export async function removeAttachment(
   justificationId: number,
   attachmentId: number,
 ) {
-  await findById(institutionId, courseIds, justificationId);
+  const j = await findById(institutionId, courseIds, justificationId);
+  await assertEnrollmentNotWithdrawn(j.enrollmentId);
 
   const att = await attRepo().findOne({ where: { id: attachmentId, justificationId } });
   if (!att) throw Object.assign(new Error('Attachment not found'), { status: 404 });

@@ -7,7 +7,8 @@ export type DomainEventType =
   | 'JustificationCreated'
   | 'JustificationDeleted'
   | 'StudentWithdrawn'
-  | 'StudentReinstated';
+  | 'StudentReinstated'
+  | 'WithdrawalVisibilityChanged';
 
 export interface DomainEventInput {
   institutionId: number;

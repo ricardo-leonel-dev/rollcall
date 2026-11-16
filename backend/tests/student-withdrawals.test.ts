@@ -44,6 +44,7 @@ const ITEM_KEYS = [
   'reason',
   'revertedAt',
   'revertedBy',
+  'statsVisibility',
   'studentId',
   'studentName',
   'withdrawalDate',
@@ -1194,6 +1195,7 @@ test('R4: withdrawing an enrollment records one StudentWithdrawn event', async (
             reasonId: fx.reasonA.id,
             withdrawalDate: fx.today,
             notes: 'Se muda',
+            statsVisibility: 'until_withdrawal',
             revertedAt: null,
           },
         });

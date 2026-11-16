@@ -1,7 +1,13 @@
 import { AppDataSource } from '../data-source';
+import { visibleRecordSql } from './enrollment-withdrawal';
 
 export async function getSummary(institutionId: number, courseIds: number[] | null, courseId?: number, academicYearId?: number, dateFrom?: string, dateTo?: string) {
-  const filters: string[] = ['a.deleted_at IS NULL', 'm.deleted_at IS NULL', 'a.institution_id = $1'];
+  const filters: string[] = [
+    'a.deleted_at IS NULL',
+    'm.deleted_at IS NULL',
+    'a.institution_id = $1',
+    visibleRecordSql('a.enrollment_id', 'a.date'),
+  ];
   const params: any[] = [institutionId];
   let i = 2;
   if (courseIds !== null) { filters.push(`m.course_id = ANY($${i++})`); params.push(courseIds); }
@@ -39,6 +45,7 @@ export async function getSummary(institutionId: number, courseIds: number[] | nu
         ) ORDER BY a2.date)
         FROM absences a2
         WHERE a2.enrollment_id = m.id AND a2.deleted_at IS NULL
+          AND ${visibleRecordSql('a2.enrollment_id', 'a2.date')}
           ${dateFromIdx ? `AND a2.date >= $${dateFromIdx}` : ''}
           ${dateToIdx   ? `AND a2.date <= $${dateToIdx}`   : ''}
       ), '[]') AS breakdown

@@ -1,4 +1,5 @@
 import { AppDataSource } from '../data-source';
+import { notWithdrawnSql } from './enrollment-withdrawal';
 
 const WHISPER_URL     = process.env.WHISPER_URL ?? '';
 const LLM_URL         = process.env.LLM_URL ?? '';
@@ -22,7 +23,7 @@ export interface VoiceAbsencePreview {
 
 async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<string> {
   const fd = new FormData();
-  fd.append('file', new Blob([audioBuffer], { type: mimeType }), 'audio.webm');
+  fd.append('file', new Blob([new Uint8Array(audioBuffer)], { type: mimeType }), 'audio.webm');
   fd.append('model', 'Systran/faster-whisper-large-v3');
   fd.append('language', 'es');
   fd.append('response_format', 'json');
@@ -33,7 +34,7 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<s
   return data.text.trim();
 }
 
-async function fetchEnrollments(courseId: number, academicYearId: number, institutionId: number) {
+export async function fetchEnrollments(courseId: number, academicYearId: number, institutionId: number) {
   return AppDataSource.query(`
     SELECT e.id AS enrollment_id, s.name
     FROM enrollments e
@@ -43,6 +44,7 @@ async function fetchEnrollments(courseId: number, academicYearId: number, instit
       AND e.institution_id = $3
       AND e.deleted_at IS NULL
       AND s.deleted_at IS NULL
+      AND ${notWithdrawnSql('e', 'id')}
     ORDER BY s.name
   `, [courseId, academicYearId, institutionId]) as Promise<{ enrollment_id: number; name: string }[]>;
 }

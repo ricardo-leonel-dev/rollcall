@@ -6,6 +6,7 @@ import { JustificationAbsence } from '../entities/JustificationAbsence';
 import { Justification } from '../entities/Justification';
 import { recordEvents } from './domain-event.service';
 import type { DomainEventInput } from './domain-event.service';
+import { visibleRecordSql, assertEnrollmentNotWithdrawn } from './enrollment-withdrawal';
 
 const repo = () => AppDataSource.getRepository(Absence);
 
@@ -39,7 +40,12 @@ interface AbsenceFilters {
 }
 
 export async function findAll(institutionId: number, courseIds: number[] | null, filters: AbsenceFilters) {
-  const conditions: string[] = ['a.deleted_at IS NULL', 'm.deleted_at IS NULL', 'a.institution_id = $1'];
+  const conditions: string[] = [
+    'a.deleted_at IS NULL',
+    'm.deleted_at IS NULL',
+    'a.institution_id = $1',
+    visibleRecordSql('a.enrollment_id', 'a.date'),
+  ];
   const params: any[] = [institutionId];
   let i = 2;
 
@@ -136,6 +142,7 @@ export async function createRange(institutionId: number, courseIds: number[] | n
     throw Object.assign(new Error('dateFrom must be on or before dateTo'), { status: 400 });
   }
   await assertEnrollmentInScope(institutionId, courseIds, data.enrollmentId);
+  await assertEnrollmentNotWithdrawn(data.enrollmentId);
 
   const days = businessDaysInRange(data.dateFrom, data.dateTo);
   if (!days.length) {
@@ -244,6 +251,7 @@ export async function update(institutionId: number, courseIds: number[] | null, 
   date: string; type: 'F' | 'AT'; notes: string; photoSource: string;
 }>) {
   const a = await findById(institutionId, courseIds, id);
+  await assertEnrollmentNotWithdrawn(a.enrollmentId);
   if (data.type && !['F', 'AT'].includes(data.type)) {
     throw Object.assign(new Error('Invalid type. Only F or AT'), { status: 400 });
   }
@@ -256,6 +264,7 @@ export async function update(institutionId: number, courseIds: number[] | null, 
 
 export async function remove(institutionId: number, courseIds: number[] | null, id: number, actorUserId: number | null = null) {
   const a = await findById(institutionId, courseIds, id);
+  await assertEnrollmentNotWithdrawn(a.enrollmentId);
   await AppDataSource.transaction(async (em) => {
     await cascadeSoftDeleteAbsence(em, id);
     await recordEvents(em, [{

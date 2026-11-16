@@ -3,6 +3,7 @@ import { Student } from '../entities/Student';
 import { Enrollment } from '../entities/Enrollment';
 import { IsNull } from 'typeorm';
 import { cascadeSoftDeleteEnrollment } from './enrollment.service';
+import { notWithdrawnSql } from './enrollment-withdrawal';
 
 const repo = () => AppDataSource.getRepository(Student);
 
@@ -15,14 +16,36 @@ async function assertStudentInScope(courseIds: number[] | null, studentId: numbe
   if (!rows.length) throw Object.assign(new Error('Student not found'), { status: 404 });
 }
 
-export async function findAll(institutionId: number, courseIds: number[] | null, search?: string) {
+export async function findAll(institutionId: number, courseIds: number[] | null, search?: string, academicYearId?: number) {
+  if (academicYearId !== undefined) {
+    const years = await AppDataSource.query(
+      `SELECT 1 FROM academic_years WHERE id = $1 AND institution_id = $2 AND deleted_at IS NULL`,
+      [academicYearId, institutionId],
+    );
+    if (!years.length) throw Object.assign(new Error('Academic year not found'), { status: 404 });
+  }
+
   const qb = repo().createQueryBuilder('s')
     .where('s.institution_id = :institutionId', { institutionId })
     .andWhere('s.deleted_at IS NULL');
   if (search) qb.andWhere('s.name ILIKE :search', { search: `%${search}%` });
-  if (courseIds !== null) {
-    qb.andWhere('s.id IN (SELECT student_id FROM enrollments WHERE course_id = ANY(:courseIds) AND deleted_at IS NULL)', { courseIds });
+
+  // The year and the course scope narrow the list through the enrollments:
+  // a student is only listed when it has an enrollment of that year (and of
+  // those courses) that is neither deleted nor withdrawn.
+  if (academicYearId !== undefined || courseIds !== null) {
+    const conditions = ['e.student_id = s.id', 'e.deleted_at IS NULL', notWithdrawnSql('e', 'id')];
+    if (academicYearId !== undefined) {
+      qb.setParameter('academicYearId', academicYearId);
+      conditions.push('e.academic_year_id = :academicYearId');
+    }
+    if (courseIds !== null) {
+      qb.setParameter('courseIds', courseIds);
+      conditions.push('e.course_id = ANY(:courseIds)');
+    }
+    qb.andWhere(`EXISTS (SELECT 1 FROM enrollments e WHERE ${conditions.join(' AND ')})`);
   }
+
   qb.orderBy('s.name', 'ASC');
   return qb.getMany();
 }
