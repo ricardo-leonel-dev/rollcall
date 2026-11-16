@@ -1,4 +1,4 @@
-import { IsNull } from 'typeorm';
+import { IsNull, Not } from 'typeorm';
 import fs from 'fs';
 import path from 'path';
 import { AppDataSource } from '../data-source';
@@ -180,6 +180,32 @@ function justificationSnapshot(
   };
 }
 
+// An update re-links the absences it already holds, so its own links must not
+// count as "already justified".
+async function assertAbsencesLinkable(
+  institutionId: number,
+  enrollmentId: number,
+  absenceIds: number[],
+  justificationId: number | null = null,
+): Promise<void> {
+  for (const absId of absenceIds) {
+    const abs = await absRepo().findOne({ where: { id: absId, institutionId, deletedAt: IsNull() } });
+    if (!abs) throw Object.assign(new Error(`Absence ${absId} not found`), { status: 404 });
+    if (abs.enrollmentId !== enrollmentId) {
+      throw Object.assign(new Error(`Absence ${absId} does not belong to this enrollment`), { status: 400 });
+    }
+    if (!['F', 'AT'].includes(abs.type)) {
+      throw Object.assign(new Error(`Invalid absence type: ${abs.type}`), { status: 400 });
+    }
+    const exists = await jaRepo().findOne({
+      where: justificationId === null
+        ? { absenceId: absId }
+        : { absenceId: absId, justificationId: Not(justificationId) },
+    });
+    if (exists) throw Object.assign(new Error(`Absence ${absId} is already justified`), { status: 409 });
+  }
+}
+
 export async function create(institutionId: number, courseIds: number[] | null, data: {
   enrollmentId: number; reason: string;
   notifiedBy?: string; absenceIds: number[];
@@ -191,18 +217,7 @@ export async function create(institutionId: number, courseIds: number[] | null, 
   await assertEnrollmentInScope(institutionId, courseIds, data.enrollmentId);
   await assertEnrollmentNotWithdrawn(data.enrollmentId);
 
-  for (const absId of data.absenceIds) {
-    const abs = await absRepo().findOne({ where: { id: absId, institutionId, deletedAt: IsNull() } });
-    if (!abs) throw Object.assign(new Error(`Absence ${absId} not found`), { status: 404 });
-    if (abs.enrollmentId !== data.enrollmentId) {
-      throw Object.assign(new Error(`Absence ${absId} does not belong to this enrollment`), { status: 400 });
-    }
-    if (!['F', 'AT'].includes(abs.type)) {
-      throw Object.assign(new Error(`Invalid absence type: ${abs.type}`), { status: 400 });
-    }
-    const exists = await jaRepo().findOne({ where: { absenceId: absId } });
-    if (exists) throw Object.assign(new Error(`Absence ${absId} is already justified`), { status: 409 });
-  }
+  await assertAbsencesLinkable(institutionId, data.enrollmentId, data.absenceIds);
 
   return AppDataSource.transaction(async (em) => {
     const j = em.create(Justification, {
@@ -240,6 +255,9 @@ export async function update(institutionId: number, courseIds: number[] | null, 
 }) {
   const j = await findById(institutionId, courseIds, id);
   await assertEnrollmentNotWithdrawn(j.enrollmentId);
+  if (data.absenceIds !== undefined) {
+    await assertAbsencesLinkable(institutionId, j.enrollmentId, data.absenceIds, id);
+  }
 
   if (data.reason) j.reason = data.reason;
   if (data.notifiedBy !== undefined) j.notifiedBy = data.notifiedBy;
