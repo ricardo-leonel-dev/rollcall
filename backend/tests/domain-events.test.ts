@@ -1297,7 +1297,7 @@ test('R8: GET /api/audit-events lists the caller institution events', async (t) 
         const role = await createTestRole([{ resource: 'audit-events', canRead: true }]);
         const { token } = await createUser(role.name, fx.institution.id);
 
-        const [row] = await AppDataSource.query(`SELECT current_date::text AS today`);
+        const [row] = await AppDataSource.query(`SELECT (now() AT TIME ZONE 'America/Guayaquil')::date::text AS today`);
         const today = row.today;
         await AppDataSource.query(
           `INSERT INTO domain_events (institution_id, event_type, entity_type, entity_id, occurred_at)
@@ -1310,6 +1310,31 @@ test('R8: GET /api/audit-events lists the caller institution events', async (t) 
         assert.equal(res.status, 200);
         assert.equal(res.body.items.length, 1, 'only the event of that day came back');
         assert.equal(res.body.items[0].entityId, 1);
+      },
+    },
+    {
+      name: 'the date range follows Ecuador local days, not UTC days',
+      run: async () => {
+        const fx = await createFixture();
+        const role = await createTestRole([{ resource: 'audit-events', canRead: true }]);
+        const { token } = await createUser(role.name, fx.institution.id);
+
+        await AppDataSource.query(
+          `INSERT INTO domain_events (institution_id, event_type, entity_type, entity_id, occurred_at)
+           VALUES ($1, 'AbsenceRecorded', 'absence', 1, '2026-11-16 01:30:00+00'),
+                  ($1, 'AbsenceRecorded', 'absence', 2, '2026-11-15 04:59:00+00')`,
+          [fx.institution.id],
+        );
+
+        const idsOn = async (day: string) => {
+          const res = await request('GET', `/api/audit-events?date_from=${day}&date_to=${day}`, { token, institutionId: fx.institution.id });
+          assert.equal(res.status, 200);
+          return res.body.items.map((i: any) => i.entityId).sort();
+        };
+
+        assert.deepEqual(await idsOn('2026-11-14'), [2], 'an event at 04:59 UTC belongs to the previous local day');
+        assert.deepEqual(await idsOn('2026-11-15'), [1], 'an event at 01:30 UTC the next day still belongs to this local day');
+        assert.deepEqual(await idsOn('2026-11-16'), [], 'the early UTC event is not on the later local day');
       },
     },
     {

@@ -61,6 +61,11 @@ export interface AuditEventItem {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// date_from/date_to name school days, so they are local days, not UTC days.
+// The bounds become instants compared against the bare column, which keeps the
+// (institution_id, occurred_at) index usable.
+const LOCAL_TIME_ZONE = 'America/Guayaquil';
+
 function invalidQuery(): Error {
   return Object.assign(new Error('Parámetros de consulta inválidos'), { status: 400 });
 }
@@ -128,8 +133,8 @@ export async function findAll(
   if (eventType !== undefined) { params.push(eventType); conditions.push(`e.event_type = $${params.length}`); }
   if (entityId !== undefined) { params.push(entityId); conditions.push(`e.entity_id = $${params.length}`); }
   if (actorUserId !== undefined) { params.push(actorUserId); conditions.push(`e.actor_user_id = $${params.length}`); }
-  if (dateFrom !== undefined) { params.push(dateFrom); conditions.push(`e.occurred_at >= $${params.length}::date`); }
-  if (dateTo !== undefined) { params.push(dateTo); conditions.push(`e.occurred_at < ($${params.length}::date + 1)`); }
+  if (dateFrom !== undefined) { params.push(dateFrom); conditions.push(`e.occurred_at >= (($${params.length}::date)::timestamp AT TIME ZONE '${LOCAL_TIME_ZONE}')`); }
+  if (dateTo !== undefined) { params.push(dateTo); conditions.push(`e.occurred_at < (($${params.length}::date + 1)::timestamp AT TIME ZONE '${LOCAL_TIME_ZONE}')`); }
   if (beforeId !== undefined) {
     params.push(beforeId);
     conditions.push(
