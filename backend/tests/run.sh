@@ -18,6 +18,7 @@ rm -rf /tmp/test-build
   tests/message-template-catalog.test.ts \
   tests/user-modules.test.ts \
   tests/withdrawal-reasons.test.ts \
+  tests/student-withdrawals.test.ts \
   tests/domain-events.test.ts \
   tests/helpers/test-app.ts \
   tests/helpers/test-users.ts \
@@ -28,4 +29,5 @@ NODE_PATH="$(pwd)/node_modules" exec node --test --test-concurrency=1 \
   /tmp/test-build/tests/message-template-catalog.test.js \
   /tmp/test-build/tests/user-modules.test.js \
   /tmp/test-build/tests/withdrawal-reasons.test.js \
+  /tmp/test-build/tests/student-withdrawals.test.js \
   /tmp/test-build/tests/domain-events.test.js
