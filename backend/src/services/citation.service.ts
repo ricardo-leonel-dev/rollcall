@@ -5,6 +5,7 @@ import { CitationCitationReason } from '../entities/CitationCitationReason';
 import { CitationAttachment } from '../entities/CitationAttachment';
 import { CitationReason } from '../entities/CitationReason';
 import { Enrollment } from '../entities/Enrollment';
+import { notWithdrawnSql, visibleRecordSql, assertEnrollmentNotWithdrawn } from './enrollment-withdrawal';
 import fs from 'fs';
 import path from 'path';
 
@@ -140,6 +141,7 @@ export async function findRoster(institutionId: number, courseIds: number[] | nu
       ), '[]') AS citations
     FROM v_enrollments_detail v
     WHERE v.institution_id = $1 AND v.course_id = $2 AND v.academic_year_id = $3
+      AND ${notWithdrawnSql('v', 'enrollment_id')}
     ORDER BY v.roster_number
   `;
   const rows = await AppDataSource.query(sql, [institutionId, courseId, academicYearId]);
@@ -158,7 +160,11 @@ export async function findByEnrollment(institutionId: number, courseIds: number[
   }
   await assertEnrollmentInScope(institutionId, courseIds, enrollmentId);
 
-  const conditions = ['c.enrollment_id = $1', 'c.deleted_at IS NULL'];
+  const conditions = [
+    'c.enrollment_id = $1',
+    'c.deleted_at IS NULL',
+    visibleRecordSql('c.enrollment_id', 'c.date'),
+  ];
   const params: any[] = [enrollmentId];
   if (status) { conditions.push(`c.status = $2`); params.push(status); }
 
@@ -182,6 +188,7 @@ export async function create(institutionId: number, courseIds: number[] | null, 
     throw Object.assign(new Error('El campo date es obligatorio'), { status: 400 });
   }
   const enrollment = await assertEnrollmentInScope(institutionId, courseIds, data.enrollmentId);
+  await assertEnrollmentNotWithdrawn(data.enrollmentId);
   if (enrollment.guardianId === null) {
     throw Object.assign(new Error('La matrícula no tiene representante asignado'), { status: 400 });
   }
@@ -214,6 +221,7 @@ export async function update(institutionId: number, courseIds: number[] | null, 
   }
 
   const c = await findOwned(institutionId, courseIds, id);
+  await assertEnrollmentNotWithdrawn(c.enrollmentId);
 
   if (c.guardianId === null) {
     throw Object.assign(new Error('Esta citación no tiene representante asignado y no puede editarse'), { status: 400 });
@@ -243,6 +251,7 @@ export async function update(institutionId: number, courseIds: number[] | null, 
 
 export async function close(institutionId: number, courseIds: number[] | null, id: number, closedByUserId: number | null) {
   const c = await findOwned(institutionId, courseIds, id);
+  await assertEnrollmentNotWithdrawn(c.enrollmentId);
   if (c.status === 'closed') {
     throw Object.assign(new Error('La citación ya está cerrada'), { status: 409 });
   }
@@ -253,12 +262,21 @@ export async function close(institutionId: number, courseIds: number[] | null, i
 }
 
 export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
-  await findOwned(institutionId, courseIds, id);
+  const c = await findOwned(institutionId, courseIds, id);
+  await assertEnrollmentNotWithdrawn(c.enrollmentId);
   await repo().update({ id }, { deletedAt: new Date(), isActive: false });
 }
 
 export async function addAttachments(institutionId: number, courseIds: number[] | null, citationId: number, files: Express.Multer.File[]) {
-  await findOwned(institutionId, courseIds, citationId);
+  try {
+    const c = await findOwned(institutionId, courseIds, citationId);
+    await assertEnrollmentNotWithdrawn(c.enrollmentId);
+  } catch (err) {
+    // The upload is already on disk; a refused write must not leave it there.
+    await Promise.allSettled(files.map(f => fs.promises.unlink(f.path)));
+    throw err;
+  }
+
   const rows = files.map(f => attRepo().create({
     citationId,
     fileName: f.filename,
@@ -270,7 +288,8 @@ export async function addAttachments(institutionId: number, courseIds: number[] 
 }
 
 export async function removeAttachment(institutionId: number, courseIds: number[] | null, citationId: number, attachmentId: number) {
-  await findOwned(institutionId, courseIds, citationId);
+  const c = await findOwned(institutionId, courseIds, citationId);
+  await assertEnrollmentNotWithdrawn(c.enrollmentId);
   const att = await attRepo().findOne({ where: { id: attachmentId, citationId } });
   if (!att) throw Object.assign(new Error('Attachment not found'), { status: 404 });
   await attRepo().remove(att);

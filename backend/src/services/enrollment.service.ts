@@ -7,6 +7,7 @@ import { AcademicYear } from '../entities/AcademicYear';
 import { Guardian } from '../entities/Guardian';
 import { Absence } from '../entities/Absence';
 import { cascadeSoftDeleteAbsence } from './absence.service';
+import { notWithdrawnSql, assertEnrollmentNotWithdrawn } from './enrollment-withdrawal';
 
 const repo = () => AppDataSource.getRepository(Enrollment);
 
@@ -41,7 +42,7 @@ async function assertOwnership(institutionId: number, courseIds: number[] | null
 }
 
 export async function findAll(institutionId: number, courseIds: number[] | null, courseId?: number, academicYearId?: number, studentId?: number, courseIdsFilter?: number[]) {
-  const conditions: string[] = ['institution_id = $1'];
+  const conditions: string[] = ['institution_id = $1', notWithdrawnSql('v_enrollments_detail', 'enrollment_id')];
   const params: any[] = [institutionId];
   let i = 2;
   if (courseIds !== null)  { conditions.push(`course_id = ANY($${i++})`); params.push(courseIds); }
@@ -59,7 +60,7 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
        course,
        teacher,
        student_id      AS "studentId",
-       ROW_NUMBER() OVER (PARTITION BY course_id, academic_year_id ORDER BY full_name) AS "rosterNumber",
+       roster_number   AS "rosterNumber",
        id_number       AS "idNumber",
        full_name       AS "fullName",
        gender,
@@ -77,7 +78,7 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
        is_active       AS "isActive"
      FROM v_enrollments_detail
      WHERE ${conditions.join(' AND ')}
-     ORDER BY academic_year_id DESC, course, "rosterNumber"`,
+     ORDER BY academic_year_id DESC, course, roster_number NULLS LAST, full_name`,
     params
   );
 }
@@ -114,6 +115,7 @@ export async function update(institutionId: number, courseIds: number[] | null, 
   studentPhone: string; studentEmail: string; isActive: boolean;
 }>) {
   const e = await findById(institutionId, courseIds, id);
+  await assertEnrollmentNotWithdrawn(id);
   if (data.guardianId !== undefined) await assertOwnership(institutionId, courseIds, { guardianId: data.guardianId });
   Object.assign(e, data);
   return repo().save(e);
@@ -121,5 +123,6 @@ export async function update(institutionId: number, courseIds: number[] | null, 
 
 export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
   await findById(institutionId, courseIds, id);
+  await assertEnrollmentNotWithdrawn(id);
   await AppDataSource.transaction(em => cascadeSoftDeleteEnrollment(em, id));
 }
