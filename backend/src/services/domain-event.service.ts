@@ -5,12 +5,14 @@ export type DomainEventType =
   | 'AbsenceRecorded'
   | 'AbsenceDeleted'
   | 'JustificationCreated'
-  | 'JustificationDeleted';
+  | 'JustificationDeleted'
+  | 'StudentWithdrawn'
+  | 'StudentReinstated';
 
 export interface DomainEventInput {
   institutionId: number;
   eventType: DomainEventType;
-  entityType: 'absence' | 'justification';
+  entityType: 'absence' | 'justification' | 'student_withdrawal';
   entityId: number;
   actorUserId: number | null;
   payload: { before: Record<string, unknown> | null; after: Record<string, unknown> | null } & Record<string, unknown>;
@@ -64,7 +66,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // date_from/date_to name school days, so they are local days, not UTC days.
 // The bounds become instants compared against the bare column, which keeps the
 // (institution_id, occurred_at) index usable.
-const LOCAL_TIME_ZONE = 'America/Guayaquil';
+export const LOCAL_TIME_ZONE = 'America/Guayaquil';
 
 function invalidQuery(): Error {
   return Object.assign(new Error('Parámetros de consulta inválidos'), { status: 400 });
