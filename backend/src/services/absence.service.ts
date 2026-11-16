@@ -4,6 +4,8 @@ import { Absence } from '../entities/Absence';
 import { Enrollment } from '../entities/Enrollment';
 import { JustificationAbsence } from '../entities/JustificationAbsence';
 import { Justification } from '../entities/Justification';
+import { recordEvents } from './domain-event.service';
+import type { DomainEventInput } from './domain-event.service';
 
 const repo = () => AppDataSource.getRepository(Absence);
 
@@ -90,6 +92,21 @@ export async function findById(institutionId: number, courseIds: number[] | null
   return a;
 }
 
+// The audit snapshot carries the business fields only — the technical ones
+// (createdAt/updatedAt/isActive/deletedAt) would change the meaning of the
+// record on every later read.
+function absenceSnapshot(a: {
+  id: number; enrollmentId: number; date: string; type: string; notes: string | null;
+}) {
+  return {
+    id: a.id,
+    enrollmentId: a.enrollmentId,
+    date: a.date,
+    type: a.type,
+    notes: a.notes ?? null,
+  };
+}
+
 // Monday–Friday only between dateFrom/dateTo inclusive — same business-day
 // rule already used by excel-service's diasHabiles for the attendance export.
 function businessDaysInRange(dateFrom: string, dateTo: string): string[] {
@@ -159,14 +176,34 @@ export async function createRange(institutionId: number, courseIds: number[] | n
 
   if (toRestore.length || toInsert.length) {
     await AppDataSource.transaction(async (em) => {
+      const events: DomainEventInput[] = [];
       for (const date of toRestore) {
-        await em.update(Absence, { id: softDeletedByDate.get(date) }, {
+        const id = softDeletedByDate.get(date)!;
+        await em.update(Absence, { id }, {
           type: data.type,
           notes: data.notes ?? null,
           deletedAt: null as unknown as Date,
           isActive: true,
           updatedAt: new Date(),
           createdByUserId,
+        });
+        events.push({
+          institutionId,
+          eventType: 'AbsenceRecorded',
+          entityType: 'absence',
+          entityId: id,
+          actorUserId: createdByUserId,
+          payload: {
+            before: null,
+            after: absenceSnapshot({
+              id,
+              enrollmentId: data.enrollmentId,
+              date,
+              type: data.type,
+              notes: data.notes ?? null,
+            }),
+            restored: true,
+          },
         });
       }
       for (const date of toInsert) {
@@ -179,7 +216,20 @@ export async function createRange(institutionId: number, courseIds: number[] | n
           createdByUserId,
         });
         await em.save(a);
+        events.push({
+          institutionId,
+          eventType: 'AbsenceRecorded',
+          entityType: 'absence',
+          entityId: a.id,
+          actorUserId: createdByUserId,
+          payload: {
+            before: null,
+            after: absenceSnapshot(a),
+            restored: false,
+          },
+        });
       }
+      await recordEvents(em, events);
     });
   }
 
@@ -204,7 +254,17 @@ export async function update(institutionId: number, courseIds: number[] | null, 
   return repo().save(a);
 }
 
-export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
-  await findById(institutionId, courseIds, id);
-  await AppDataSource.transaction(em => cascadeSoftDeleteAbsence(em, id));
+export async function remove(institutionId: number, courseIds: number[] | null, id: number, actorUserId: number | null = null) {
+  const a = await findById(institutionId, courseIds, id);
+  await AppDataSource.transaction(async (em) => {
+    await cascadeSoftDeleteAbsence(em, id);
+    await recordEvents(em, [{
+      institutionId,
+      eventType: 'AbsenceDeleted',
+      entityType: 'absence',
+      entityId: id,
+      actorUserId,
+      payload: { before: absenceSnapshot(a), after: null },
+    }]);
+  });
 }
