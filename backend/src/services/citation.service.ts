@@ -268,13 +268,12 @@ export async function remove(institutionId: number, courseIds: number[] | null, 
 }
 
 export async function addAttachments(institutionId: number, courseIds: number[] | null, citationId: number, files: Express.Multer.File[]) {
-  const c = await findOwned(institutionId, courseIds, citationId);
-
   try {
+    const c = await findOwned(institutionId, courseIds, citationId);
     await assertEnrollmentNotWithdrawn(c.enrollmentId);
   } catch (err) {
     // The upload is already on disk; a refused write must not leave it there.
-    for (const f of files) fs.unlink(path.join(ATTACHMENTS_DIR, f.filename), () => {});
+    await Promise.allSettled(files.map(f => fs.promises.unlink(f.path)));
     throw err;
   }
 

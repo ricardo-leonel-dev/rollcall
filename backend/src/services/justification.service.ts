@@ -297,13 +297,12 @@ export async function addAttachments(
   justificationId: number,
   files: Express.Multer.File[],
 ) {
-  const j = await findById(institutionId, courseIds, justificationId);
-
   try {
+    const j = await findById(institutionId, courseIds, justificationId);
     await assertEnrollmentNotWithdrawn(j.enrollmentId);
   } catch (err) {
     // The upload is already on disk; a refused write must not leave it there.
-    for (const f of files) fs.unlink(path.join(ATTACHMENTS_DIR, f.filename), () => {});
+    await Promise.allSettled(files.map(f => fs.promises.unlink(f.path)));
     throw err;
   }
 

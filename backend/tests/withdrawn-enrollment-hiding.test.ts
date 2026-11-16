@@ -2405,6 +2405,103 @@ test('a write on a withdrawn enrollment is refused', async (t) => {
         assert.equal(outOfScope.status, 404, 'an enrollment out of the course scope is not found');
       },
     },
+    {
+      name: 'a record write on an enrollment of another institution or out of scope is not found',
+      run: async () => {
+        const fx = await createFixture();
+        const student = await createStudent(fx.institution.id, 'FUERA DE ALCANCE REGISTROS');
+        const enrollment = await createEnrollment(
+          fx.institution.id, student.id, fx.windowCourse.id, fx.year.id, 1, fx.guardianId,
+        );
+        const absence = await insertAbsence(fx.institution.id, enrollment.id, '2026-07-10');
+        const justification = await insertJustification(
+          fx.institution.id, enrollment.id, 'MOTIVO', [absence],
+        );
+        await withdraw(fx, enrollment.id, { withdrawalDate: WITHDRAWAL_IN_Q3 });
+
+        const role = await createTestRole([
+          { resource: 'justifications', canRead: true, canCreate: true, canUpdate: true, canDelete: true },
+          { resource: 'citaciones', canRead: true, canCreate: true, canUpdate: true, canDelete: true },
+          { resource: 'enrollments', canRead: true, canCreate: true, canUpdate: true, canDelete: true },
+        ]);
+        const scoped = await createUser(role.name, fx.institution.id);
+        await scopeUserToCourse(scoped.id, fx.scopeCourse.id, fx.year.id);
+
+        const callers = [
+          { label: 'another institution', token: fx.otherToken, institutionId: fx.otherInstitution.id },
+          { label: 'out of the course scope', token: scoped.token, institutionId: fx.institution.id },
+        ];
+
+        for (const caller of callers) {
+          const justificationUpdate = await request('PUT', `/api/justifications/${justification}`, {
+            token: caller.token, institutionId: caller.institutionId,
+            body: { reason: 'OTRO MOTIVO' },
+          });
+          assert.equal(justificationUpdate.status, 404, `justification update from ${caller.label}`);
+
+          const citationCreate = await request('POST', '/api/citations', {
+            token: caller.token, institutionId: caller.institutionId,
+            body: { enrollmentId: enrollment.id, date: '2026-07-21', time: '08:00', reasonIds: [1] },
+          });
+          assert.equal(citationCreate.status, 404, `citation create from ${caller.label}`);
+
+          const enrollmentUpdate = await request('PUT', `/api/enrollments/${enrollment.id}`, {
+            token: caller.token, institutionId: caller.institutionId,
+            body: { rosterNumber: 9 },
+          });
+          assert.equal(enrollmentUpdate.status, 404, `enrollment update from ${caller.label}`);
+        }
+
+        const rows = await AppDataSource.query(
+          `SELECT reason FROM justifications WHERE id = $1`,
+          [justification],
+        );
+        assert.equal(rows[0].reason, 'MOTIVO', 'the justification did not change');
+        const citations = await AppDataSource.query(
+          `SELECT COUNT(*)::int AS count FROM citations WHERE enrollment_id = $1`,
+          [enrollment.id],
+        );
+        assert.equal(citations[0].count, 0, 'no citation was added');
+        const enrollments = await AppDataSource.query(
+          `SELECT roster_number FROM enrollments WHERE id = $1`,
+          [enrollment.id],
+        );
+        assert.equal(enrollments[0].roster_number, 1, 'the enrollment did not change');
+      },
+    },
+    {
+      name: 'an attachment upload to a record that is not found leaves no file behind',
+      run: async () => {
+        const fx = await createFixture();
+        const student = await createStudent(fx.institution.id, 'ADJUNTO NO ENCONTRADO');
+        const enrollment = await createEnrollment(
+          fx.institution.id, student.id, fx.windowCourse.id, fx.year.id, 1, fx.guardianId,
+        );
+        const absence = await insertAbsence(fx.institution.id, enrollment.id, '2026-07-10');
+        const justification = await insertJustification(
+          fx.institution.id, enrollment.id, 'MOTIVO', [absence],
+        );
+        const citation = await insertCitation(
+          fx.institution.id, enrollment.id, fx.guardianId, '2026-07-10', '08:00',
+        );
+
+        const uploads = [
+          { dir: 'justifications', url: `/api/justifications/${justification}/attachments` },
+          { dir: 'citaciones', url: `/api/citations/${citation}/attachments` },
+        ];
+
+        for (const upload of uploads) {
+          const dir = path.join(process.cwd(), 'uploads', upload.dir);
+          const before = fs.readdirSync(dir);
+
+          const added = await uploadFile(
+            'POST', upload.url, 'files', 'prueba.pdf', fx.otherToken, fx.otherInstitution.id,
+          );
+          assert.equal(added.status, 404, `${upload.url} from another institution is not found`);
+          assert.deepEqual(fs.readdirSync(dir), before, `the file uploaded to ${upload.url} was removed`);
+        }
+      },
+    },
   ];
 
   for (const c of cases) {
