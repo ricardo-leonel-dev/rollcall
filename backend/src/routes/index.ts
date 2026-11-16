@@ -26,6 +26,7 @@ import notificationTemplateRouter from '../controllers/notification-template.con
 import citationReasonRouter    from '../controllers/citation-reason.controller';
 import citationRouter           from '../controllers/citation.controller';
 import withdrawalReasonRouter   from '../controllers/withdrawal-reason.controller';
+import auditEventRouter       from '../controllers/audit-event.controller';
 
 const router = Router();
 
@@ -62,5 +63,6 @@ router.use('/notification-templates', notificationTemplateRouter);
 router.use('/citation-reasons',      citationReasonRouter);
 router.use('/citations',             citationRouter);
 router.use('/withdrawal-reasons',    withdrawalReasonRouter);
+router.use('/audit-events',         auditEventRouter);
 
 export default router;

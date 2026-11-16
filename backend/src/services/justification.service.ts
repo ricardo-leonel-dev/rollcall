@@ -7,6 +7,7 @@ import { JustificationAbsence } from '../entities/JustificationAbsence';
 import { JustificationAttachment } from '../entities/JustificationAttachment';
 import { Absence } from '../entities/Absence';
 import { Enrollment } from '../entities/Enrollment';
+import { recordEvents } from './domain-event.service';
 
 const repo = () => AppDataSource.getRepository(Justification);
 const jaRepo = () => AppDataSource.getRepository(JustificationAbsence);
@@ -152,6 +153,22 @@ export async function findById(institutionId: number, courseIds: number[] | null
   return j;
 }
 
+// The audit snapshot carries the business fields only — the technical ones
+// (createdAt/updatedAt/isActive/deletedAt) would change the meaning of the
+// record on every later read.
+function justificationSnapshot(
+  j: { id: number; enrollmentId: number; reason: string; notifiedBy: string | null },
+  absenceIds: number[],
+) {
+  return {
+    id: j.id,
+    enrollmentId: j.enrollmentId,
+    reason: j.reason,
+    notifiedBy: j.notifiedBy ?? null,
+    absenceIds,
+  };
+}
+
 export async function create(institutionId: number, courseIds: number[] | null, data: {
   enrollmentId: number; reason: string;
   notifiedBy?: string; absenceIds: number[];
@@ -193,6 +210,15 @@ export async function create(institutionId: number, courseIds: number[] | null, 
       await em.save(ja);
     }
 
+    await recordEvents(em, [{
+      institutionId,
+      eventType: 'JustificationCreated',
+      entityType: 'justification',
+      entityId: saved.id,
+      actorUserId: createdByUserId,
+      payload: { before: null, after: justificationSnapshot(saved, data.absenceIds) },
+    }]);
+
     return saved;
   });
 }
@@ -220,16 +246,34 @@ export async function update(institutionId: number, courseIds: number[] | null, 
   });
 }
 
-export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
+export async function remove(institutionId: number, courseIds: number[] | null, id: number, actorUserId: number | null = null) {
   const j = await findById(institutionId, courseIds, id);
 
   // Los adjuntos (justification_attachments) se preservan intactos a propósito:
   // borrar una justificación nunca debe destruir la evidencia que la respaldaba.
   return AppDataSource.transaction(async (em) => {
-    await em.delete(JustificationAbsence, { justificationId: id });
+    // DELETE ... RETURNING trae las faltas que quedaron enlazadas sin pagar
+    // una consulta extra: el snapshot de la auditoría sale de la misma frase.
+    const result = await em.query(
+      'DELETE FROM justification_absences WHERE justification_id = $1 RETURNING absence_id',
+      [id],
+    );
+    const rows: any[] = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : result;
+    const absenceIds = rows.map((r: any) => r.absence_id);
+
+    const before = justificationSnapshot(j, absenceIds);
     j.deletedAt = new Date();
     j.isActive = false;
     await em.save(j);
+
+    await recordEvents(em, [{
+      institutionId,
+      eventType: 'JustificationDeleted',
+      entityType: 'justification',
+      entityId: id,
+      actorUserId,
+      payload: { before, after: null },
+    }]);
   });
 }
 
