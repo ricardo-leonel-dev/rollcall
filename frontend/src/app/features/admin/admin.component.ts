@@ -530,7 +530,7 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
                   <tr>
                     <td style="color:var(--muted);width:36px">{{i+1}}</td>
                     <td style="font-weight:500">{{c.name}}</td>
-                    <td>{{c.paralelo || '—'}}</td>
+                    <td>{{c.section || '—'}}</td>
                     <td><span class="badge-info">{{c.shift}}</span></td>
                     <td>
                       <button mat-icon-button style="color:var(--muted-strong)" (click)="openCourseDialog(c)"><mat-icon>edit</mat-icon></button>
@@ -546,7 +546,7 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
               <div class="admin-row">
                 <div>
                   <div style="font-weight:600">{{c.name}}</div>
-                  <div style="font-size:12px;color:var(--muted)">{{c.paralelo ? 'Paralelo ' + c.paralelo : ''}}</div>
+                  <div style="font-size:12px;color:var(--muted)">{{c.section ? 'Paralelo ' + c.section : ''}}</div>
                   <span class="badge-info" style="margin-top:4px;display:inline-block">{{c.shift}}</span>
                 </div>
                 <div class="admin-row-actions">
