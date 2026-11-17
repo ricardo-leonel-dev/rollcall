@@ -79,7 +79,7 @@ func TestProcessCourse_DistinctAnchorsForDifferentHeights(t *testing.T) {
 		{studentName: "ALUMNO DOS", rosterNumber: intPtr(2)},
 	}
 	cd := courseData{
-		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", parallel: "A",
+		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", section: "A",
 		shift: "MAÑANA", roster: roster,
 		records: []absenceRecord{
 			{studentName: "ALUMNO UNO", rosterNumber: intPtr(1), date: dateShort, typ: "F", notes: shortText[len("Nota: "):]},
@@ -138,7 +138,7 @@ func TestProcessCourse_DiagonalBorderOnNotedCells(t *testing.T) {
 		{studentName: "ALUMNO CINCO", rosterNumber: intPtr(5)},
 	}
 	cd := courseData{
-		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", parallel: "A",
+		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", section: "A",
 		shift: "MAÑANA", roster: roster,
 		records: []absenceRecord{
 			{studentName: "ALUMNO UNO", rosterNumber: intPtr(1), date: dateFnote, typ: "F", notes: "F with note"},
@@ -441,7 +441,7 @@ func TestProcessCourse_FRecordComment_NoCommentForATEmptyFields(t *testing.T) {
 		{studentName: "ALUMNO DOS", rosterNumber: intPtr(2)},
 	}
 	cd := courseData{
-		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", parallel: "A",
+		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", section: "A",
 		shift: "MAÑANA", roster: roster,
 		records: []absenceRecord{
 			{studentName: "ALUMNO UNO", rosterNumber: intPtr(1), date: date, typ: "F", notes: "F note"},
@@ -501,7 +501,7 @@ func TestProcessCourse_F_AT_J_ThreeDistinctShapeIDs(t *testing.T) {
 		{studentName: "ALUMNO TRES", rosterNumber: intPtr(3)},
 	}
 	cd := courseData{
-		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", parallel: "A",
+		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", section: "A",
 		shift: "MAÑANA", roster: roster,
 		records: []absenceRecord{
 			{studentName: "ALUMNO UNO", rosterNumber: intPtr(1), date: dateF, typ: "F", notes: "F note"},
@@ -992,7 +992,7 @@ func TestProcessCourse_WithdrawnStudent(t *testing.T) {
 		{studentName: "ALUMNO NORMAL", rosterNumber: intPtr(4)},
 	}
 	cd := courseData{
-		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", parallel: "A",
+		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", section: "A",
 		shift: "MAÑANA", roster: roster,
 		records: []absenceRecord{
 			{studentName: "ALUMNO RETIRADO", date: day2, typ: "F", notes: "gripe", withdrawal: withdrawalUntilDay2},
@@ -1126,7 +1126,7 @@ func TestProcessCourse_WithdrawnStudentKeepsEarlierRecords(t *testing.T) {
 	withdrawalUntilDay3 := withdrawalUntil(day3, day3)
 
 	cd := courseData{
-		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", parallel: "A",
+		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", section: "A",
 		shift: "MAÑANA",
 		roster: []rosterStudent{
 			{studentName: "ALUMNO RETIRADO", rosterNumber: intPtr(1), withdrawal: withdrawalUntilDay3},
@@ -1222,7 +1222,7 @@ func TestProcessCourse_NoWithdrawalsUnchanged(t *testing.T) {
 	days := dates[:4]
 
 	cd := courseData{
-		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", parallel: "A",
+		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", section: "A",
 		shift: "MAÑANA",
 		roster: []rosterStudent{
 			{studentName: "ALUMNO UNO", rosterNumber: intPtr(1)},

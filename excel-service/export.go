@@ -64,7 +64,7 @@ type courseData struct {
 	id       int
 	name     string
 	fullName string
-	parallel string
+	section  string
 	shift    string
 	roster   []rosterStudent
 	records  []absenceRecord
@@ -209,27 +209,27 @@ func gradeFromAbbreviation(courseName string) string {
 	return word + upper[loc[1]:]
 }
 
-// insertParallel inserts the paralelo (quoted, uppercase) right after the
+// insertSection inserts the section (quoted, uppercase) right after the
 // first word of the grade text, e.g. "DÉCIMO BS" + "A" -> `DÉCIMO "A" BS`.
-func insertParallel(grade, parallel string) string {
-	parallel = strings.ToUpper(strings.TrimSpace(parallel))
-	if parallel == "" {
+func insertSection(grade, section string) string {
+	section = strings.ToUpper(strings.TrimSpace(section))
+	if section == "" {
 		return grade
 	}
 	parts := strings.SplitN(grade, " ", 2)
 	if len(parts) == 2 {
-		return parts[0] + ` "` + parallel + `" ` + parts[1]
+		return parts[0] + ` "` + section + `" ` + parts[1]
 	}
-	return grade + ` "` + parallel + `"`
+	return grade + ` "` + section + `"`
 }
 
-// gradeDisplay prefers the structured full_name (with paralelo inserted after
+// gradeDisplay prefers the structured full_name (with the section inserted after
 // the first word); falls back to inferring the grade word from the
 // abbreviated name for courses not yet migrated — that fallback already
-// carries the paralelo embedded (e.g. "10MO F BS"), so it isn't added again.
+// carries the section embedded (e.g. "10MO F BS"), so it isn't added again.
 func gradeDisplay(cd courseData) string {
 	if fn := strings.ToUpper(strings.TrimSpace(cd.fullName)); fn != "" {
-		return insertParallel(fn, cd.parallel)
+		return insertSection(fn, cd.section)
 	}
 	return gradeFromAbbreviation(cd.name)
 }
@@ -1103,7 +1103,7 @@ func exportExcelHandler(pool *pgxpool.Pool, templatePath, outputDir string) http
 			if err := pool.QueryRow(ctx,
 				"SELECT name, shift, COALESCE(full_name, ''), COALESCE(paralelo, '') FROM courses WHERE id = $1 AND institution_id = $2",
 				courseID, institutionID,
-			).Scan(&cd.name, &cd.shift, &cd.fullName, &cd.parallel); err != nil {
+			).Scan(&cd.name, &cd.shift, &cd.fullName, &cd.section); err != nil {
 				http.Error(w, fmt.Sprintf("Course %d not found", courseID), http.StatusNotFound)
 				return
 			}

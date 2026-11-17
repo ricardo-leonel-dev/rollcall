@@ -77,17 +77,17 @@ in Postgres, it only reads it to fill the template. It is called by the
 
 ## Course Grade Display: Structured Field with a Legacy Regex Fallback
 
-`courseData.fullName`/`.parallel` (added by `postgres/16_course_grade_shift.sql`)
+`courseData.fullName`/`.section` (added by `postgres/16_course_grade_shift.sql`)
 are nullable — the ~27 courses that existed before that migration were left
 with both columns `NULL` on purpose (no automated backfill; an admin fills
 them in later via Admin → Cursos). `gradeDisplay` (export.go) therefore has
 two paths, and both must keep working:
 
-1. **Preferred:** `cd.fullName` is set → `insertParallel` inserts the
-   course's `paralelo` after the first word (e.g. `DÉCIMO "A" BS`).
+1. **Preferred:** `cd.fullName` is set → `insertSection` inserts the
+   course's section (DB column `paralelo`) after the first word (e.g. `DÉCIMO "A" BS`).
 2. **Fallback:** `cd.fullName` is empty → `gradeFromAbbreviation` infers the
    grade word from the abbreviated `cd.name` via `reGradeOrdinal`
-   (`10MO` → `DÉCIMO`); the abbreviated name already carries the paralelo
+   (`10MO` → `DÉCIMO`); the abbreviated name already carries the section
    embedded, so it is *not* re-inserted in this path.
 
 Don't delete `gradeFromAbbreviation`/`reGradeOrdinal` as unreachable/legacy —
