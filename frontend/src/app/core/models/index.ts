@@ -24,7 +24,7 @@ export interface Course {
   id: number;
   name: string;
   fullName: string | null;
-  paralelo: string | null;
+  section: string | null;
   shift: string;
   isActive: boolean;
 }

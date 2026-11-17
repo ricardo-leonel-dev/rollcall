@@ -34,7 +34,7 @@ export interface CourseDialogData {
       <div style="display:flex;gap:12px">
         <mat-form-field appearance="outline" style="flex:1">
           <mat-label>Paralelo</mat-label>
-          <input matInput [(ngModel)]="paralelo" placeholder="Ej: A">
+          <input matInput [(ngModel)]="section" placeholder="Ej: A">
         </mat-form-field>
         <mat-form-field appearance="outline" style="flex:1">
           <mat-label>Jornada</mat-label>
@@ -64,14 +64,14 @@ export class CourseDialogComponent {
 
   name = this.data.course?.name ?? '';
   fullName = this.data.course?.fullName ?? '';
-  paralelo = this.data.course?.paralelo ?? '';
+  section = this.data.course?.section ?? '';
   shift = this.data.course?.shift ?? 'MATUTINA';
   readonly saving = signal(false);
 
   async save(): Promise<void> {
     if (!this.name) return;
     this.saving.set(true);
-    const payload = { name: this.name, fullName: this.fullName, paralelo: this.paralelo, shift: this.shift };
+    const payload = { name: this.name, fullName: this.fullName, section: this.section, shift: this.shift };
     try {
       if (this.data.mode === 'edit') {
         await firstValueFrom(this.http.put(`/api/courses/${this.data.course!.id}`, payload));
