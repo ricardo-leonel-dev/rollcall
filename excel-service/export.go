@@ -1101,7 +1101,7 @@ func exportExcelHandler(pool *pgxpool.Pool, templatePath, outputDir string) http
 			var cd courseData
 			cd.id = courseID
 			if err := pool.QueryRow(ctx,
-				"SELECT name, shift, COALESCE(full_name, ''), COALESCE(paralelo, '') FROM courses WHERE id = $1 AND institution_id = $2",
+				"SELECT name, shift, COALESCE(full_name, ''), COALESCE(section, '') FROM courses WHERE id = $1 AND institution_id = $2",
 				courseID, institutionID,
 			).Scan(&cd.name, &cd.shift, &cd.fullName, &cd.section); err != nil {
 				http.Error(w, fmt.Sprintf("Course %d not found", courseID), http.StatusNotFound)

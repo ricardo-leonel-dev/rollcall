@@ -84,7 +84,7 @@ them in later via Admin → Cursos). `gradeDisplay` (export.go) therefore has
 two paths, and both must keep working:
 
 1. **Preferred:** `cd.fullName` is set → `insertSection` inserts the
-   course's section (DB column `paralelo`) after the first word (e.g. `DÉCIMO "A" BS`).
+   course's section (DB column `section`) after the first word (e.g. `DÉCIMO "A" BS`).
 2. **Fallback:** `cd.fullName` is empty → `gradeFromAbbreviation` infers the
    grade word from the abbreviated `cd.name` via `reGradeOrdinal`
    (`10MO` → `DÉCIMO`); the abbreviated name already carries the section
