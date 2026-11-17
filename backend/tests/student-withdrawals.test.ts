@@ -272,7 +272,7 @@ async function createFixture(): Promise<Fixture> {
     AppDataSource.getRepository(Course).create({
       name: uniqueName('__test_sw_course_'),
       fullName: null,
-      paralelo: null,
+      section: null,
       institutionId: institution.id,
       shift: 'MATUTINA',
       isActive: true,
@@ -284,7 +284,7 @@ async function createFixture(): Promise<Fixture> {
     AppDataSource.getRepository(Course).create({
       name: uniqueName('__test_sw_course_'),
       fullName: null,
-      paralelo: null,
+      section: null,
       institutionId: institution.id,
       shift: 'MATUTINA',
       isActive: true,

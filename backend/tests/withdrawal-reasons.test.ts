@@ -769,7 +769,7 @@ test('R4: listing returns the institution reasons that are not deleted, ordered 
           AppDataSource.getRepository(Course).create({
             name: uniqueName('__test_wr_course_'),
             fullName: null,
-            paralelo: null,
+            section: null,
             institutionId: inst.id,
             shift: 'MATUTINA',
             isActive: true,
