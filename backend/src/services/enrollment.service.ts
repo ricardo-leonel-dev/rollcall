@@ -66,7 +66,6 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
        gender,
        birth_date      AS "birthDate",
        age,
-       is_enrolled     AS "isEnrolled",
        student_phone   AS "studentPhone",
        student_email   AS "studentEmail",
        guardian_id     AS "guardianId",
@@ -93,7 +92,7 @@ export async function findById(institutionId: number, courseIds: number[] | null
 
 export async function create(institutionId: number, courseIds: number[] | null, data: {
   studentId: number; courseId: number; academicYearId: number;
-  guardianId?: number; rosterNumber?: number; isEnrolled?: boolean;
+  guardianId?: number; rosterNumber?: number;
   studentPhone?: string; studentEmail?: string;
 }, createdByUserId: number | null = null) {
   await assertOwnership(institutionId, courseIds, data);
@@ -106,18 +105,34 @@ export async function create(institutionId: number, courseIds: number[] | null, 
     );
     data.rosterNumber = Number(row.next);
   }
-  const e = repo().create({ ...data, institutionId, createdByUserId });
+  const e = repo().create({
+    studentId: data.studentId,
+    courseId: data.courseId,
+    academicYearId: data.academicYearId,
+    guardianId: data.guardianId ?? null,
+    rosterNumber: data.rosterNumber,
+    studentPhone: data.studentPhone ?? null,
+    studentEmail: data.studentEmail ?? null,
+    institutionId,
+    createdByUserId,
+  });
   return repo().save(e);
 }
 
 export async function update(institutionId: number, courseIds: number[] | null, id: number, data: Partial<{
-  guardianId: number; rosterNumber: number; isEnrolled: boolean;
+  guardianId: number; rosterNumber: number;
   studentPhone: string; studentEmail: string; isActive: boolean;
 }>) {
   const e = await findById(institutionId, courseIds, id);
   await assertEnrollmentNotWithdrawn(id);
-  if (data.guardianId !== undefined) await assertOwnership(institutionId, courseIds, { guardianId: data.guardianId });
-  Object.assign(e, data);
+  if (data.guardianId !== undefined) {
+    await assertOwnership(institutionId, courseIds, { guardianId: data.guardianId });
+    e.guardianId = data.guardianId;
+  }
+  if (data.rosterNumber !== undefined) e.rosterNumber = data.rosterNumber;
+  if (data.studentPhone !== undefined) e.studentPhone = data.studentPhone;
+  if (data.studentEmail !== undefined) e.studentEmail = data.studentEmail;
+  if (data.isActive !== undefined) e.isActive = data.isActive;
   return repo().save(e);
 }
 

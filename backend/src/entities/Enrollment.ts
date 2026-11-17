@@ -24,9 +24,6 @@ export class Enrollment {
   @Column({ name: 'roster_number', nullable: true, type: 'integer' })
   rosterNumber!: number | null;
 
-  @Column({ name: 'is_enrolled', default: true })
-  isEnrolled!: boolean;
-
   @Column({ name: 'student_phone', type: 'varchar', nullable: true })
   studentPhone!: string | null;
 

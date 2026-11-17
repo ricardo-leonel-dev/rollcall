@@ -77,8 +77,8 @@ async function createEnrollment(institutionId: number): Promise<number> {
     [uniqueName('ALUMNO '), institutionId],
   );
   return insertRow(
-    `INSERT INTO enrollments (student_id, course_id, academic_year_id, institution_id, is_enrolled, is_active)
-     VALUES ($1, $2, $3, $4, true, true) RETURNING id`,
+    `INSERT INTO enrollments (student_id, course_id, academic_year_id, institution_id, is_active)
+     VALUES ($1, $2, $3, $4, true) RETURNING id`,
     [studentId, courseId, yearId, institutionId],
   );
 }
