@@ -25,8 +25,8 @@ var monthNames = []string{
 }
 
 const (
-	filaInicialNomina = 11
-	filaFinalNomina   = 40
+	rosterFirstRow = 11
+	rosterLastRow  = 40
 )
 
 type absenceRecord struct {
@@ -45,13 +45,13 @@ type rosterStudent struct {
 }
 
 type courseData struct {
-	id        int
-	name      string
-	fullName  string
-	paralelo  string
-	shift     string
-	roster    []rosterStudent
-	registros []absenceRecord
+	id       int
+	name     string
+	fullName string
+	parallel string
+	shift    string
+	roster   []rosterStudent
+	records  []absenceRecord
 }
 
 // ── template helpers ──────────────────────────────────────────────────────────
@@ -77,22 +77,22 @@ func getColumnMap(f *excelize.File, sheet string) (map[string]map[int]int, error
 		return nil, err
 	}
 	colMap := map[string]map[int]int{}
-	mesActual := ""
+	currentMonth := ""
 	for c := 1; c <= maxCol; c++ {
 		cellRow7, _ := excelize.CoordinatesToCellName(c, 7)
 		cellRow10, _ := excelize.CoordinatesToCellName(c, 10)
 		v7, _ := f.GetCellValue(sheet, cellRow7)
 		v10, _ := f.GetCellValue(sheet, cellRow10)
 		v7Up := strings.ToUpper(strings.TrimSpace(v7))
-		if v7Up != "" && isMonth(v7Up) && v7Up != mesActual {
-			mesActual = v7Up
-			colMap[mesActual] = map[int]int{}
+		if v7Up != "" && isMonth(v7Up) && v7Up != currentMonth {
+			currentMonth = v7Up
+			colMap[currentMonth] = map[int]int{}
 		}
-		if mesActual != "" {
+		if currentMonth != "" {
 			if v10Num, err := strconv.ParseFloat(strings.TrimSpace(v10), 64); err == nil {
-				dia := int(v10Num)
-				if _, exists := colMap[mesActual][dia]; !exists {
-					colMap[mesActual][dia] = c
+				day := int(v10Num)
+				if _, exists := colMap[currentMonth][day]; !exists {
+					colMap[currentMonth][day] = c
 				}
 			}
 		}
@@ -102,7 +102,7 @@ func getColumnMap(f *excelize.File, sheet string) (map[string]map[int]int, error
 
 func getStudentRowMap(f *excelize.File, sheet string) (map[string]int, error) {
 	rowMap := map[string]int{}
-	for r := filaInicialNomina; r <= filaFinalNomina; r++ {
+	for r := rosterFirstRow; r <= rosterLastRow; r++ {
 		cellRef, _ := excelize.CoordinatesToCellName(2, r)
 		v, err := f.GetCellValue(sheet, cellRef)
 		if err != nil {
@@ -116,20 +116,20 @@ func getStudentRowMap(f *excelize.File, sheet string) (map[string]int, error) {
 	return rowMap, nil
 }
 
-func escribirNomina(f *excelize.File, sheet string, roster []rosterStudent) error {
-	for idx, est := range roster {
-		row := filaInicialNomina + idx
-		if row > filaFinalNomina {
+func writeRoster(f *excelize.File, sheet string, roster []rosterStudent) error {
+	for idx, student := range roster {
+		row := rosterFirstRow + idx
+		if row > rosterLastRow {
 			break
 		}
 		cellA, _ := excelize.CoordinatesToCellName(1, row)
 		cellB, _ := excelize.CoordinatesToCellName(2, row)
-		if est.rosterNumber != nil {
-			if err := f.SetCellValue(sheet, cellA, *est.rosterNumber); err != nil {
+		if student.rosterNumber != nil {
+			if err := f.SetCellValue(sheet, cellA, *student.rosterNumber); err != nil {
 				return err
 			}
 		}
-		if err := f.SetCellValue(sheet, cellB, est.studentName); err != nil {
+		if err := f.SetCellValue(sheet, cellB, student.studentName); err != nil {
 			return err
 		}
 	}
@@ -142,10 +142,10 @@ var ordinalWords = map[string]string{
 }
 var reGradeOrdinal = regexp.MustCompile(`^(\d{1,2})(?:ERO|ER|DO|RO|TO|MO|VO|NO|MA)\b`)
 
-// gradoDesdeAbreviado infers the grade word from a leading numeral-ordinal
+// gradeFromAbbreviation infers the grade word from a leading numeral-ordinal
 // abbreviation in the course's abbreviated name (e.g. "10MO F BS" -> "DÉCIMO F BS").
 // Used only as a fallback for courses without a structured full_name yet.
-func gradoDesdeAbreviado(courseName string) string {
+func gradeFromAbbreviation(courseName string) string {
 	upper := strings.ToUpper(strings.TrimSpace(courseName))
 	loc := reGradeOrdinal.FindStringSubmatchIndex(upper)
 	if loc == nil {
@@ -158,45 +158,45 @@ func gradoDesdeAbreviado(courseName string) string {
 	return word + upper[loc[1]:]
 }
 
-// insertarParalelo inserts the paralelo (quoted, uppercase) right after the
+// insertParallel inserts the paralelo (quoted, uppercase) right after the
 // first word of the grade text, e.g. "DÉCIMO BS" + "A" -> `DÉCIMO "A" BS`.
-func insertarParalelo(grado, paralelo string) string {
-	paralelo = strings.ToUpper(strings.TrimSpace(paralelo))
-	if paralelo == "" {
-		return grado
+func insertParallel(grade, parallel string) string {
+	parallel = strings.ToUpper(strings.TrimSpace(parallel))
+	if parallel == "" {
+		return grade
 	}
-	partes := strings.SplitN(grado, " ", 2)
-	if len(partes) == 2 {
-		return partes[0] + ` "` + paralelo + `" ` + partes[1]
+	parts := strings.SplitN(grade, " ", 2)
+	if len(parts) == 2 {
+		return parts[0] + ` "` + parallel + `" ` + parts[1]
 	}
-	return grado + ` "` + paralelo + `"`
+	return grade + ` "` + parallel + `"`
 }
 
-// gradoDisplay prefers the structured full_name (with paralelo inserted after
+// gradeDisplay prefers the structured full_name (with paralelo inserted after
 // the first word); falls back to inferring the grade word from the
 // abbreviated name for courses not yet migrated — that fallback already
 // carries the paralelo embedded (e.g. "10MO F BS"), so it isn't added again.
-func gradoDisplay(cd courseData) string {
+func gradeDisplay(cd courseData) string {
 	if fn := strings.ToUpper(strings.TrimSpace(cd.fullName)); fn != "" {
-		return insertarParalelo(fn, cd.paralelo)
+		return insertParallel(fn, cd.parallel)
 	}
-	return gradoDesdeAbreviado(cd.name)
+	return gradeFromAbbreviation(cd.name)
 }
 
-// escribirGradoYJornada writes the course's grade (C9) and shift (B9) values.
-func escribirGradoYJornada(f *excelize.File, sheet string, cd courseData) {
-	f.SetCellValue(sheet, "C9", gradoDisplay(cd))
+// writeGradeAndShift writes the course's grade (C9) and shift (B9) values.
+func writeGradeAndShift(f *excelize.File, sheet string, cd courseData) {
+	f.SetCellValue(sheet, "C9", gradeDisplay(cd))
 	f.SetCellValue(sheet, "B9", strings.ToUpper(strings.TrimSpace(cd.shift)))
 }
 
-func diasHabiles(desde, hasta time.Time) []time.Time {
-	var dias []time.Time
-	for d := desde; !d.After(hasta); d = d.AddDate(0, 0, 1) {
+func businessDays(from, to time.Time) []time.Time {
+	var days []time.Time
+	for d := from; !d.After(to); d = d.AddDate(0, 0, 1) {
 		if d.Weekday() != time.Saturday && d.Weekday() != time.Sunday {
-			dias = append(dias, d)
+			days = append(days, d)
 		}
 	}
-	return dias
+	return days
 }
 
 var nonAlnum = regexp.MustCompile(`[^A-Za-z0-9_]`)
@@ -708,9 +708,9 @@ func selectAndKeepSheet(f *excelize.File, sheetIndex int) (string, error) {
 
 // processCourse writes one course into a fresh copy of the template and returns
 // the path to the resulting temp file. The caller is responsible for removing it.
-func processCourse(plantillaPath, outputDir, ts string, cd courseData, sheetName string, sheetIndex int, diasDelRango []time.Time, signers []Signer) (string, error) {
+func processCourse(templatePath, outputDir, ts string, cd courseData, sheetName string, sheetIndex int, rangeDays []time.Time, signers []Signer) (string, error) {
 	tempPath := filepath.Join(outputDir, fmt.Sprintf("temp_%d_%s.xlsx", cd.id, ts))
-	if err := copyFile(plantillaPath, tempPath); err != nil {
+	if err := copyFile(templatePath, tempPath); err != nil {
 		return "", err
 	}
 
@@ -747,7 +747,7 @@ func processCourse(plantillaPath, outputDir, ts string, cd courseData, sheetName
 outerBorder:
 	for _, monthCols := range colMap {
 		for _, col := range monthCols {
-			ref, _ := excelize.CoordinatesToCellName(col, filaInicialNomina)
+			ref, _ := excelize.CoordinatesToCellName(col, rosterFirstRow)
 			styleIdx, _ := f.GetCellStyle(base, ref)
 			if s, err2 := f.GetStyle(styleIdx); err2 == nil {
 				templateBorder = s.Border
@@ -766,15 +766,15 @@ outerBorder:
 	styleATNote, _ := f.NewStyle(&excelize.Style{Border: noteBorder, Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"FFEB9C"}}, Alignment: &excelize.Alignment{Horizontal: "center"}})
 	styleJNote, _ := f.NewStyle(&excelize.Style{Border: noteBorder, Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"C6EFCE"}}, Alignment: &excelize.Alignment{Horizontal: "center"}})
 
-	if err := escribirNomina(f, base, cd.roster); err != nil {
+	if err := writeRoster(f, base, cd.roster); err != nil {
 		f.Close()
 		os.Remove(tempPath)
 		return "", err
 	}
-	escribirGradoYJornada(f, base, cd)
+	writeGradeAndShift(f, base, cd)
 
 	if len(signers) > 0 {
-		escribirFirmas(f, base, signers)
+		writeSigners(f, base, signers)
 	}
 
 	rowMap, err := getStudentRowMap(f, base)
@@ -788,11 +788,11 @@ outerBorder:
 		rowMapKeys[k] = true
 	}
 
-	marcadas := map[[2]int]bool{}
+	marked := map[[2]int]bool{}
 
-	for _, reg := range cd.registros {
-		mesNombre := monthNames[int(reg.date.Month())-1]
-		cols, ok := colMap[mesNombre]
+	for _, reg := range cd.records {
+		monthName := monthNames[int(reg.date.Month())-1]
+		cols, ok := colMap[monthName]
 		if !ok {
 			continue
 		}
@@ -842,7 +842,7 @@ outerBorder:
 				f.SetCellStyle(base, cellRef, cellRef, styleJ)
 			}
 		}
-		marcadas[[2]int{row, col}] = true
+		marked[[2]int{row, col}] = true
 
 		if hasNote {
 			text := strings.Join(parts, "\n")
@@ -857,29 +857,29 @@ outerBorder:
 		}
 	}
 
-	for _, est := range cd.roster {
-		matched, ok := matchName(est.studentName, rowMapKeys)
+	for _, student := range cd.roster {
+		matched, ok := matchName(student.studentName, rowMapKeys)
 		if !ok {
 			continue
 		}
 		row := rowMap[matched]
-		for _, diaHabil := range diasDelRango {
-			mesNombre := monthNames[int(diaHabil.Month())-1]
-			cols, ok := colMap[mesNombre]
+		for _, businessDay := range rangeDays {
+			monthName := monthNames[int(businessDay.Month())-1]
+			cols, ok := colMap[monthName]
 			if !ok {
 				continue
 			}
-			col, ok := cols[diaHabil.Day()]
+			col, ok := cols[businessDay.Day()]
 			if !ok {
 				continue
 			}
-			if marcadas[[2]int{row, col}] {
+			if marked[[2]int{row, col}] {
 				continue
 			}
 			cellRef, _ := excelize.CoordinatesToCellName(col, row)
 			f.SetCellValue(base, cellRef, "A")
 			f.SetCellStyle(base, cellRef, cellRef, styleP)
-			marcadas[[2]int{row, col}] = true
+			marked[[2]int{row, col}] = true
 		}
 	}
 
@@ -921,10 +921,10 @@ func signerDisplayName(s Signer) string {
 }
 
 const (
-	colDocenteTutor     = 4  // D
-	colInspectorPiso    = 26 // Z
-	colInspectorGeneral = 45 // AS
-	colRector           = 64 // BL
+	colHomeroomTeacher  = 4  // D
+	colFloorInspector   = 26 // Z
+	colGeneralInspector = 45 // AS
+	colPrincipal        = 64 // BL
 )
 
 // labelToSignatureCol maps a signature_label to the column index (1-based) for
@@ -933,20 +933,20 @@ func labelToSignatureCol(label string) int {
 	upper := strings.ToUpper(strings.TrimSpace(label))
 	switch {
 	case strings.Contains(upper, "DOCENTE TUTOR") || strings.Contains(upper, "DOCENTE TUTORA"):
-		return colDocenteTutor
+		return colHomeroomTeacher
 	case strings.Contains(upper, "INSPECTOR PISO") || (strings.Contains(upper, "INSPECTOR") && strings.Contains(upper, "PISO")):
-		return colInspectorPiso
+		return colFloorInspector
 	case upper == "INSPECTOR GENERAL":
-		return colInspectorGeneral
+		return colGeneralInspector
 	case strings.Contains(upper, "RECTOR"):
-		return colRector
+		return colPrincipal
 	}
 	return 0
 }
 
-// escribirFirmas writes signer name (row 44) and label (row 45) to the template,
+// writeSigners writes signer name (row 44) and label (row 45) to the template,
 // and also sets cell A7 to the tutor/inspector signer's display name.
-func escribirFirmas(f *excelize.File, sheet string, signers []Signer) {
+func writeSigners(f *excelize.File, sheet string, signers []Signer) {
 	for _, s := range signers {
 		col := labelToSignatureCol(s.Label)
 		if col == 0 {
@@ -960,7 +960,7 @@ func escribirFirmas(f *excelize.File, sheet string, signers []Signer) {
 		// A7 (under "INSPECTORA/DOCENTE TUTOR") reflects the docente tutor or
 		// either inspector variant — not the rector. Reuses the same `col`
 		// classification as the signature block so both stay in sync.
-		if col == colDocenteTutor || col == colInspectorPiso || col == colInspectorGeneral {
+		if col == colHomeroomTeacher || col == colFloorInspector || col == colGeneralInspector {
 			f.SetCellValue(sheet, "A7", signerDisplayName(s))
 		}
 	}
@@ -968,7 +968,7 @@ func escribirFirmas(f *excelize.File, sheet string, signers []Signer) {
 
 // ── handler ───────────────────────────────────────────────────────────────────
 
-func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) http.HandlerFunc {
+func exportExcelHandler(pool *pgxpool.Pool, templatePath, outputDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		institutionID, errI := strconv.Atoi(q.Get("institution_id"))
@@ -991,12 +991,12 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 		if raw := q.Get("signers"); raw != "" {
 			_ = json.Unmarshal([]byte(raw), &signers)
 		}
-		fDesde, err := time.Parse("2006-01-02", dateFromStr)
+		dateFrom, err := time.Parse("2006-01-02", dateFromStr)
 		if err != nil {
 			http.Error(w, "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest)
 			return
 		}
-		fHasta, err := time.Parse("2006-01-02", dateToStr)
+		dateTo, err := time.Parse("2006-01-02", dateToStr)
 		if err != nil {
 			http.Error(w, "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest)
 			return
@@ -1012,7 +1012,7 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 			if err := pool.QueryRow(ctx,
 				"SELECT name, shift, COALESCE(full_name, ''), COALESCE(paralelo, '') FROM courses WHERE id = $1 AND institution_id = $2",
 				courseID, institutionID,
-			).Scan(&cd.name, &cd.shift, &cd.fullName, &cd.paralelo); err != nil {
+			).Scan(&cd.name, &cd.shift, &cd.fullName, &cd.parallel); err != nil {
 				http.Error(w, fmt.Sprintf("Course %d not found", courseID), http.StatusNotFound)
 				return
 			}
@@ -1040,7 +1040,7 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 				  AND a.deleted_at IS NULL
 				  AND m.deleted_at IS NULL
 				ORDER BY m.roster_number, a.date
-			`, courseID, academicYearID, fDesde, fHasta, institutionID)
+			`, courseID, academicYearID, dateFrom, dateTo, institutionID)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -1052,7 +1052,7 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				cd.registros = append(cd.registros, rec)
+				cd.records = append(cd.records, rec)
 			}
 			rows.Close()
 
@@ -1072,13 +1072,13 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 				return
 			}
 			for rosterRows.Next() {
-				var est rosterStudent
-				if err := rosterRows.Scan(&est.studentName, &est.rosterNumber); err != nil {
+				var student rosterStudent
+				if err := rosterRows.Scan(&student.studentName, &student.rosterNumber); err != nil {
 					rosterRows.Close()
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				cd.roster = append(cd.roster, est)
+				cd.roster = append(cd.roster, student)
 			}
 			rosterRows.Close()
 
@@ -1086,7 +1086,7 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 		}
 
 		ts := time.Now().Format("20060102_150405")
-		diasDelRango := diasHabiles(fDesde, fHasta)
+		rangeDays := businessDays(dateFrom, dateTo)
 
 		// Compute unique sheet names (Excel forbids duplicates)
 		sheetNames := make([]string, len(courses))
@@ -1103,7 +1103,7 @@ func exportExcelHandler(pool *pgxpool.Pool, plantillaPath, outputDir string) htt
 		// Process each course in its own fresh template copy
 		tempPaths := make([]string, 0, len(courses))
 		for i, cd := range courses {
-			p, err := processCourse(plantillaPath, outputDir, ts, cd, sheetNames[i], sheetIndex, diasDelRango, signers)
+			p, err := processCourse(templatePath, outputDir, ts, cd, sheetNames[i], sheetIndex, rangeDays, signers)
 			if err != nil {
 				for _, old := range tempPaths {
 					os.Remove(old)

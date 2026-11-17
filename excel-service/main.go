@@ -36,17 +36,17 @@ func main() {
 		log.Fatalf("could not create output dir: %v", err)
 	}
 
-	plantillaPath := os.Getenv("PLANTILLA")
-	if plantillaPath == "" {
-		plantillaPath = "/app/plantilla_asistencia.xlsx"
+	templatePath := os.Getenv("PLANTILLA")
+	if templatePath == "" {
+		templatePath = "/app/plantilla_asistencia.xlsx"
 	}
-	if info, err := os.Stat(plantillaPath); err != nil || info.IsDir() {
-		log.Fatalf("plantilla not found or is a directory: %s", plantillaPath)
+	if info, err := os.Stat(templatePath); err != nil || info.IsDir() {
+		log.Fatalf("plantilla not found or is a directory: %s", templatePath)
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler(pool))
-	mux.HandleFunc("GET /export/excel", exportExcelHandler(pool, plantillaPath, outputDir))
+	mux.HandleFunc("GET /export/excel", exportExcelHandler(pool, templatePath, outputDir))
 
 	port := os.Getenv("PORT")
 	if port == "" {

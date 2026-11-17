@@ -62,7 +62,7 @@ func TestCommentBoxSize_Bounds(t *testing.T) {
 // per-shape (R1, R6) ─────────────────────────────────────────────────────────
 
 func TestProcessCourse_DistinctAnchorsForDifferentHeights(t *testing.T) {
-	sheet, dates, _ := probePlantilla(t, 2)
+	sheet, dates, _ := probeTemplate(t, 2)
 	dateShort, dateLong := dates[0], dates[1]
 
 	shortText := "Nota: gripe"
@@ -79,9 +79,9 @@ func TestProcessCourse_DistinctAnchorsForDifferentHeights(t *testing.T) {
 		{studentName: "ALUMNO DOS", rosterNumber: intPtr(2)},
 	}
 	cd := courseData{
-		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", paralelo: "A",
+		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", parallel: "A",
 		shift: "MAÑANA", roster: roster,
-		registros: []absenceRecord{
+		records: []absenceRecord{
 			{studentName: "ALUMNO UNO", rosterNumber: intPtr(1), date: dateShort, typ: "F", notes: shortText[len("Nota: "):]},
 			{studentName: "ALUMNO DOS", rosterNumber: intPtr(2), date: dateLong, typ: "F", notes: longText[len("Nota: "):]},
 		},
@@ -126,7 +126,7 @@ func TestProcessCourse_DistinctAnchorsForDifferentHeights(t *testing.T) {
 // ── T7 — diagonal border on noted F/AT/J cells, not on non-noted F / styleP ─
 
 func TestProcessCourse_DiagonalBorderOnNotedCells(t *testing.T) {
-	sheet, dates, cols := probePlantilla(t, 4)
+	sheet, dates, cols := probeTemplate(t, 4)
 	dateFnote, dateFn, dateAT, dateJ := dates[0], dates[1], dates[2], dates[3]
 	colFnote, colFn, colAT, colJ := cols[0], cols[1], cols[2], cols[3]
 
@@ -138,21 +138,21 @@ func TestProcessCourse_DiagonalBorderOnNotedCells(t *testing.T) {
 		{studentName: "ALUMNO CINCO", rosterNumber: intPtr(5)},
 	}
 	cd := courseData{
-		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", paralelo: "A",
+		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", parallel: "A",
 		shift: "MAÑANA", roster: roster,
-		registros: []absenceRecord{
+		records: []absenceRecord{
 			{studentName: "ALUMNO UNO", rosterNumber: intPtr(1), date: dateFnote, typ: "F", notes: "F with note"},
 			{studentName: "ALUMNO DOS", rosterNumber: intPtr(2), date: dateFn, typ: "F"}, // F, no note
 			{studentName: "ALUMNO TRES", rosterNumber: intPtr(3), date: dateAT, typ: "AT", notes: "AT with note"},
 			{studentName: "ALUMNO CUATRO", rosterNumber: intPtr(4), date: dateJ, typ: "F", justified: true, notes: "J note", justificationReason: stringPtr("illness")},
-			// ALUMNO CINCO has no absence record -> diasDelRango fallback writes styleP at filaInicialNomina+4
+			// ALUMNO CINCO has no absence record -> rangeDays fallback writes styleP at rosterFirstRow+4
 		},
 	}
 
 	outputDir := t.TempDir()
 	ts := time.Now().Format("20060102_150405")
-	dias := []time.Time{dateFnote, dateFn, dateAT, dateJ}
-	p, err := processCourse("plantilla_asistencia.xlsx", outputDir, ts, cd, sheet, 0, dias, nil)
+	days := []time.Time{dateFnote, dateFn, dateAT, dateJ}
+	p, err := processCourse("plantilla_asistencia.xlsx", outputDir, ts, cd, sheet, 0, days, nil)
 	if err != nil {
 		t.Fatalf("processCourse: %v", err)
 	}
@@ -164,11 +164,11 @@ func TestProcessCourse_DiagonalBorderOnNotedCells(t *testing.T) {
 	}
 	defer f.Close()
 
-	fnoteRef, _ := excelize.CoordinatesToCellName(colFnote, filaInicialNomina)
-	fnRef, _ := excelize.CoordinatesToCellName(colFn, filaInicialNomina+1)
-	atRef, _ := excelize.CoordinatesToCellName(colAT, filaInicialNomina+2)
-	jRef, _ := excelize.CoordinatesToCellName(colJ, filaInicialNomina+3)
-	pRef, _ := excelize.CoordinatesToCellName(colFnote, filaInicialNomina+4) // ALUMNO CINCO, no record -> styleP
+	fnoteRef, _ := excelize.CoordinatesToCellName(colFnote, rosterFirstRow)
+	fnRef, _ := excelize.CoordinatesToCellName(colFn, rosterFirstRow+1)
+	atRef, _ := excelize.CoordinatesToCellName(colAT, rosterFirstRow+2)
+	jRef, _ := excelize.CoordinatesToCellName(colJ, rosterFirstRow+3)
+	pRef, _ := excelize.CoordinatesToCellName(colFnote, rosterFirstRow+4) // ALUMNO CINCO, no record -> styleP
 
 	hasDiagonal := func(ref string) bool {
 		t.Helper()
@@ -380,13 +380,13 @@ func TestDedupeCommentShapeIDs_Unit(t *testing.T) {
 func intPtr(n int) *int          { return &n }
 func stringPtr(s string) *string { return &s }
 
-// probePlantilla returns the first n valid (month, day) pairs from the first
+// probeTemplate returns the first n valid (month, day) pairs from the first
 // sheet of plantilla_asistencia.xlsx, paired with their resolved column index.
 // Year is fixed to 2026 — processCourse only consults month + day.
-func probePlantilla(t *testing.T, n int) (sheet string, dates []time.Time, cols []int) {
+func probeTemplate(t *testing.T, n int) (sheet string, dates []time.Time, cols []int) {
 	t.Helper()
-	const plantillaPath = "plantilla_asistencia.xlsx"
-	f, err := excelize.OpenFile(plantillaPath)
+	const templatePath = "plantilla_asistencia.xlsx"
+	f, err := excelize.OpenFile(templatePath)
 	if err != nil {
 		t.Fatalf("open plantilla: %v", err)
 	}
@@ -396,8 +396,8 @@ func probePlantilla(t *testing.T, n int) (sheet string, dates []time.Time, cols 
 	if err != nil {
 		t.Fatalf("getColumnMap: %v", err)
 	}
-	for _, mes := range monthNames {
-		cd, ok := colMap[mes]
+	for _, month := range monthNames {
+		cd, ok := colMap[month]
 		if !ok {
 			continue
 		}
@@ -406,7 +406,7 @@ func probePlantilla(t *testing.T, n int) (sheet string, dates []time.Time, cols 
 			if !ok {
 				continue
 			}
-			mIdx := slices.Index(monthNames, mes) + 1
+			mIdx := slices.Index(monthNames, month) + 1
 			dates = append(dates, time.Date(2026, time.Month(mIdx), d, 0, 0, 0, 0, time.UTC))
 			cols = append(cols, c)
 			if len(dates) >= n {
@@ -414,7 +414,7 @@ func probePlantilla(t *testing.T, n int) (sheet string, dates []time.Time, cols 
 			}
 		}
 	}
-	t.Fatalf("probePlantilla: only found %d valid date(s), need %d", len(dates), n)
+	t.Fatalf("probeTemplate: only found %d valid date(s), need %d", len(dates), n)
 	return
 }
 
@@ -432,7 +432,7 @@ func findVMLDrawing(entries []zipEntry) []byte {
 // ── T3 — F-record comment present, AT-with-empty-fields has no comment (R1, R3)
 
 func TestProcessCourse_FRecordComment_NoCommentForATEmptyFields(t *testing.T) {
-	sheet, dates, cols := probePlantilla(t, 1)
+	sheet, dates, cols := probeTemplate(t, 1)
 	date := dates[0]
 	col := cols[0]
 
@@ -441,9 +441,9 @@ func TestProcessCourse_FRecordComment_NoCommentForATEmptyFields(t *testing.T) {
 		{studentName: "ALUMNO DOS", rosterNumber: intPtr(2)},
 	}
 	cd := courseData{
-		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", paralelo: "A",
+		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", parallel: "A",
 		shift: "MAÑANA", roster: roster,
-		registros: []absenceRecord{
+		records: []absenceRecord{
 			{studentName: "ALUMNO UNO", rosterNumber: intPtr(1), date: date, typ: "F", notes: "F note"},
 			{studentName: "ALUMNO DOS", rosterNumber: intPtr(2), date: date, typ: "AT"},
 		},
@@ -471,8 +471,8 @@ func TestProcessCourse_FRecordComment_NoCommentForATEmptyFields(t *testing.T) {
 		t.Fatalf("xl/comments1.xml missing in output")
 	}
 
-	fcellRef, _ := excelize.CoordinatesToCellName(col, filaInicialNomina)
-	atcellRef, _ := excelize.CoordinatesToCellName(col, filaInicialNomina+1)
+	fcellRef, _ := excelize.CoordinatesToCellName(col, rosterFirstRow)
+	atcellRef, _ := excelize.CoordinatesToCellName(col, rosterFirstRow+1)
 
 	if !bytes.Contains(commentsXML, []byte(fmt.Sprintf(`ref="%s"`, fcellRef))) {
 		t.Fatalf("R1: xl/comments1.xml missing comment ref for F cell %s\n--- comments1.xml ---\n%s", fcellRef, commentsXML)
@@ -489,7 +489,7 @@ func TestProcessCourse_FRecordComment_NoCommentForATEmptyFields(t *testing.T) {
 // ── T4 — three records (F / AT / J) on same sheet, 3 distinct shape ids (R1, R2, R4, R5, R11)
 
 func TestProcessCourse_F_AT_J_ThreeDistinctShapeIDs(t *testing.T) {
-	sheet, dates, cols := probePlantilla(t, 3)
+	sheet, dates, cols := probeTemplate(t, 3)
 	// Spread the three absences across three different dates → three different
 	// columns. (Same date would still work but gives identical test coverage.)
 	dateF, dateAT, dateJ := dates[0], dates[1], dates[2]
@@ -501,9 +501,9 @@ func TestProcessCourse_F_AT_J_ThreeDistinctShapeIDs(t *testing.T) {
 		{studentName: "ALUMNO TRES", rosterNumber: intPtr(3)},
 	}
 	cd := courseData{
-		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", paralelo: "A",
+		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", parallel: "A",
 		shift: "MAÑANA", roster: roster,
-		registros: []absenceRecord{
+		records: []absenceRecord{
 			{studentName: "ALUMNO UNO", rosterNumber: intPtr(1), date: dateF, typ: "F", notes: "F note"},
 			{studentName: "ALUMNO DOS", rosterNumber: intPtr(2), date: dateAT, typ: "AT", notes: "AT note"},
 			{studentName: "ALUMNO TRES", rosterNumber: intPtr(3), date: dateJ, typ: "F", justified: true, notes: "J note", justificationReason: stringPtr("illness")},
@@ -532,9 +532,9 @@ func TestProcessCourse_F_AT_J_ThreeDistinctShapeIDs(t *testing.T) {
 		t.Fatalf("xl/comments1.xml missing in output")
 	}
 
-	fRef, _ := excelize.CoordinatesToCellName(colF, filaInicialNomina)
-	atRef, _ := excelize.CoordinatesToCellName(colAT, filaInicialNomina+1)
-	jRef, _ := excelize.CoordinatesToCellName(colJ, filaInicialNomina+2)
+	fRef, _ := excelize.CoordinatesToCellName(colF, rosterFirstRow)
+	atRef, _ := excelize.CoordinatesToCellName(colAT, rosterFirstRow+1)
+	jRef, _ := excelize.CoordinatesToCellName(colJ, rosterFirstRow+2)
 
 	type want struct {
 		cellRef, text string
