@@ -23,6 +23,7 @@ rm -rf /tmp/test-build
   tests/domain-events.test.ts \
   tests/justification-update.test.ts \
   tests/drop-enrollment-is-enrolled.test.ts \
+  tests/course-section.test.ts \
   tests/helpers/test-app.ts \
   tests/helpers/test-users.ts \
   tests/helpers/test-templates.ts \
@@ -36,4 +37,5 @@ NODE_PATH="$(pwd)/node_modules" exec node --test --test-concurrency=1 \
   /tmp/test-build/tests/withdrawn-enrollment-hiding.test.js \
   /tmp/test-build/tests/domain-events.test.js \
   /tmp/test-build/tests/justification-update.test.js \
-  /tmp/test-build/tests/drop-enrollment-is-enrolled.test.js
+  /tmp/test-build/tests/drop-enrollment-is-enrolled.test.js \
+  /tmp/test-build/tests/course-section.test.js

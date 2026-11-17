@@ -222,7 +222,7 @@ async function createCourse(institutionId: number, name?: string): Promise<Cours
   return repo.save(repo.create({
     name: name ?? uniqueName('__test_dei_course_'),
     fullName: null,
-    paralelo: null,
+    section: null,
     institutionId,
     shift: 'MATUTINA',
     isActive: true,
