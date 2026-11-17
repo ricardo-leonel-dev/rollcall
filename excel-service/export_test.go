@@ -571,3 +571,710 @@ func TestProcessCourse_F_AT_J_ThreeDistinctShapeIDs(t *testing.T) {
 		seen[string(id)] = true
 	}
 }
+
+// ── retiro: último día visible, filtrado de nómina y marca ───────────────────
+
+// withdrawalUntil builds a withdrawal whose last visible day is the given date.
+func withdrawalUntil(date, lastVisibleDay time.Time) *withdrawal {
+	return &withdrawal{date: date, lastVisibleDay: &lastVisibleDay}
+}
+
+// wholeYearWithdrawal builds a withdrawal that is never visible.
+func wholeYearWithdrawal(date time.Time) *withdrawal {
+	return &withdrawal{date: date, lastVisibleDay: nil}
+}
+
+// buildRoster returns a five-student roster whose stored roster numbers are
+// 1..5; the withdrawal of each student is taken from withdrawals (nil = none).
+func buildRoster(withdrawals []*withdrawal) []rosterStudent {
+	names := []string{"ALUMNO UNO", "ALUMNO DOS", "ALUMNO TRES", "ALUMNO CUATRO", "ALUMNO CINCO"}
+	roster := make([]rosterStudent, 0, len(names))
+	for i, name := range names {
+		roster = append(roster, rosterStudent{
+			studentName:  name,
+			rosterNumber: intPtr(i + 1),
+			withdrawal:   withdrawals[i],
+		})
+	}
+	return roster
+}
+
+// absenceLabel describes an absence record compactly for comparisons.
+func absenceLabel(rec absenceRecord) string {
+	return fmt.Sprintf("%s|%s|%s", rec.studentName, rec.typ, rec.date.Format("2006-01-02"))
+}
+
+func TestWithdrawalVisibleOn(t *testing.T) {
+	last := time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name       string
+		withdrawal *withdrawal
+		day        time.Time
+		visible    bool
+	}{
+		{
+			name:       "a withdrawal with no visible day hides every day",
+			withdrawal: wholeYearWithdrawal(time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC)),
+			day:        time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC),
+			visible:    false,
+		},
+		{
+			name:       "the day before the last visible day still counts",
+			withdrawal: withdrawalUntil(time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC), last),
+			day:        time.Date(2026, 10, 14, 0, 0, 0, 0, time.UTC),
+			visible:    true,
+		},
+		{
+			name:       "the last visible day itself still counts",
+			withdrawal: withdrawalUntil(time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC), last),
+			day:        last,
+			visible:    true,
+		},
+		{
+			name:       "the day after the last visible day does not count",
+			withdrawal: withdrawalUntil(time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC), last),
+			day:        time.Date(2026, 10, 16, 0, 0, 0, 0, time.UTC),
+			visible:    false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.withdrawal.visibleOn(tc.day); got != tc.visible {
+				t.Fatalf("visibleOn(%s): got %v, want %v", tc.day.Format("2006-01-02"), got, tc.visible)
+			}
+		})
+	}
+}
+
+func TestFilterWithdrawn(t *testing.T) {
+	september := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	november := time.Date(2026, 11, 30, 0, 0, 0, 0, time.UTC)
+	december := time.Date(2026, 12, 10, 0, 0, 0, 0, time.UTC)
+
+	// Cada retiro se comparte entre la fila de la nómina y sus ausencias: en
+	// el export real ambas salen de la misma matrícula.
+	octoberWithdrawal := withdrawalUntil(time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC), time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC))
+	decemberWithdrawal := withdrawalUntil(december, november)
+	yearLongWithdrawal := wholeYearWithdrawal(time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC))
+
+	cases := []struct {
+		name         string
+		from         time.Time
+		roster       []rosterStudent
+		records      []absenceRecord
+		wantNames    []string
+		wantNumbers  []int
+		wantAbsences []string
+	}{
+		{
+			name: "a withdrawal visible in the period keeps the student in the roster",
+			from: september,
+			roster: buildRoster([]*withdrawal{
+				nil, nil, nil,
+				withdrawalUntil(time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC), time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC)),
+				nil,
+			}),
+			wantNames:   []string{"ALUMNO UNO", "ALUMNO DOS", "ALUMNO TRES", "ALUMNO CUATRO", "ALUMNO CINCO"},
+			wantNumbers: []int{1, 2, 3, 4, 5},
+		},
+		{
+			name: "a withdrawal whose last visible day is the first day of the period keeps the student",
+			from: september,
+			roster: buildRoster([]*withdrawal{
+				nil, nil, nil,
+				withdrawalUntil(time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC), september),
+				nil,
+			}),
+			wantNames:   []string{"ALUMNO UNO", "ALUMNO DOS", "ALUMNO TRES", "ALUMNO CUATRO", "ALUMNO CINCO"},
+			wantNumbers: []int{1, 2, 3, 4, 5},
+		},
+		{
+			name: "a withdrawal whose last visible day is the last day of the period keeps the student",
+			from: september,
+			roster: buildRoster([]*withdrawal{
+				nil, nil, nil,
+				withdrawalUntil(november, november),
+				nil,
+			}),
+			wantNames:   []string{"ALUMNO UNO", "ALUMNO DOS", "ALUMNO TRES", "ALUMNO CUATRO", "ALUMNO CINCO"},
+			wantNumbers: []int{1, 2, 3, 4, 5},
+		},
+		{
+			name: "a withdrawal whose last visible day is after the period keeps the student",
+			from: september,
+			roster: buildRoster([]*withdrawal{
+				nil, nil, nil,
+				withdrawalUntil(december, december),
+				nil,
+			}),
+			wantNames:   []string{"ALUMNO UNO", "ALUMNO DOS", "ALUMNO TRES", "ALUMNO CUATRO", "ALUMNO CINCO"},
+			wantNumbers: []int{1, 2, 3, 4, 5},
+		},
+		{
+			name: "a withdrawal whose last visible day is before the period drops the student and leaves a gap in the numbers",
+			from: september,
+			roster: buildRoster([]*withdrawal{
+				nil, nil, nil,
+				withdrawalUntil(time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC), time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC)),
+				nil,
+			}),
+			wantNames:   []string{"ALUMNO UNO", "ALUMNO DOS", "ALUMNO TRES", "ALUMNO CINCO"},
+			wantNumbers: []int{1, 2, 3, 5},
+		},
+		{
+			name: "a withdrawal for the whole year drops the student and leaves a gap in the numbers",
+			from: september,
+			roster: buildRoster([]*withdrawal{
+				nil, nil, nil,
+				wholeYearWithdrawal(time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC)),
+				nil,
+			}),
+			wantNames:   []string{"ALUMNO UNO", "ALUMNO DOS", "ALUMNO TRES", "ALUMNO CINCO"},
+			wantNumbers: []int{1, 2, 3, 5},
+		},
+		{
+			name: "the period start decides who is listed",
+			from: time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC),
+			roster: buildRoster([]*withdrawal{
+				nil, nil, nil,
+				withdrawalUntil(december, time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)),
+				nil,
+			}),
+			wantNames:   []string{"ALUMNO UNO", "ALUMNO DOS", "ALUMNO TRES", "ALUMNO CINCO"},
+			wantNumbers: []int{1, 2, 3, 5},
+		},
+		{
+			name: "an absence after the last visible day is dropped",
+			from: september,
+			roster: buildRoster([]*withdrawal{
+				nil, nil, nil, octoberWithdrawal, nil,
+			}),
+			records: []absenceRecord{
+				{studentName: "ALUMNO CUATRO", date: time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC), typ: "F", notes: "posterior", withdrawal: octoberWithdrawal},
+			},
+			wantNames:    []string{"ALUMNO UNO", "ALUMNO DOS", "ALUMNO TRES", "ALUMNO CUATRO", "ALUMNO CINCO"},
+			wantNumbers:  []int{1, 2, 3, 4, 5},
+			wantAbsences: nil,
+		},
+		{
+			name: "an absence on the last visible day is kept",
+			from: september,
+			roster: buildRoster([]*withdrawal{
+				nil, nil, nil, octoberWithdrawal, nil,
+			}),
+			records: []absenceRecord{
+				{studentName: "ALUMNO CUATRO", date: time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC), typ: "F", withdrawal: octoberWithdrawal},
+			},
+			wantNames:    []string{"ALUMNO UNO", "ALUMNO DOS", "ALUMNO TRES", "ALUMNO CUATRO", "ALUMNO CINCO"},
+			wantNumbers:  []int{1, 2, 3, 4, 5},
+			wantAbsences: []string{"ALUMNO CUATRO|F|2026-10-15"},
+		},
+		{
+			name: "an absence between the last visible day and the withdrawal date is dropped",
+			from: september,
+			roster: buildRoster([]*withdrawal{
+				nil, nil, nil, decemberWithdrawal, nil,
+			}),
+			records: []absenceRecord{
+				{studentName: "ALUMNO CUATRO", date: time.Date(2026, 12, 3, 0, 0, 0, 0, time.UTC), typ: "F", withdrawal: decemberWithdrawal},
+			},
+			wantNames:    []string{"ALUMNO UNO", "ALUMNO DOS", "ALUMNO TRES", "ALUMNO CUATRO", "ALUMNO CINCO"},
+			wantNumbers:  []int{1, 2, 3, 4, 5},
+			wantAbsences: nil,
+		},
+		{
+			name: "a withdrawal for the whole year drops the student and all their absences",
+			from: september,
+			roster: buildRoster([]*withdrawal{
+				nil, nil, nil, yearLongWithdrawal, nil,
+			}),
+			records: []absenceRecord{
+				{studentName: "ALUMNO CUATRO", date: time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC), typ: "F", withdrawal: yearLongWithdrawal},
+			},
+			wantNames:    []string{"ALUMNO UNO", "ALUMNO DOS", "ALUMNO TRES", "ALUMNO CINCO"},
+			wantNumbers:  []int{1, 2, 3, 5},
+			wantAbsences: nil,
+		},
+		{
+			name: "the absences of a dropped student never reach a student sharing their name",
+			from: september,
+			roster: []rosterStudent{
+				{studentName: "PEREZ LOPEZ JUAN", rosterNumber: intPtr(1)},
+				{studentName: "PEREZ LOPEZ PEDRO", rosterNumber: intPtr(2), withdrawal: yearLongWithdrawal},
+			},
+			records: []absenceRecord{
+				{studentName: "PEREZ LOPEZ PEDRO", date: time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC), typ: "F", withdrawal: yearLongWithdrawal},
+			},
+			wantNames:    []string{"PEREZ LOPEZ JUAN"},
+			wantNumbers:  []int{1},
+			wantAbsences: nil,
+		},
+		{
+			name:   "a student without withdrawal keeps everything",
+			from:   september,
+			roster: buildRoster([]*withdrawal{nil, nil, nil, nil, nil}),
+			records: []absenceRecord{
+				{studentName: "ALUMNO CUATRO", date: time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC), typ: "F"},
+				{studentName: "ALUMNO UNO", date: time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC), typ: "AT"},
+			},
+			wantNames:   []string{"ALUMNO UNO", "ALUMNO DOS", "ALUMNO TRES", "ALUMNO CUATRO", "ALUMNO CINCO"},
+			wantNumbers: []int{1, 2, 3, 4, 5},
+			wantAbsences: []string{
+				"ALUMNO CUATRO|F|2026-09-15",
+				"ALUMNO UNO|AT|2026-10-20",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cd := courseData{id: 1, name: "CURSO DE PRUEBA", roster: tc.roster, records: tc.records}
+			got := filterWithdrawn(cd, tc.from)
+
+			var names []string
+			var numbers []int
+			for _, student := range got.roster {
+				names = append(names, student.studentName)
+				if student.rosterNumber != nil {
+					numbers = append(numbers, *student.rosterNumber)
+				}
+			}
+			if !reflect.DeepEqual(names, tc.wantNames) {
+				t.Fatalf("roster names: got %v, want %v", names, tc.wantNames)
+			}
+			if !reflect.DeepEqual(numbers, tc.wantNumbers) {
+				t.Fatalf("roster numbers: got %v, want %v", numbers, tc.wantNumbers)
+			}
+
+			var labels []string
+			for _, rec := range got.records {
+				labels = append(labels, absenceLabel(rec))
+			}
+			if !reflect.DeepEqual(labels, tc.wantAbsences) {
+				t.Fatalf("absences: got %v, want %v", labels, tc.wantAbsences)
+			}
+
+			// The input must stay untouched: the filter returns a copy.
+			if len(cd.roster) != len(tc.roster) {
+				t.Fatalf("input roster was mutated: got %d entries, want %d", len(cd.roster), len(tc.roster))
+			}
+			if len(cd.records) != len(tc.records) {
+				t.Fatalf("input absences were mutated: got %d entries, want %d", len(cd.records), len(tc.records))
+			}
+		})
+	}
+}
+
+func TestNameWithWithdrawalMark(t *testing.T) {
+	cases := []struct {
+		name    string
+		student rosterStudent
+		want    string
+	}{
+		{
+			name:    "a student without withdrawal keeps the plain name",
+			student: rosterStudent{studentName: "PEREZ LOPEZ JUAN", rosterNumber: intPtr(1)},
+			want:    "PEREZ LOPEZ JUAN",
+		},
+		{
+			name: "the mark shows the withdrawal date",
+			student: rosterStudent{
+				studentName:  "PEREZ LOPEZ JUAN",
+				rosterNumber: intPtr(1),
+				withdrawal:   withdrawalUntil(time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC), time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC)),
+			},
+			want: "PEREZ LOPEZ JUAN (RETIRADO 15/10/2026)",
+		},
+		{
+			name: "the day of the withdrawal is zero padded",
+			student: rosterStudent{
+				studentName:  "PEREZ LOPEZ JUAN",
+				rosterNumber: intPtr(1),
+				withdrawal:   withdrawalUntil(time.Date(2026, 3, 5, 0, 0, 0, 0, time.UTC), time.Date(2026, 3, 5, 0, 0, 0, 0, time.UTC)),
+			},
+			want: "PEREZ LOPEZ JUAN (RETIRADO 05/03/2026)",
+		},
+		{
+			name: "the mark shows the withdrawal date, not the last visible day",
+			student: rosterStudent{
+				studentName:  "PEREZ LOPEZ JUAN",
+				rosterNumber: intPtr(1),
+				withdrawal:   withdrawalUntil(time.Date(2026, 12, 10, 0, 0, 0, 0, time.UTC), time.Date(2026, 11, 30, 0, 0, 0, 0, time.UTC)),
+			},
+			want: "PEREZ LOPEZ JUAN (RETIRADO 10/12/2026)",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := nameWithWithdrawalMark(tc.student); got != tc.want {
+				t.Fatalf("name cell: got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// ── processCourse con estudiantes retirados ─────────────────────────────────
+
+// commentTextFor returns the text of the comment attached to the given cell
+// reference in an xl/comments1.xml payload ("" when the cell has none).
+func commentTextFor(commentsXML []byte, ref string) string {
+	re := regexp.MustCompile(`(?s)<comment ref="` + regexp.QuoteMeta(ref) + `"[^>]*>(.*?)</comment>`)
+	m := re.FindSubmatch(commentsXML)
+	if m == nil {
+		return ""
+	}
+	tm := regexp.MustCompile(`(?s)<t[^>]*>(.*?)</t>`).FindSubmatch(m[1])
+	if tm == nil {
+		return ""
+	}
+	return string(tm[1])
+}
+
+// readCommentsPart returns the xl/comments1.xml payload of a workbook (nil
+// when the workbook has no comments).
+func readCommentsPart(t *testing.T, path string) []byte {
+	t.Helper()
+	entries, err := readZipEntries(path)
+	if err != nil {
+		t.Fatalf("readZipEntries(%s): %v", path, err)
+	}
+	for _, e := range entries {
+		if e.name == "xl/comments1.xml" {
+			return e.content
+		}
+	}
+	return nil
+}
+
+// cellSnapshot is the value and style of one cell of a generated workbook.
+type cellSnapshot struct {
+	ref   string
+	value string
+	style int
+}
+
+// snapshotCells reads the value and the style of every given cell reference.
+func snapshotCells(t *testing.T, path, sheet string, refs []string) []cellSnapshot {
+	t.Helper()
+	f, err := excelize.OpenFile(path)
+	if err != nil {
+		t.Fatalf("open %s: %v", path, err)
+	}
+	defer f.Close()
+	snapshot := make([]cellSnapshot, 0, len(refs))
+	for _, ref := range refs {
+		value, err := f.GetCellValue(sheet, ref)
+		if err != nil {
+			t.Fatalf("GetCellValue(%s): %v", ref, err)
+		}
+		style, err := f.GetCellStyle(sheet, ref)
+		if err != nil {
+			t.Fatalf("GetCellStyle(%s): %v", ref, err)
+		}
+		snapshot = append(snapshot, cellSnapshot{ref: ref, value: value, style: style})
+	}
+	return snapshot
+}
+
+func TestProcessCourse_WithdrawnStudent(t *testing.T) {
+	sheet, dates, cols := probeTemplate(t, 5)
+	day1, day2, day3, day4, day5 := dates[0], dates[1], dates[2], dates[3], dates[4]
+	col1, col2, col3, col4 := cols[0], cols[1], cols[2], cols[3]
+
+	withdrawalUntilDay2 := withdrawalUntil(day2, day2)
+	withdrawalUntilTrimesterStart := withdrawalUntil(day4, day2)
+	withdrawalAfterPeriod := withdrawalUntil(day5, day5)
+
+	roster := []rosterStudent{
+		{studentName: "ALUMNO RETIRADO", rosterNumber: intPtr(1), withdrawal: withdrawalUntilDay2},
+		{studentName: "ALUMNO TRIMESTRE", rosterNumber: intPtr(2), withdrawal: withdrawalUntilTrimesterStart},
+		{studentName: "ALUMNO POSTERIOR", rosterNumber: intPtr(3), withdrawal: withdrawalAfterPeriod},
+		{studentName: "ALUMNO NORMAL", rosterNumber: intPtr(4)},
+	}
+	cd := courseData{
+		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", parallel: "A",
+		shift: "MAÑANA", roster: roster,
+		records: []absenceRecord{
+			{studentName: "ALUMNO RETIRADO", date: day2, typ: "F", notes: "gripe", withdrawal: withdrawalUntilDay2},
+			{studentName: "ALUMNO RETIRADO", date: day3, typ: "F", notes: "posterior al retiro", withdrawal: withdrawalUntilDay2},
+			{studentName: "ALUMNO TRIMESTRE", date: day3, typ: "F", notes: "entre el trimestre y el retiro", withdrawal: withdrawalUntilTrimesterStart},
+		},
+	}
+
+	cd = filterWithdrawn(cd, day1)
+
+	outputDir := t.TempDir()
+	ts := time.Now().Format("20060102_150405")
+	p, err := processCourse("plantilla_asistencia.xlsx", outputDir, ts, cd, sheet, 0, []time.Time{day1, day2, day3, day4}, nil)
+	if err != nil {
+		t.Fatalf("processCourse: %v", err)
+	}
+
+	f, err := excelize.OpenFile(p)
+	if err != nil {
+		t.Fatalf("open %s: %v", p, err)
+	}
+	defer f.Close()
+
+	value := func(row, col int) string {
+		t.Helper()
+		ref, _ := excelize.CoordinatesToCellName(col, row)
+		v, err := f.GetCellValue(sheet, ref)
+		if err != nil {
+			t.Fatalf("GetCellValue(%s): %v", ref, err)
+		}
+		return v
+	}
+	style := func(row, col int) int {
+		t.Helper()
+		ref, _ := excelize.CoordinatesToCellName(col, row)
+		idx, err := f.GetCellStyle(sheet, ref)
+		if err != nil {
+			t.Fatalf("GetCellStyle(%s): %v", ref, err)
+		}
+		return idx
+	}
+	nameCell := func(row int) string {
+		t.Helper()
+		ref, _ := excelize.CoordinatesToCellName(2, row)
+		v, err := f.GetCellValue(sheet, ref)
+		if err != nil {
+			t.Fatalf("GetCellValue(%s): %v", ref, err)
+		}
+		return v
+	}
+
+	// La marca del retiro va en la celda del nombre, con la fecha del retiro.
+	for _, tc := range []struct {
+		row  int
+		want string
+	}{
+		{rosterFirstRow, "ALUMNO RETIRADO (RETIRADO " + day2.Format("02/01/2006") + ")"},
+		{rosterFirstRow + 1, "ALUMNO TRIMESTRE (RETIRADO " + day4.Format("02/01/2006") + ")"},
+		{rosterFirstRow + 2, "ALUMNO POSTERIOR (RETIRADO " + day5.Format("02/01/2006") + ")"},
+		{rosterFirstRow + 3, "ALUMNO NORMAL"},
+	} {
+		if got := nameCell(tc.row); got != tc.want {
+			t.Fatalf("name cell of row %d: got %q, want %q", tc.row, got, tc.want)
+		}
+	}
+
+	// El número de nómina guardado se respeta.
+	for i, row := range []int{rosterFirstRow, rosterFirstRow + 1, rosterFirstRow + 2, rosterFirstRow + 3} {
+		ref, _ := excelize.CoordinatesToCellName(1, row)
+		got, err := f.GetCellValue(sheet, ref)
+		if err != nil {
+			t.Fatalf("GetCellValue(%s): %v", ref, err)
+		}
+		if got != fmt.Sprintf("%d", i+1) {
+			t.Fatalf("roster number of row %d: got %q, want %d", row, got, i+1)
+		}
+	}
+
+	// Días: hasta el último día visible la absences manda, después la celda
+	// queda en blanco y sin el estilo de presencia.
+	for _, tc := range []struct {
+		row  int
+		want []string
+	}{
+		{rosterFirstRow, []string{"A", "F", "", ""}},
+		{rosterFirstRow + 1, []string{"A", "A", "", ""}},
+		{rosterFirstRow + 2, []string{"A", "A", "A", "A"}},
+		{rosterFirstRow + 3, []string{"A", "A", "A", "A"}},
+	} {
+		for i, want := range tc.want {
+			col := []int{col1, col2, col3, col4}[i]
+			if got := value(tc.row, col); got != want {
+				t.Fatalf("cell of row %d and day %d: got %q, want %q", tc.row, i+1, got, want)
+			}
+		}
+	}
+
+	// La celda en blanco conserva el estilo de la plantilla: ni el de la
+	// ausencia ni el de la presencia.
+	if style(rosterFirstRow, col3) == style(rosterFirstRow, col2) {
+		t.Fatalf("blanked cell must not keep the absence style")
+	}
+	if style(rosterFirstRow, col3) == style(rosterFirstRow+3, col3) {
+		t.Fatalf("blanked cell must not use the presence style")
+	}
+
+	// Las celdas en blanco no llevan comentario.
+	commentsXML := readCommentsPart(t, p)
+	if commentsXML == nil {
+		t.Fatalf("xl/comments1.xml missing in output")
+	}
+	rowRef, _ := excelize.CoordinatesToCellName(col2, rosterFirstRow)
+	if commentTextFor(commentsXML, rowRef) == "" {
+		t.Fatalf("the absence on the last visible day must keep its comment")
+	}
+	for _, row := range []int{rosterFirstRow, rosterFirstRow + 1} {
+		for _, col := range []int{col3, col4} {
+			ref, _ := excelize.CoordinatesToCellName(col, row)
+			if text := commentTextFor(commentsXML, ref); text != "" {
+				t.Fatalf("cell %s must not carry a comment, got %q", ref, text)
+			}
+		}
+	}
+}
+
+func TestProcessCourse_WithdrawnStudentKeepsEarlierRecords(t *testing.T) {
+	sheet, dates, cols := probeTemplate(t, 3)
+	day1, day2, day3 := dates[0], dates[1], dates[2]
+	col1, col2, col3 := cols[0], cols[1], cols[2]
+
+	withdrawalUntilDay3 := withdrawalUntil(day3, day3)
+
+	cd := courseData{
+		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", parallel: "A",
+		shift: "MAÑANA",
+		roster: []rosterStudent{
+			{studentName: "ALUMNO RETIRADO", rosterNumber: intPtr(1), withdrawal: withdrawalUntilDay3},
+			{studentName: "ALUMNO NORMAL", rosterNumber: intPtr(2)},
+		},
+		records: []absenceRecord{
+			{studentName: "ALUMNO RETIRADO", date: day1, typ: "F", notes: "gripe", withdrawal: withdrawalUntilDay3},
+			{studentName: "ALUMNO RETIRADO", date: day2, typ: "AT", withdrawal: withdrawalUntilDay3},
+			{studentName: "ALUMNO RETIRADO", date: day3, typ: "F", justified: true, notes: "reposo", justificationReason: stringPtr("enfermedad"), withdrawal: withdrawalUntilDay3},
+			{studentName: "ALUMNO NORMAL", date: day1, typ: "F", notes: "gripe"},
+			{studentName: "ALUMNO NORMAL", date: day2, typ: "AT"},
+			{studentName: "ALUMNO NORMAL", date: day3, typ: "F", justified: true, notes: "reposo", justificationReason: stringPtr("enfermedad")},
+		},
+	}
+
+	cd = filterWithdrawn(cd, day1)
+
+	outputDir := t.TempDir()
+	ts := time.Now().Format("20060102_150405")
+	p, err := processCourse("plantilla_asistencia.xlsx", outputDir, ts, cd, sheet, 0, []time.Time{day1, day2, day3}, nil)
+	if err != nil {
+		t.Fatalf("processCourse: %v", err)
+	}
+
+	commentsXML := readCommentsPart(t, p)
+	if commentsXML == nil {
+		t.Fatalf("xl/comments1.xml missing in output")
+	}
+
+	f, err := excelize.OpenFile(p)
+	if err != nil {
+		t.Fatalf("open %s: %v", p, err)
+	}
+	defer f.Close()
+
+	hasDiagonal := func(ref string) bool {
+		t.Helper()
+		idx, err := f.GetCellStyle(sheet, ref)
+		if err != nil {
+			t.Fatalf("GetCellStyle(%s): %v", ref, err)
+		}
+		s, err := f.GetStyle(idx)
+		if err != nil {
+			t.Fatalf("GetStyle(%d): %v", idx, err)
+		}
+		for _, b := range s.Border {
+			if b.Type == "diagonalUp" {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Las ausencias hasta el último día visible se exportan igual que las de
+	// un estudiante sin retiro.
+	for i, tc := range []struct {
+		col   int
+		value string
+	}{
+		{col1, "F"},
+		{col2, "AT"},
+		{col3, "J"},
+	} {
+		withdrawnRef, _ := excelize.CoordinatesToCellName(tc.col, rosterFirstRow)
+		regularRef, _ := excelize.CoordinatesToCellName(tc.col, rosterFirstRow+1)
+
+		gotWithdrawn, err := f.GetCellValue(sheet, withdrawnRef)
+		if err != nil {
+			t.Fatalf("GetCellValue(%s): %v", withdrawnRef, err)
+		}
+		gotRegular, err := f.GetCellValue(sheet, regularRef)
+		if err != nil {
+			t.Fatalf("GetCellValue(%s): %v", regularRef, err)
+		}
+		if gotWithdrawn != tc.value || gotRegular != tc.value {
+			t.Fatalf("record %d: withdrawn cell %s is %q and regular cell %s is %q, want %q in both", i+1, withdrawnRef, gotWithdrawn, regularRef, gotRegular, tc.value)
+		}
+
+		if hasDiagonal(withdrawnRef) != hasDiagonal(regularRef) {
+			t.Fatalf("record %d: the note border of %s and %s must match", i+1, withdrawnRef, regularRef)
+		}
+
+		withdrawnText := commentTextFor(commentsXML, withdrawnRef)
+		regularText := commentTextFor(commentsXML, regularRef)
+		if withdrawnText != regularText {
+			t.Fatalf("record %d: comment of %s is %q and comment of %s is %q, want the same text", i+1, withdrawnRef, withdrawnText, regularRef, regularText)
+		}
+	}
+}
+
+func TestProcessCourse_NoWithdrawalsUnchanged(t *testing.T) {
+	sheet, dates, cols := probeTemplate(t, 4)
+	days := dates[:4]
+
+	cd := courseData{
+		id: 1, name: "TEST COURSE", fullName: "PRIMERO BS", parallel: "A",
+		shift: "MAÑANA",
+		roster: []rosterStudent{
+			{studentName: "ALUMNO UNO", rosterNumber: intPtr(1)},
+			{studentName: "ALUMNO DOS", rosterNumber: intPtr(2)},
+			{studentName: "ALUMNO TRES", rosterNumber: intPtr(3)},
+		},
+		records: []absenceRecord{
+			{studentName: "ALUMNO UNO", date: days[0], typ: "F", notes: "gripe"},
+			{studentName: "ALUMNO DOS", date: days[1], typ: "AT"},
+			{studentName: "ALUMNO TRES", date: days[2], typ: "F", justified: true, notes: "reposo", justificationReason: stringPtr("enfermedad")},
+		},
+	}
+
+	outputDir := t.TempDir()
+	ts := time.Now().Format("20060102_150405")
+
+	filtered := filterWithdrawn(cd, days[0])
+	filtered.id = 11
+	pFiltered, err := processCourse("plantilla_asistencia.xlsx", outputDir, ts, filtered, sheet, 0, days, nil)
+	if err != nil {
+		t.Fatalf("processCourse (filtered): %v", err)
+	}
+
+	unfiltered := cd
+	unfiltered.id = 12
+	pUnfiltered, err := processCourse("plantilla_asistencia.xlsx", outputDir, ts, unfiltered, sheet, 0, days, nil)
+	if err != nil {
+		t.Fatalf("processCourse (not filtered): %v", err)
+	}
+
+	var refs []string
+	for i := range 3 {
+		row := rosterFirstRow + i
+		for _, col := range []int{1, 2} {
+			ref, _ := excelize.CoordinatesToCellName(col, row)
+			refs = append(refs, ref)
+		}
+		for _, col := range cols[:4] {
+			ref, _ := excelize.CoordinatesToCellName(col, row)
+			refs = append(refs, ref)
+		}
+	}
+
+	filteredCells := snapshotCells(t, pFiltered, sheet, refs)
+	unfilteredCells := snapshotCells(t, pUnfiltered, sheet, refs)
+	if !reflect.DeepEqual(filteredCells, unfilteredCells) {
+		t.Fatalf("a course without withdrawals must export exactly as before:\nfiltered:   %+v\nnot filtered: %+v", filteredCells, unfilteredCells)
+	}
+
+	filteredComments := readCommentsPart(t, pFiltered)
+	unfilteredComments := readCommentsPart(t, pUnfiltered)
+	if !bytes.Equal(filteredComments, unfilteredComments) {
+		t.Fatalf("the comments of a course without withdrawals must not change")
+	}
+}

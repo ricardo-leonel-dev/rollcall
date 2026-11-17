@@ -29,6 +29,20 @@ const (
 	rosterLastRow  = 40
 )
 
+// withdrawal es el retiro activo de una matrícula: la fecha del retiro y el
+// último día en el que el estudiante todavía cuenta en el registro.
+// lastVisibleDay nil significa retiro de todo el año: el estudiante no se
+// muestra nunca.
+type withdrawal struct {
+	date           time.Time
+	lastVisibleDay *time.Time
+}
+
+// visibleOn indica si el día d cae en el último día visible del retiro.
+func (r *withdrawal) visibleOn(d time.Time) bool {
+	return r.lastVisibleDay != nil && !d.After(*r.lastVisibleDay)
+}
+
 type absenceRecord struct {
 	studentName         string
 	rosterNumber        *int
@@ -37,11 +51,13 @@ type absenceRecord struct {
 	notes               string
 	justified           bool
 	justificationReason *string
+	withdrawal          *withdrawal // nil si la matrícula no tiene retiro activo
 }
 
 type rosterStudent struct {
 	studentName  string
 	rosterNumber *int
+	withdrawal   *withdrawal // nil si la matrícula no tiene retiro activo
 }
 
 type courseData struct {
@@ -134,6 +150,41 @@ func writeRoster(f *excelize.File, sheet string, roster []rosterStudent) error {
 		}
 	}
 	return nil
+}
+
+// filterWithdrawn deja la nómina solo con los estudiantes que todavía
+// cuentan en el periodo exportado (desde <= último día visible del retiro) y
+// descarta las ausencias fechadas después de ese último día visible.
+// Devuelve una copia: no muta los slices de la entrada.
+func filterWithdrawn(cd courseData, from time.Time) courseData {
+	filtered := cd
+
+	var roster []rosterStudent
+	for _, student := range cd.roster {
+		if student.withdrawal == nil || student.withdrawal.visibleOn(from) {
+			roster = append(roster, student)
+		}
+	}
+	filtered.roster = roster
+
+	var records []absenceRecord
+	for _, rec := range cd.records {
+		if rec.withdrawal == nil || rec.withdrawal.visibleOn(rec.date) {
+			records = append(records, rec)
+		}
+	}
+	filtered.records = records
+
+	return filtered
+}
+
+// nameWithWithdrawalMark devuelve el texto de la celda del nombre: el nombre tal
+// cual, o el nombre con la marca del retiro y su fecha.
+func nameWithWithdrawalMark(student rosterStudent) string {
+	if student.withdrawal == nil {
+		return student.studentName
+	}
+	return fmt.Sprintf("%s (RETIRADO %s)", student.studentName, student.withdrawal.date.Format("02/01/2006"))
 }
 
 var ordinalWords = map[string]string{
@@ -877,10 +928,32 @@ outerBorder:
 				continue
 			}
 			cellRef, _ := excelize.CoordinatesToCellName(col, row)
+			if student.withdrawal != nil && !student.withdrawal.visibleOn(businessDay) {
+				// El día ya no cuenta para el estudiante retirado: se borra la
+				// "A" que trae la plantilla para que no entre en los totales.
+				f.SetCellValue(base, cellRef, "")
+				marked[[2]int{row, col}] = true
+				continue
+			}
 			f.SetCellValue(base, cellRef, "A")
 			f.SetCellStyle(base, cellRef, cellRef, styleP)
 			marked[[2]int{row, col}] = true
 		}
+	}
+
+	// La marca del retiro va en la celda del nombre, después de escribir la
+	// nómina, para que las claves de coincidencia de nombres sigan siendo las
+	// del nombre guardado.
+	for idx, student := range cd.roster {
+		if student.withdrawal == nil {
+			continue
+		}
+		row := rosterFirstRow + idx
+		if row > rosterLastRow {
+			break
+		}
+		cellB, _ := excelize.CoordinatesToCellName(2, row)
+		f.SetCellValue(base, cellB, nameWithWithdrawalMark(student))
 	}
 
 	if err := f.SetSheetName(base, sheetName); err != nil {
@@ -968,6 +1041,24 @@ func writeSigners(f *excelize.File, sheet string, signers []Signer) {
 
 // ── handler ───────────────────────────────────────────────────────────────────
 
+// withdrawalColumnsSQL calcula el último día visible del retiro activo de una
+// matrícula, con el mismo criterio que aplica el backend al filtrar los
+// registros visibles de un estudiante retirado: según stats_visibility, el
+// último día visible es la fecha del retiro, el día anterior al inicio del
+// trimestre que la contiene, o ninguno (retiro de todo el año).
+// Necesita el alias m para las matrículas y w para el retiro activo.
+const withdrawalColumnsSQL = `
+  w.withdrawal_date,
+  CASE w.stats_visibility
+    WHEN 'whole_year' THEN NULL
+    WHEN 'until_quarter_start' THEN COALESCE((
+      SELECT q.start_date - 1 FROM quarters q
+       WHERE q.academic_year_id = m.academic_year_id AND q.deleted_at IS NULL
+         AND q.start_date <= w.withdrawal_date AND q.end_date >= w.withdrawal_date
+       ORDER BY q.start_date ASC LIMIT 1), w.withdrawal_date)
+    ELSE w.withdrawal_date
+  END AS ultimo_dia_visible`
+
 func exportExcelHandler(pool *pgxpool.Pool, templatePath, outputDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
@@ -1029,10 +1120,13 @@ func exportExcelHandler(pool *pgxpool.Pool, templatePath, outputDir string) http
 				  ) AS is_justified,
 				  (SELECT j.reason FROM justification_absences ja
 				   JOIN justifications j ON j.id = ja.justification_id
-				   WHERE ja.absence_id = a.id LIMIT 1) AS justification_reason
+				   WHERE ja.absence_id = a.id LIMIT 1) AS justification_reason,
+				`+withdrawalColumnsSQL+`
 				FROM absences a
 				JOIN enrollments m ON m.id = a.enrollment_id
 				JOIN students e    ON e.id = m.student_id
+				LEFT JOIN student_withdrawals w
+				       ON w.enrollment_id = m.id AND w.reverted_at IS NULL
 				WHERE m.course_id = $1
 				  AND m.academic_year_id = $2
 				  AND a.date BETWEEN $3 AND $4
@@ -1047,19 +1141,26 @@ func exportExcelHandler(pool *pgxpool.Pool, templatePath, outputDir string) http
 			}
 			for rows.Next() {
 				var rec absenceRecord
-				if err := rows.Scan(&rec.studentName, &rec.rosterNumber, &rec.date, &rec.typ, &rec.notes, &rec.justified, &rec.justificationReason); err != nil {
+				var withdrawalDate, lastVisible *time.Time
+				if err := rows.Scan(&rec.studentName, &rec.rosterNumber, &rec.date, &rec.typ, &rec.notes, &rec.justified, &rec.justificationReason, &withdrawalDate, &lastVisible); err != nil {
 					rows.Close()
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
+				}
+				if withdrawalDate != nil {
+					rec.withdrawal = &withdrawal{date: *withdrawalDate, lastVisibleDay: lastVisible}
 				}
 				cd.records = append(cd.records, rec)
 			}
 			rows.Close()
 
 			rosterRows, err := pool.Query(ctx, `
-				SELECT e.name AS student_name, m.roster_number
+				SELECT e.name AS student_name, m.roster_number,
+				`+withdrawalColumnsSQL+`
 				FROM enrollments m
 				JOIN students e ON e.id = m.student_id
+				LEFT JOIN student_withdrawals w
+				       ON w.enrollment_id = m.id AND w.reverted_at IS NULL
 				WHERE m.course_id = $1
 				  AND m.academic_year_id = $2
 				  AND m.institution_id = $3
@@ -1073,15 +1174,20 @@ func exportExcelHandler(pool *pgxpool.Pool, templatePath, outputDir string) http
 			}
 			for rosterRows.Next() {
 				var student rosterStudent
-				if err := rosterRows.Scan(&student.studentName, &student.rosterNumber); err != nil {
+				var withdrawalDate, lastVisible *time.Time
+				if err := rosterRows.Scan(&student.studentName, &student.rosterNumber, &withdrawalDate, &lastVisible); err != nil {
 					rosterRows.Close()
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
+				}
+				if withdrawalDate != nil {
+					student.withdrawal = &withdrawal{date: *withdrawalDate, lastVisibleDay: lastVisible}
 				}
 				cd.roster = append(cd.roster, student)
 			}
 			rosterRows.Close()
 
+			cd = filterWithdrawn(cd, dateFrom)
 			courses = append(courses, cd)
 		}
 
