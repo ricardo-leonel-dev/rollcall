@@ -5,31 +5,35 @@
 
 ## Current state (read this first)
 
-This project has **no automated test suite** yet (no `*_test.go` files).
-`.harness.json`'s `verify_command` is intentionally left **empty** until
-tests exist — `init.sh` will skip verification with a `[WARN]`, not a
-failure. Until then, "verified" means Level 1 (build/vet/fmt) + Level 3
-(manual smoke test) below, not an automated pass. Say explicitly that a
-change was build-checked and manually smoke-tested, not unit-tested.
+This project **has an automated test suite** (`export_test.go`, run with
+`go test ./...`). It covers the pure helpers and the workbook writing
+(`processCourse`) against the real `plantilla_asistencia.xlsx`; it does not
+touch the database — the SQL that only Postgres can answer is checked with
+the Level 2 integration pass below.
+
+`.harness.json`'s `verify_command` is intentionally left **empty**: `init.sh`
+still skips its own verification step with a `[WARN]`, not a failure. Run
+`go test ./...` yourself as part of Level 1 — a green `go build` alone does
+not prove the change works. Say explicitly which of the levels below a
+change was checked against.
 
 ## Verification Levels
 
-### Level 1 — Build check (mandatory, stands in for unit tests today)
+### Level 1 — Build check + unit tests (mandatory)
 
 ```bash
 go build ./...
 gofmt -l .        # must print nothing
 go vet ./...      # must print nothing
+go test ./...     # must print "ok"
 ```
 
 `go build` catches compile errors; `gofmt -l .`/`go vet ./...` catch
 formatting drift and common correctness issues (neither should ever be
-skipped — both are cheap and currently clean). None of this exercises
-runtime behavior (no DB connection, no HTTP request is actually made).
-
-If a real test suite is added later (`names.go`'s pure helpers are the
-easiest starting point — see `docs/conventions.md`), set `.harness.json`'s
-`verify_command` to `go test ./...` (or similar) and update this section.
+skipped — both are cheap and currently clean). `go test ./...` runs the
+suite in `export_test.go`: the pure helpers and the workbook writing, with
+the real template as the fixture. None of this exercises the database (no
+DB connection, no HTTP request is actually made).
 
 ### Level 2 — Integration check (against the real DB + template)
 
@@ -77,10 +81,10 @@ course/date range — not just that a file came back.
 ## Anti-patterns (do not do)
 
 - "I added the feature, it should work." → missing executable proof (at
-  minimum, clean `go build`/`gofmt`/`go vet`, plus a described manual
-  export against real data).
-- Claiming "tests pass" when there is no test suite — there isn't one yet;
-  say what was actually checked.
+  minimum, clean `go build`/`gofmt`/`go vet`/`go test`, plus a described
+  manual export against real data).
+- Claiming "tests pass" without pasting the `go test ./...` result, or
+  claiming a database behaviour was tested when only the pure helpers were.
 - Checking only the HTTP status code of `/export/excel` without opening the
   resulting file — a 200 with a corrupted or empty workbook is still a bug.
 - Marking a feature `done` when `go vet ./...` or `gofmt -l .` reports
@@ -94,7 +98,7 @@ course/date range — not just that a file came back.
 
 `init.sh`'s verification step will `[WARN]` (not fail) since
 `verify_command` is unset — that WARN is expected right now, not a signal to
-skip `go build ./...`/`gofmt -l .`/`go vet ./...`. Run them manually and
-confirm they're clean before logging out. If any is red, do not close the
-session as `done` — record the blocker and set the feature's status to
-`blocked` instead.
+skip `go build ./...`/`gofmt -l .`/`go vet ./...`/`go test ./...`. Run them
+manually and confirm they're clean before logging out. If any is red, do
+not close the session as `done` — record the blocker and set the feature's
+status to `blocked` instead.

@@ -21,16 +21,18 @@
 | Construct | Convention | Example |
 |---|---|---|
 | Generic/infra function | English, `camelCase` (unexported — nothing in this package is exported, there's no importable API) | `parseCourseIDs`, `mergeWorkbooks`, `sanitizeFilename`, `stripExternalLinks` |
-| Domain/template function | Spanish, `camelCase` — mirrors the vocabulary of the `.xlsx` template and the school domain it fills in | `escribirNomina`, `escribirFirmas`, `escribirGradoYJornada`, `gradoDesdeAbreviado`, `diasHabiles` |
+| Domain/template function | English, `camelCase` — same rule as every other identifier, even when it fills a Spanish-language part of the `.xlsx` template | `writeRoster`, `writeSigners`, `writeGradeAndShift`, `gradeFromAbbreviation`, `businessDays` |
 | Internal struct | Unexported `camelCase` | `courseData`, `absenceRecord`, `rosterStudent` |
 | Exported struct (JSON payload) | `PascalCase` — only used where a type crosses the HTTP JSON boundary | `Signer` (decoded from the `signers` query param) |
 | HTTP error strings | English, sent verbatim via `http.Error` | `"Invalid date format. Use YYYY-MM-DD"` |
-| Package-level constant/regex | grouped in a `const (...)`/`var (...)` block near first use, not all hoisted to the top of the file | `filaInicialNomina`/`filaFinalNomina` above `courseData`; `reGradeOrdinal` above `gradoDesdeAbreviado` |
+| Package-level constant/regex | grouped in a `const (...)`/`var (...)` block near first use, not all hoisted to the top of the file | `rosterFirstRow`/`rosterLastRow` above `courseData`; `reGradeOrdinal` above `gradeFromAbbreviation` |
 
-Comments and identifiers are **not** uniformly English or Spanish — match
-whichever the surrounding function already uses (Spanish for
-template/domain logic close to the `.xlsx` structure, English for generic
-infrastructure) rather than "fixing" one to match the other.
+Identifiers (functions, types, struct fields, constants, variables, test
+names) are **always English**, including domain/template logic. Comments may
+be in English or Spanish — match whichever the surrounding code already uses
+rather than translating one to match the other. Text written into the
+`.xlsx` (e.g. `RETIRADO`, month names), SQL column names/aliases and HTTP
+query parameters keep their existing spelling.
 
 ## File Structure
 
