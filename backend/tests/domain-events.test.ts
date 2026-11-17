@@ -234,7 +234,6 @@ async function createFixture(): Promise<Fixture> {
       institutionId: institution.id,
       guardianId: null,
       rosterNumber: null,
-      isEnrolled: true,
       studentPhone: null,
       studentEmail: null,
       createdByUserId: null,

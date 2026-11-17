@@ -63,7 +63,6 @@ export async function importRoster(institutionId: number, buffer: Buffer, create
     const colName   = colIndex('APELLIDOS');
     const colSex    = colIndex('SEXO');
     const colBirth  = colIndex('NACIMIENTO');
-    const colEnroll = colIndex('MATRICULADO');
 
     // El Excel trae columnas separadas para estudiante y representante que comparten
     // la misma palabra clave (TELEFONO / CORREO) — hace falta el segundo substring
@@ -168,7 +167,6 @@ export async function importRoster(institutionId: number, buffer: Buffer, create
         });
 
         const num = colNum >= 0 ? parseInt(String(row[colNum] ?? '0')) || null : null;
-        const enrolled = colEnroll >= 0 ? String(row[colEnroll] ?? '').trim().toUpperCase() !== 'NO' : true;
 
         if (!existing) {
           await enrollRepo.save(enrollRepo.create({
@@ -178,7 +176,6 @@ export async function importRoster(institutionId: number, buffer: Buffer, create
             academicYearId: activeYear.id,
             guardianId: guardian?.id ?? null,
             rosterNumber: num,
-            isEnrolled: enrolled,
             studentPhone,
             studentEmail,
             createdByUserId,
@@ -187,7 +184,6 @@ export async function importRoster(institutionId: number, buffer: Buffer, create
         } else {
           let enrollmentChanged = false;
           if (num !== null && existing.rosterNumber !== num) { existing.rosterNumber = num; enrollmentChanged = true; }
-          if (existing.isEnrolled !== enrolled) { existing.isEnrolled = enrolled; enrollmentChanged = true; }
           if (studentPhone && existing.studentPhone !== studentPhone) { existing.studentPhone = studentPhone; enrollmentChanged = true; }
           if (studentEmail && existing.studentEmail !== studentEmail) { existing.studentEmail = studentEmail; enrollmentChanged = true; }
           if (guardian && existing.guardianId !== guardian.id) { existing.guardianId = guardian.id; enrollmentChanged = true; }

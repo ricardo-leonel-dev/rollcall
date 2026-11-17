@@ -345,7 +345,6 @@ async function createEnrollment(
     institutionId,
     guardianId: null,
     rosterNumber: null,
-    isEnrolled: true,
     studentPhone: null,
     studentEmail: null,
     createdByUserId: null,
