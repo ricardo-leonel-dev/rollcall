@@ -54,6 +54,42 @@ export interface WithdrawalReason {
   deletedAt: string | null;
 }
 
+// How much of a withdrawn student's records keep counting in the reports.
+export type StatsVisibility = 'until_withdrawal' | 'until_quarter_start' | 'whole_year';
+
+export interface CreateStudentWithdrawalPayload {
+  enrollmentId: number;
+  withdrawalDate: string;
+  reasonId: number;
+  notes: string | null;
+  statsVisibility: StatsVisibility;
+}
+
+export interface WithdrawalActor {
+  id: number;
+  fullName: string | null;
+}
+
+export interface WithdrawalItem {
+  id: number;
+  enrollmentId: number;
+  studentId: number;
+  studentName: string;
+  idNumber: string | null;
+  courseId: number;
+  courseName: string;
+  academicYearId: number;
+  academicYear: string;
+  withdrawalDate: string;
+  reason: { id: number; name: string };
+  notes: string | null;
+  statsVisibility: StatsVisibility;
+  withdrawnAt: string;
+  withdrawnBy: WithdrawalActor | null;
+  revertedAt: string | null;
+  revertedBy: WithdrawalActor | null;
+}
+
 export interface CourseAcademicYear {
   id: number;
   courseId: number;

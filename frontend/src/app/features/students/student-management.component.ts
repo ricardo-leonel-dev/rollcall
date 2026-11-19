@@ -10,14 +10,17 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
-import { Enrollment, Course, Student } from '../../core/models/index';
+import { Enrollment, Course, RolePermission, Student } from '../../core/models/index';
+import { NO_FLAGS, ResourceFlags, resolveResourcePermissions } from '../../shared/utils/permission.util';
 import { WhatsappIconComponent } from '../../shared/components/whatsapp-icon/whatsapp-icon.component';
 import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
+import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { StudentDialogComponent } from './student-dialog.component';
 import { StudentDetailDialogComponent } from './student-detail-dialog.component';
+import { StudentWithdrawDialogComponent } from './student-withdraw-dialog.component';
 
 @Component({
   standalone: true,
@@ -149,6 +152,9 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
                   <mat-menu #rowMenu="matMenu">
                     <button mat-menu-item (click)="openDetail(e, 'view')"><mat-icon>visibility</mat-icon> Ver</button>
                     <button mat-menu-item (click)="openEditDirect(e)"><mat-icon>edit</mat-icon> Editar</button>
+                    @if (withdrawalFlags().canCreate) {
+                      <button mat-menu-item (click)="openWithdraw(e)"><mat-icon>person_remove</mat-icon> Retirar</button>
+                    }
                     <button mat-menu-item (click)="deleteStudent(e)"><mat-icon>delete</mat-icon> Eliminar</button>
                   </mat-menu>
                 </td>
@@ -182,6 +188,9 @@ import { StudentDetailDialogComponent } from './student-detail-dialog.component'
               <mat-menu #rowMenuMobile="matMenu">
                 <button mat-menu-item (click)="openDetail(e, 'view')"><mat-icon>visibility</mat-icon> Ver</button>
                 <button mat-menu-item (click)="openEditDirect(e)"><mat-icon>edit</mat-icon> Editar</button>
+                @if (withdrawalFlags().canCreate) {
+                  <button mat-menu-item (click)="openWithdraw(e)"><mat-icon>person_remove</mat-icon> Retirar</button>
+                }
                 <button mat-menu-item (click)="deleteStudent(e)"><mat-icon>delete</mat-icon> Eliminar</button>
               </mat-menu>
             </div>
@@ -195,12 +204,14 @@ export class StudentManagementComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly notify = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
+  private readonly auth = inject(AuthService);
   readonly academicYearContext = inject(AcademicYearContextService);
 
   readonly courses = signal<Course[]>([]);
   readonly enrollments = signal<Enrollment[]>([]);
   readonly loading = signal(false);
   readonly searchTerm = signal('');
+  readonly withdrawalFlags = signal<ResourceFlags>(NO_FLAGS);
 
   selYear: number | null = null;
   selectModel: number[] = [];
@@ -218,9 +229,24 @@ export class StudentManagementComponent implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    this.courses.set(await firstValueFrom(this.http.get<Course[]>('/api/courses')));
+    const [courses] = await Promise.all([
+      firstValueFrom(this.http.get<Course[]>('/api/courses')),
+      this.loadWithdrawalFlags(),
+    ]);
+    this.courses.set(courses);
     const active = this.academicYearContext.selected();
     if (active) this.selYear = active.id;
+  }
+
+  // A failed request never hides the roster: the action simply stays away.
+  private async loadWithdrawalFlags(): Promise<void> {
+    const roleId = this.auth.currentUser()?.roleId ?? null;
+    const permissionRows = this.auth.isSuperAdmin() || roleId === null
+      ? null
+      : await firstValueFrom(this.http.get<RolePermission[]>(`/api/roles/permissions/${roleId}`)).catch(() => null);
+    this.withdrawalFlags.set(
+      resolveResourcePermissions(permissionRows, 'student-withdrawals', this.auth.isSuperAdmin()),
+    );
   }
 
   handleSelectChange(values: number[]): void {
@@ -294,6 +320,16 @@ export class StudentManagementComponent implements OnInit {
       data: { mode: 'edit', student: this.toStudent(e), enrollment: e, years: this.academicYearContext.years(), courses: this.courses() },
     }).afterClosed().subscribe(async ok => {
       if (ok) await this.load();
+    });
+  }
+
+  openWithdraw(e: Enrollment): void {
+    const year = this.academicYearContext.years().find(y => y.id === e.academicYearId) ?? null;
+    this.dialog.open(StudentWithdrawDialogComponent, {
+      width: '480px',
+      data: { enrollment: e, year },
+    }).afterClosed().subscribe(async result => {
+      if (result === 'withdrawn' || result === 'stale') await this.load();
     });
   }
 

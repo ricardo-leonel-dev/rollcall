@@ -164,7 +164,27 @@ const MOCK_WITHDRAWAL_REASONS = [
   { id: 2, institutionId: 1, name: 'Otro', description: null, isActive: true, createdAt: '2026-01-10T12:00:00.000Z', updatedAt: '2026-01-10T12:00:00.000Z', deletedAt: null },
 ];
 
-async function mockApi(context) {
+// Roster fixture for the students screen: two students of 5° A, so the
+// capture can show the row menu of a student and the numbers the roster
+// keeps as they are stored.
+const MOCK_ENROLLMENTS = [
+  {
+    enrollmentId: 101, academicYearId: 1, academicYear: 'Año Lectivo 2026', courseId: 1, course: '5° A',
+    teacher: null, studentId: 11, rosterNumber: 1, idNumber: '0750110011', fullName: 'Ana Torres',
+    gender: 'F', birthDate: '2013-04-11', age: 13, isEnrolled: true, studentPhone: null, studentEmail: null,
+    guardianId: 21, guardianName: 'María Torres', guardianPhone: '+593991234567',
+    whatsappLink: 'https://wa.me/593991234567', guardianEmail: null, guardianIdNumber: null, isActive: true,
+  },
+  {
+    enrollmentId: 102, academicYearId: 1, academicYear: 'Año Lectivo 2026', courseId: 1, course: '5° A',
+    teacher: null, studentId: 12, rosterNumber: 2, idNumber: '0750110022', fullName: 'Luis Pérez',
+    gender: 'M', birthDate: '2012-09-02', age: 14, isEnrolled: true, studentPhone: null, studentEmail: null,
+    guardianId: 22, guardianName: 'Carlos Pérez', guardianPhone: '+593992345678',
+    whatsappLink: 'https://wa.me/593992345678', guardianEmail: null, guardianIdNumber: null, isActive: true,
+  },
+];
+
+async function mockApi(context, options = {}) {
   await context.route('**/api/**', async (route) => {
     const url = route.request().url();
     if (url.includes('/api/auth/login')) {
@@ -191,12 +211,16 @@ async function mockApi(context) {
       // table on @if (permissions().length)). Resource names match the
       // backend's role_permissions schema so the eyebrow + table render
       // together.
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
+      const rows = [
         { resource: 'absences',       canRead: true,  canCreate: true,  canUpdate: true,  canDelete: false },
         { resource: 'students',        canRead: true,  canCreate: true,  canUpdate: true,  canDelete: false },
         { resource: 'justifications',  canRead: true,  canCreate: true,  canUpdate: true,  canDelete: true  },
         { resource: 'withdrawal-reasons', canRead: true, canCreate: true, canUpdate: true, canDelete: true },
-      ]) });
+      ];
+      if (FEATURE === 'student_withdraw_action') {
+        rows.push({ resource: 'student-withdrawals', canRead: true, canCreate: true, canUpdate: true, canDelete: false });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) });
     }
     if (url.includes('/api/roles')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
@@ -207,8 +231,12 @@ async function mockApi(context) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_CITATION_REASONS) });
     }
     if (url.includes('/api/withdrawal-reasons')) {
-      const reasons = process.env.VISUAL_EMPTY_WITHDRAWAL_REASONS === '1' ? [] : MOCK_WITHDRAWAL_REASONS;
+      const empty = options.emptyReasons === true || process.env.VISUAL_EMPTY_WITHDRAWAL_REASONS === '1';
+      const reasons = empty ? [] : MOCK_WITHDRAWAL_REASONS;
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reasons) });
+    }
+    if (url.includes('/api/enrollments')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_ENROLLMENTS) });
     }
     if (url.includes('/api/courses')) {
       // feature 34 fixture: three courses (5° A, 5° B, 6° A) so the folio's
@@ -736,12 +764,134 @@ async function extractDom(page) {
   });
 }
 
+// The "Retirar" action of the students screen: the states worth looking at
+// (the row menu, the dialog, the counter, the catalog without active reasons
+// and the confirmation) live behind clicks, so this feature gets its own
+// capture sequence.
+async function captureStudentWithdrawAction(browser, page, outDir) {
+  const report = { states: [] };
+  const shot = async (target, name) => {
+    const path = join(outDir, `visual_${FEATURE}_${VW}_${name}.png`);
+    await target.screenshot({ path, fullPage: false });
+    report.states.push({ name, screenshot: path });
+  };
+
+  // Below the md breakpoint the roster is a list of cards instead of a
+  // table, so the row and its menu live in a different place.
+  const isMobile = Number(VW) < 768;
+
+  const openRoster = async (target) => {
+    await target.goto(`${BASE_URL}/students/manage`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    const courseSelect = target.locator('mat-form-field:has(mat-label:text-is("Curso")) mat-select').first();
+    await courseSelect.waitFor({ state: 'visible', timeout: 15000 });
+    await courseSelect.click();
+    await target.locator('mat-option', { hasText: '5° A' }).first().click();
+    // The course filter is a multiple select: the overlay stays open.
+    await target.keyboard.press('Escape');
+    await firstRow(target).waitFor({ state: 'visible', timeout: 15000 });
+  };
+
+  const firstRow = (target) => isMobile
+    ? target.locator('.md\\:hidden .card').first()
+    : target.locator('table.data-table tbody tr').first();
+
+  const menuTrigger = (target) => isMobile
+    ? target.locator('.md\\:hidden .card').first().locator('button').last()
+    : target.locator('table.data-table tbody tr').first().locator('td:last-child button');
+
+  const openRowMenu = async (target) => {
+    await menuTrigger(target).click();
+    await target.locator('.mat-mdc-menu-panel').waitFor({ state: 'visible', timeout: 10000 });
+  };
+
+  const openWithdrawDialog = async (target) => {
+    const dialog = target.locator('mat-dialog-container').filter({ hasText: 'Fecha de retiro' });
+    await dialog.waitFor({ state: 'visible', timeout: 10000 });
+    await wait(600);
+    return dialog;
+  };
+
+  await openRoster(page);
+
+  // 1. the row menu of a student, with the Retirar item.
+  await openRowMenu(page);
+  report.menuItems = (await page.locator('.mat-mdc-menu-item').allTextContents())
+    .map(t => t.replace(/\s+/g, ' ').trim());
+  await shot(page, 'menu');
+
+  // 2. the dialog in its default state.
+  await page.locator('.mat-mdc-menu-item', { hasText: 'Retirar' }).first().click();
+  const dialog = await openWithdrawDialog(page);
+  report.dialog = {
+    title: (await dialog.locator('h2[mat-dialog-title]').textContent()).trim(),
+    student: (await dialog.locator('.who-name').textContent()).trim(),
+    course: (await dialog.locator('.who-course').textContent()).replace(/\s+/g, ' ').trim(),
+    fields: (await dialog.locator('mat-label').allTextContents()).map(t => t.trim()),
+    date: await dialog.locator('input[matinput]').first().inputValue(),
+    counter: (await dialog.locator('.notes-counter').textContent()).trim(),
+    visibilityOptions: await dialog.locator('.visibility-row').evaluateAll(rows => rows.map(row => ({
+      label: row.querySelector('.option-label')?.textContent.trim() ?? null,
+      help: row.querySelector('.option-help')?.textContent.trim() ?? null,
+      selected: row.classList.contains('selected'),
+    }))),
+    notices: (await dialog.locator('.pending-banner').allTextContents()).map(t => t.replace(/\s+/g, ' ').trim()),
+  };
+  await shot(page, 'dialog');
+
+  // 3. the counter near the limit.
+  await dialog.locator('textarea').fill('x'.repeat(980));
+  await wait(300);
+  report.counterNearLimit = (await dialog.locator('.notes-counter').textContent()).trim();
+  await shot(page, 'notes');
+
+  // 4. the confirmation.
+  await dialog.locator('mat-select').click();
+  await page.locator('mat-option', { hasText: 'Cambio de domicilio' }).first().click();
+  await wait(300);
+  await dialog.locator('mat-dialog-actions button', { hasText: 'Retirar' }).click();
+  const confirm = page.locator('mat-dialog-container').filter({ hasText: '¿Retirar a' });
+  await confirm.waitFor({ state: 'visible', timeout: 10000 });
+  await wait(400);
+  report.confirmation = {
+    title: (await confirm.locator('.title').textContent()).trim(),
+    message: (await confirm.locator('.message').textContent()).replace(/\s+/g, ' ').trim(),
+  };
+  await shot(page, 'confirm');
+
+  // 5. the catalog without active reasons (its own context, so the reasons
+  // list is empty for that page only).
+  const emptyContext = await browser.newContext({
+    viewport: { width: Number(VW), height: Number(VH) },
+    serviceWorkers: 'block',
+  });
+  await mockApi(emptyContext, { emptyReasons: true });
+  const emptyPage = await emptyContext.newPage();
+  await injectAuth(emptyPage);
+  await openRoster(emptyPage);
+  await openRowMenu(emptyPage);
+  await emptyPage.locator('.mat-mdc-menu-item', { hasText: 'Retirar' }).first().click();
+  const emptyDialog = await openWithdrawDialog(emptyPage);
+  report.emptyCatalogNotice = (await emptyDialog.locator('.pending-banner').textContent())
+    .replace(/\s+/g, ' ').trim();
+  report.emptyCatalogRetirarDisabled = await emptyDialog
+    .locator('mat-dialog-actions button', { hasText: 'Retirar' }).isDisabled();
+  await shot(emptyPage, 'no_reasons');
+  await emptyContext.close();
+
+  return report;
+}
+
 async function main() {
   if (!NO_SERVER) await startServer();
   let browser;
   try {
     browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({ viewport: { width: Number(VW), height: Number(VH) } });
+    const context = await browser.newContext({
+      viewport: { width: Number(VW), height: Number(VH) },
+      // The service worker caches two API paths of its own; blocking it keeps
+      // the mocked API in charge of every request the page makes.
+      serviceWorkers: FEATURE === 'student_withdraw_action' ? 'block' : 'allow',
+    });
     await mockApi(context);
     const page = await context.newPage();
     await injectAuth(page);
@@ -749,6 +899,16 @@ async function main() {
     page.on('console', (msg) => {
       if (msg.type() === 'error') console.error('[console.error]', msg.text());
     });
+    if (FEATURE === 'student_withdraw_action') {
+      const info = await captureStudentWithdrawAction(browser, page, OUT_DIR);
+      const payload = { ...info, viewport: { width: Number(VW), height: Number(VH) } };
+      // One report per width, so the captures of both sizes are kept.
+      const widthReport = join(OUT_DIR, `visual_${FEATURE}_${VW}.json`);
+      writeFileSync(widthReport, JSON.stringify(payload, null, 2));
+      writeFileSync(REPORT_PATH, JSON.stringify(payload, null, 2));
+      console.log(JSON.stringify({ ok: true, report: widthReport, ...info }, null, 2));
+      return;
+    }
     // The admin page's activeTab is bound to ?tab= queryParam (default 'users').
 // Navigate directly to the years tab so we don't depend on the sidebar nav.
 await page.goto(`${BASE_URL}${process.env.VISUAL_PATH || '/admin?tab=years'}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
