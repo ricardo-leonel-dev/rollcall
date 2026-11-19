@@ -43,6 +43,17 @@ export interface CitationReason {
   deletedAt: string | null;
 }
 
+export interface WithdrawalReason {
+  id: number;
+  institutionId: number;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
 export interface CourseAcademicYear {
   id: number;
   courseId: number;

@@ -11,7 +11,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { firstValueFrom, map } from 'rxjs';
-import { AcademicYear, Course, User, Role, RolePermission, Institution, Quarter, CitationReason } from '../../core/models/index';
+import { AcademicYear, Course, User, Role, RolePermission, Institution, Quarter, CitationReason, WithdrawalReason } from '../../core/models/index';
 import { AuthService } from '../../core/services/auth.service';
 import { InstitutionContextService } from '../../core/services/institution-context.service';
 import { AcademicYearContextService } from '../../core/services/academic-year-context.service';
@@ -21,12 +21,14 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
 import { ChapterHeaderComponent } from '../../shared/components/chapter-header/chapter-header.component';
 import { SealAvatarComponent } from '../../shared/components/seal-avatar/seal-avatar.component';
 import { CITATION_REASON_SEVERITY_OPTIONS, citationReasonSeverityBadgeClass } from '../../shared/utils/citation-reason.util';
+import { NO_FLAGS, ResourceFlags, resolveResourcePermissions } from '../../shared/utils/permission.util';
 import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
 import { InstitutionDialogComponent } from './institution-dialog.component';
 import { AcademicYearDialogComponent, AcademicYearDialogResult } from './academic-year-dialog.component';
 import { QuartersDialogComponent, QuartersDialogResult } from './quarters-dialog.component';
 import { CourseDialogComponent } from './course-dialog.component';
 import { CitationReasonDialogComponent, CitationReasonDialogData } from './citation-reason-dialog.component';
+import { WithdrawalReasonDialogComponent, WithdrawalReasonDialogData } from './withdrawal-reason-dialog.component';
 import { UserDialogComponent } from './user-dialog.component';
 import { UserPermissionsDialogComponent } from './user-permissions-dialog.component';
 import { RoleDialogComponent } from './role-dialog.component';
@@ -38,8 +40,9 @@ export const ADMIN_TAB_CHAPTER_NUMERAL: Record<string, string> = {
   years: 'III',
   permissions: 'IV',
   'citation-reasons': 'V',
-  roster: 'VI',
-  institutions: 'VII',
+  'withdrawal-reasons': 'VI',
+  roster: 'VII',
+  institutions: 'VIII',
 };
 
 export const ADMIN_TAB_EYEBROW_SUFFIX: Record<string, string> = {
@@ -48,6 +51,7 @@ export const ADMIN_TAB_EYEBROW_SUFFIX: Record<string, string> = {
   years: 'Calendario académico',
   permissions: 'Permisos',
   'citation-reasons': 'Motivos de citación',
+  'withdrawal-reasons': 'Motivos de retiro',
   roster: 'Importar nómina',
   institutions: 'Instituciones del sistema',
 };
@@ -58,6 +62,7 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
   years: 'Años lectivos',
   permissions: 'Permisos',
   'citation-reasons': 'Motivos de citación',
+  'withdrawal-reasons': 'Motivos de retiro',
   roster: 'Importar nómina',
   institutions: 'Instituciones',
 };
@@ -244,32 +249,37 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
     /* Cuaderno folio for Cursos tab (feature 34): same double-filete +
        right-aligned register-count rhythm as .users-folio, but kept
        self-contained so the Cursos list can move independently of the
-       Usuarios list. .courses-folio / .citation-reasons-folio / .users-folio
+       Usuarios list. .courses-folio / .citation-reasons-folio /
+       .withdrawal-reasons-folio / .users-folio
        share the same geometry — comma-grouped below so we don't pay the
        CSS budget three times over for identical rules. Each wrapper class
        is still its own scope (no users-folio reuse), so each list can
        move independently. Severity badges in Motivos (this tab) stay on
        .badge-F/.badge-AT/.badge-J — NOT replaced by a folio class. */
     .courses-folio,
-    .citation-reasons-folio {
+    .citation-reasons-folio,
+    .withdrawal-reasons-folio {
       display: flex;
       flex-direction: column;
       gap: 3px;
       min-width: 0;
     }
     .courses-folio .filete-ink,
-    .citation-reasons-folio .filete-ink {
+    .citation-reasons-folio .filete-ink,
+    .withdrawal-reasons-folio .filete-ink {
       height: 1px;
       background: var(--ink);
       opacity: .55;
     }
     .courses-folio .filete-border,
-    .citation-reasons-folio .filete-border {
+    .citation-reasons-folio .filete-border,
+    .withdrawal-reasons-folio .filete-border {
       height: 1px;
       background: var(--border);
     }
     .courses-folio-text,
-    .citation-reasons-folio-text {
+    .citation-reasons-folio-text,
+    .withdrawal-reasons-folio-text {
       font-family: 'Nunito', sans-serif;
       font-size: 11px;
       font-weight: 600;
@@ -280,7 +290,8 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
       text-align: right;
     }
     .courses-folio-text b,
-    .citation-reasons-folio-text b {
+    .citation-reasons-folio-text b,
+    .withdrawal-reasons-folio-text b {
       color: var(--ink);
       font-weight: 800;
       font-size: 13px;
@@ -615,6 +626,82 @@ export const ADMIN_TAB_TITLE: Record<string, string> = {
         </div>
       }
 
+      <!-- MOTIVOS DE RETIRO -->
+      @if (activeTab() === 'withdrawal-reasons') {
+        <div class="tab-content">
+          <!-- Cuaderno folio: same double filete + register count as the
+               sibling lists, with the singular/plural grammar of the
+               catalog ("1 motivo" / "N motivos"). -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;gap:12px;flex-wrap:wrap">
+            @if (withdrawalReasonFlags().canCreate) {
+              <button mat-flat-button color="primary" (click)="openWithdrawalReasonDialog()">
+                <mat-icon>add</mat-icon> Agregar motivo
+              </button>
+            }
+            <div class="withdrawal-reasons-folio" style="margin-left:auto">
+              <div class="filete-ink"></div>
+              <div class="filete-border"></div>
+              <div class="withdrawal-reasons-folio-text">
+                Registros: <b>{{ withdrawalReasons().length }}</b> {{ withdrawalReasons().length === 1 ? 'motivo' : 'motivos' }}
+              </div>
+            </div>
+          </div>
+          @if (withdrawalReasons().length) {
+            <div class="data-table-wrap hidden md:block">
+              <table class="data-table">
+                <thead><tr>
+                  <th>Nombre</th>
+                  <th>Descripción</th>
+                  @if (withdrawalReasonFlags().canUpdate || withdrawalReasonFlags().canDelete) {
+                    <th></th>
+                  }
+                </tr></thead>
+                <tbody>
+                  @for (r of withdrawalReasons(); track r.id) {
+                    <tr>
+                      <td style="font-weight:500">{{r.name}}</td>
+                      <td style="color:var(--muted-strong)">{{r.description || '—'}}</td>
+                      @if (withdrawalReasonFlags().canUpdate || withdrawalReasonFlags().canDelete) {
+                        <td>
+                          @if (withdrawalReasonFlags().canUpdate) {
+                            <button mat-icon-button style="color:var(--muted-strong)" aria-label="Editar motivo" (click)="openWithdrawalReasonDialog(r)"><mat-icon>edit</mat-icon></button>
+                          }
+                          @if (withdrawalReasonFlags().canDelete) {
+                            <button mat-icon-button style="color:#b91c1c" aria-label="Eliminar motivo" (click)="deleteWithdrawalReason(r.id)"><mat-icon>delete_outline</mat-icon></button>
+                          }
+                        </td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <div class="md:hidden">
+              @for (r of withdrawalReasons(); track r.id) {
+                <div class="admin-row">
+                  <div>
+                    <div style="font-weight:600">{{r.name}}</div>
+                    <div style="font-size:12px;color:var(--muted);margin-top:4px">{{r.description || '—'}}</div>
+                  </div>
+                  <div class="admin-row-actions">
+                    @if (withdrawalReasonFlags().canUpdate) {
+                      <button mat-icon-button style="color:var(--muted-strong)" aria-label="Editar motivo" (click)="openWithdrawalReasonDialog(r)"><mat-icon>edit</mat-icon></button>
+                    }
+                    @if (withdrawalReasonFlags().canDelete) {
+                      <button mat-icon-button style="color:#b91c1c" aria-label="Eliminar motivo" (click)="deleteWithdrawalReason(r.id)"><mat-icon>delete_outline</mat-icon></button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          } @else {
+            <p style="padding:24px 0;text-align:center;color:var(--muted-strong);font-size:14px">
+              No hay motivos de retiro registrados.
+            </p>
+          }
+        </div>
+      }
+
       <!-- USUARIOS -->
       @if (activeTab() === 'users') {
         <div class="tab-content">
@@ -874,6 +961,8 @@ export class AdminComponent implements OnInit {
   readonly years = this.academicYearContext.years;
   readonly courses = signal<Course[]>([]);
   readonly citationReasons = signal<CitationReason[]>([]);
+  readonly withdrawalReasons = signal<WithdrawalReason[]>([]);
+  readonly withdrawalReasonFlags = signal<ResourceFlags>(NO_FLAGS);
   readonly users = signal<User[]>([]);
   readonly roles = signal<Role[]>([]);
   readonly permissions = signal<RolePermission[]>([]);
@@ -1014,15 +1103,24 @@ export class AdminComponent implements OnInit {
     if (!noInstitutionYet) await this.academicYearContext.load();
     const yearId = this.academicYearContext.selectedId();
     const usersUrl = yearId ? `/api/users?academic_year_id=${yearId}` : '/api/users';
-    const [courses, users, roles, quarters, citationReasons] = await Promise.all([
+    const roleId = this.auth.currentUser()?.roleId ?? null;
+    const [courses, users, roles, quarters, citationReasons, withdrawalReasons, permissionRows] = await Promise.all([
       noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<Course[]>('/api/courses')).catch(() => []),
       noInstitutionYet ? Promise.resolve([]) : firstValueFrom(this.http.get<User[]>(usersUrl)).catch(() => []),
       firstValueFrom(this.http.get<Role[]>('/api/roles')),
       noInstitutionYet ? Promise.resolve([] as Quarter[]) : this.quarterService.getAll().catch(() => [] as Quarter[]),
       noInstitutionYet ? Promise.resolve([] as CitationReason[]) : firstValueFrom(this.http.get<CitationReason[]>('/api/citation-reasons')).catch(() => [] as CitationReason[]),
+      noInstitutionYet ? Promise.resolve([] as WithdrawalReason[]) : firstValueFrom(this.http.get<WithdrawalReason[]>('/api/withdrawal-reasons')).catch(() => [] as WithdrawalReason[]),
+      this.auth.isSuperAdmin() || roleId === null
+        ? Promise.resolve(null)
+        : firstValueFrom(this.http.get<RolePermission[]>(`/api/roles/permissions/${roleId}`)).catch(() => null),
     ]);
     this.courses.set(courses);
     this.citationReasons.set(citationReasons);
+    this.withdrawalReasons.set(withdrawalReasons);
+    this.withdrawalReasonFlags.set(
+      resolveResourcePermissions(permissionRows, 'withdrawal-reasons', this.auth.isSuperAdmin()),
+    );
     this.users.set(users); this.roles.set(roles);
     if (!noInstitutionYet && yearId !== null) {
       this.setQuartersForYear(yearId, quarters);
@@ -1211,6 +1309,32 @@ export class AdminComponent implements OnInit {
       try {
         await firstValueFrom(this.http.delete(`/api/citation-reasons/${id}`));
         this.notify.success('Motivo eliminado');
+        await this.loadAll();
+      } catch (err: any) {
+        this.notify.error(err?.error?.error ?? 'Error al eliminar');
+      }
+    });
+  }
+
+  openWithdrawalReasonDialog(reason?: WithdrawalReason): void {
+    const data: WithdrawalReasonDialogData = { mode: reason ? 'edit' : 'create', reason };
+    this.dialog.open(WithdrawalReasonDialogComponent, {
+      width: '420px',
+      data,
+    }).afterClosed().subscribe(async ok => {
+      if (ok) await this.loadAll();
+    });
+  }
+
+  deleteWithdrawalReason(id: number): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: { title: 'Eliminar motivo de retiro', message: '¿Eliminar este motivo de retiro? Ya no aparecerá al retirar estudiantes.' },
+    }).afterClosed().subscribe(async ok => {
+      if (!ok) return;
+      try {
+        await firstValueFrom(this.http.delete(`/api/withdrawal-reasons/${id}`));
+        this.notify.success('Motivo de retiro eliminado');
         await this.loadAll();
       } catch (err: any) {
         this.notify.error(err?.error?.error ?? 'Error al eliminar');
