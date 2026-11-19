@@ -19,6 +19,7 @@ import {
   WITHDRAWAL_FORM_ERROR_MESSAGES,
   buildWithdrawalPayload,
   formatWithdrawalDate,
+  showsReasonSelect,
   validateWithdrawalForm,
   withdrawalDateBounds,
   withdrawalDateRequired,
@@ -107,14 +108,16 @@ export type StudentWithdrawDialogResult = 'withdrawn' | 'stale' | false;
         @if (dateError()) { <mat-error>{{ dateError() }}</mat-error> }
       </mat-form-field>
 
-      <mat-form-field appearance="outline">
-        <mat-label>Motivo</mat-label>
-        <mat-select [ngModel]="reasonId()" (ngModelChange)="reasonId.set($event)" required>
-          @for (r of reasons(); track r.id) {
-            <mat-option [value]="r.id">{{r.name}}</mat-option>
-          }
-        </mat-select>
-      </mat-form-field>
+      @if (showReasonSelect()) {
+        <mat-form-field appearance="outline">
+          <mat-label>Motivo</mat-label>
+          <mat-select [ngModel]="reasonId()" (ngModelChange)="reasonId.set($event)" required>
+            @for (r of reasons(); track r.id) {
+              <mat-option [value]="r.id">{{r.name}}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      }
 
       <mat-form-field appearance="outline">
         <mat-label>Observaciones</mat-label>
@@ -155,6 +158,7 @@ export class StudentWithdrawDialogComponent implements OnInit {
 
   readonly reasons = signal<WithdrawalReason[]>([]);
   readonly reasonsState = signal<'loading' | 'ready' | 'error'>('loading');
+  readonly showReasonSelect = computed(() => showsReasonSelect(this.reasonsState(), this.reasons().length));
   readonly date = signal<Date | null>(dateStringToDate(this.bounds.defaultDate));
   readonly reasonId = signal<number | null>(null);
   readonly notes = signal('');

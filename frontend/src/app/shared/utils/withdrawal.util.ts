@@ -61,6 +61,14 @@ export const WITHDRAWAL_FORM_ERROR_MESSAGES: Record<Exclude<WithdrawalFormError,
   notes_too_long: 'Las observaciones no pueden superar 1000 caracteres.',
 };
 
+export type WithdrawalReasonsState = 'loading' | 'ready' | 'error';
+
+// The reason select shows while the reasons load and when there is at least
+// one active reason; otherwise the dialog shows a notice in its place.
+export function showsReasonSelect(state: WithdrawalReasonsState, activeCount: number): boolean {
+  return state === 'loading' || (state === 'ready' && activeCount > 0);
+}
+
 export interface WithdrawalErrorOutcome {
   message: string;
   closeAndReload: boolean;

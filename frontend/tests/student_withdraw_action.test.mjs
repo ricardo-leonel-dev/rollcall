@@ -462,6 +462,18 @@ test('the dialog says when the reasons could not be loaded', () => {
   assert.match(dialogSource, /No se pudieron cargar los motivos de retiro\./);
 });
 
+test('the reason select shows only while reasons load or when there are active reasons', () => {
+  const { showsReasonSelect } = withdrawalUtil;
+  assert.equal(showsReasonSelect('loading', 0), true);
+  assert.equal(showsReasonSelect('ready', 2), true);
+  assert.equal(showsReasonSelect('ready', 0), false);
+  assert.equal(showsReasonSelect('error', 0), false);
+});
+
+test('the reason field is rendered under the select visibility rule', () => {
+  assert.match(dialogSource, /@if \(showReasonSelect\(\)\) \{\s*<mat-form-field[^>]*>\s*<mat-label>Motivo<\/mat-label>/);
+});
+
 test('the date picker only offers the days of the academic year', () => {
   assert.match(dialogSource, /\[min\]="minDate\(\)"/);
   assert.match(dialogSource, /\[max\]="maxDate\(\)"/);
