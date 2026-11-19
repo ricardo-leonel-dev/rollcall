@@ -156,6 +156,14 @@ const MOCK_CITATION_REASONS = [
   { id: 3, institutionId: 1, name: 'Agresión a un compañero', severity: 'high', description: 'Requiere presencia del representante el mismo día.', isActive: true, createdAt: '2026-01-10T12:00:00.000Z', updatedAt: '2026-01-10T12:00:00.000Z', deletedAt: null },
 ];
 
+// Withdrawal reasons fixture: one row with a description and one without, so
+// the capture shows both the description cell and its "—" fallback. The
+// empty state is captured with VISUAL_EMPTY_WITHDRAWAL_REASONS=1.
+const MOCK_WITHDRAWAL_REASONS = [
+  { id: 1, institutionId: 1, name: 'Cambio de domicilio', description: 'La familia se mudó de ciudad.', isActive: true, createdAt: '2026-01-10T12:00:00.000Z', updatedAt: '2026-01-10T12:00:00.000Z', deletedAt: null },
+  { id: 2, institutionId: 1, name: 'Otro', description: null, isActive: true, createdAt: '2026-01-10T12:00:00.000Z', updatedAt: '2026-01-10T12:00:00.000Z', deletedAt: null },
+];
+
 async function mockApi(context) {
   await context.route('**/api/**', async (route) => {
     const url = route.request().url();
@@ -187,6 +195,7 @@ async function mockApi(context) {
         { resource: 'absences',       canRead: true,  canCreate: true,  canUpdate: true,  canDelete: false },
         { resource: 'students',        canRead: true,  canCreate: true,  canUpdate: true,  canDelete: false },
         { resource: 'justifications',  canRead: true,  canCreate: true,  canUpdate: true,  canDelete: true  },
+        { resource: 'withdrawal-reasons', canRead: true, canCreate: true, canUpdate: true, canDelete: true },
       ]) });
     }
     if (url.includes('/api/roles')) {
@@ -196,6 +205,10 @@ async function mockApi(context) {
     }
     if (url.includes('/api/citation-reasons')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_CITATION_REASONS) });
+    }
+    if (url.includes('/api/withdrawal-reasons')) {
+      const reasons = process.env.VISUAL_EMPTY_WITHDRAWAL_REASONS === '1' ? [] : MOCK_WITHDRAWAL_REASONS;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reasons) });
     }
     if (url.includes('/api/courses')) {
       // feature 34 fixture: three courses (5° A, 5° B, 6° A) so the folio's
@@ -480,7 +493,7 @@ async function extractDom(page) {
       })(),
       // feature 33 assertions — Cuaderno Instituciones tab behavior.
       // Each one is a real behavior check, not a structural node count:
-      // the chapter-header eyebrow must read "Capítulo VII — Instituciones
+      // the chapter-header eyebrow must read "Capítulo VIII — Instituciones
       // del sistema", every institution row must show the live stats line
       // with the bold numbers and singular/plural grammar the spec
       // requires, the seal must be the circular double-ring feature-base
@@ -539,11 +552,12 @@ async function extractDom(page) {
       })(),
       institutionFolioAbsent: !document.querySelector('.inst-folio, .institutions-folio, [class*="inst"][class*="folio"]'),
     };
-    // feature 34 assertions — Cuaderno admin tabs II/IV/V/VI. Each tab's
-    // eyebrow Roman numeral must read correctly, the page-level double
-    // filete must render, and (for Cursos/Motivos) the folio must show
-    // the real count with correct singular/plural grammar. Severity
-    // badges in Motivos are checked to still emit .badge-F/.badge-AT/
+    // feature 34 assertions — Cuaderno admin tabs II/IV/V/VI (roster is
+    // VII and institutions VIII since the withdrawal reasons tab took
+    // VI). Each tab's eyebrow Roman numeral must read correctly, the
+    // page-level double filete must render, and (for Cursos/Motivos) the
+    // folio must show the real count with correct singular/plural grammar.
+    // Severity badges in Motivos are checked to still emit .badge-F/.badge-AT/
     // .badge-J (NOT replaced by a folio class). Lateral spine check
     // confirms .admin-row cards keep the border-left: 4px the spec calls
     // for, matching Usuarios/Años lectivos.
@@ -576,7 +590,8 @@ async function extractDom(page) {
     // Eyebrow / filete / title are shared across every active tab (the
     // page-level <app-chapter-header> reads the same ADMIN_TAB_* maps);
     // these helpers report what's rendered so a per-tab smoke can assert
-    // the Roman numeral matches (II / IV / V / VI).
+    // the Roman numeral matches (II / IV / V / VI, roster VII and
+    // institutions VIII).
     const eyebrowInfo = (() => {
       const el = document.querySelector('.chapter-eyebrow');
       if (!el) return { present: false };
@@ -623,6 +638,35 @@ async function extractDom(page) {
     const permissionsFiletePresent = chapterFilete.ink && chapterFilete.border;
     // Permisos tab doesn't render a folio (per spec) — explicit absent check.
     const permissionsFolioAbsent = !document.querySelector('.permissions-folio');
+    // Withdrawal reasons tab: the folio, the rows (name + description, with
+    // the "—" fallback for a reason without description) and the empty state.
+    const withdrawalReasonsFolio = folioSnapshot('.withdrawal-reasons-folio');
+    const withdrawalReasonsEyebrow = eyebrowInfo;
+    const withdrawalReasonsTitle = document.querySelector('.chapter-title')?.textContent?.trim() ?? null;
+    const withdrawalReasonsFiletePresent = chapterFilete.ink && chapterFilete.border;
+    const withdrawalReasonsRows = Array.from(document.querySelectorAll('.data-table tbody tr')).map((tr) => {
+      const cells = Array.from(tr.querySelectorAll('td')).map((td) => (td.textContent || '').replace(/\s+/g, ' ').trim());
+      return {
+        name: cells[0] ?? null,
+        description: cells[1] ?? null,
+        hasEdit: !!tr.querySelector('button[aria-label="Editar motivo"]'),
+        hasDelete: !!tr.querySelector('button[aria-label="Eliminar motivo"]'),
+      };
+    });
+    const withdrawalReasonsEmptyState = (() => {
+      const p = Array.from(document.querySelectorAll('.tab-content p'))
+        .find(el => /No hay motivos de retiro registrados\./.test(el.textContent || ''));
+      if (!p) return { present: false };
+      const cs = getComputedStyle(p);
+      return {
+        present: true,
+        text: (p.textContent || '').replace(/\s+/g, ' ').trim(),
+        padding: cs.padding,
+        textAlign: cs.textAlign,
+        color: cs.color,
+        fontSize: cs.fontSize,
+      };
+    })();
     const rosterEyebrow = eyebrowInfo;
     const rosterTitle = document.querySelector('.chapter-title')?.textContent?.trim() ?? null;
     const rosterFiletePresent = chapterFilete.ink && chapterFilete.border;
@@ -676,6 +720,12 @@ async function extractDom(page) {
       permissionsTitle,
       permissionsFiletePresent,
       permissionsFolioAbsent,
+      withdrawalReasonsEyebrow,
+      withdrawalReasonsTitle,
+      withdrawalReasonsFiletePresent,
+      withdrawalReasonsFolio,
+      withdrawalReasonsRows,
+      withdrawalReasonsEmptyState,
       rosterEyebrow,
       rosterTitle,
       rosterFiletePresent,
