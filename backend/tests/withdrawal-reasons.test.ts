@@ -799,6 +799,180 @@ test('R4: listing returns the institution reasons that are not deleted, ordered 
   }
 });
 // ─────────────────────────────────────────────────────────────────────
+// listing the deleted reasons on demand
+// ─────────────────────────────────────────────────────────────────────
+test('listing can include the deleted reasons of the institution on demand', async (t) => {
+  const cases: Array<{ name: string; run: () => Promise<void> }> = [
+    {
+      name: 'without the parameter the deleted reasons stay hidden',
+      run: async () => {
+        const inst = await createTestInstitution();
+        await insertReason(inst.id, 'Activo');
+        const removed = await insertReason(inst.id, 'Eliminado');
+        const role = await createTestRole([
+          { resource: 'withdrawal-reasons', canRead: true, canDelete: true },
+        ]);
+        const { token } = await createUser(role.name, inst.id);
+
+        const del = await request('DELETE', `/api/withdrawal-reasons/${removed.id}`, {
+          token,
+          institutionId: inst.id,
+        });
+        assert.equal(del.status, 204);
+
+        const res = await request('GET', '/api/withdrawal-reasons', { token, institutionId: inst.id });
+        assert.equal(res.status, 200);
+        assert.deepEqual(res.body.map((r: any) => r.name), ['Activo']);
+      },
+    },
+    {
+      name: 'include_inactive=1 adds the deleted reasons to the list',
+      run: async () => {
+        const inst = await createTestInstitution();
+        await insertReason(inst.id, 'Activo');
+        const removed = await insertReason(inst.id, 'Eliminado');
+        const role = await createTestRole([
+          { resource: 'withdrawal-reasons', canRead: true, canDelete: true },
+        ]);
+        const { token } = await createUser(role.name, inst.id);
+
+        const del = await request('DELETE', `/api/withdrawal-reasons/${removed.id}`, {
+          token,
+          institutionId: inst.id,
+        });
+        assert.equal(del.status, 204);
+
+        const res = await request('GET', '/api/withdrawal-reasons?include_inactive=1', {
+          token,
+          institutionId: inst.id,
+        });
+        assert.equal(res.status, 200);
+        assert.deepEqual(res.body.map((r: any) => r.name), ['Activo', 'Eliminado']);
+
+        const deleted = res.body.find((r: any) => r.name === 'Eliminado');
+        assert.equal(deleted.isActive, false, 'the deleted reason comes back as inactive');
+        assert.notEqual(deleted.deletedAt, null, 'the deleted reason comes back with its deletion date');
+        assert.deepEqual(
+          Object.keys(deleted).sort(),
+          ['createdAt', 'deletedAt', 'description', 'id', 'institutionId', 'isActive', 'name', 'updatedAt'],
+          'the deleted reason carries the same fields as a live one',
+        );
+      },
+    },
+    {
+      name: 'include_inactive=true in any case adds the deleted reasons to the list',
+      run: async () => {
+        const inst = await createTestInstitution();
+        await insertReason(inst.id, 'Activo');
+        const removed = await insertReason(inst.id, 'Eliminado');
+        const role = await createTestRole([
+          { resource: 'withdrawal-reasons', canRead: true, canDelete: true },
+        ]);
+        const { token } = await createUser(role.name, inst.id);
+
+        const del = await request('DELETE', `/api/withdrawal-reasons/${removed.id}`, {
+          token,
+          institutionId: inst.id,
+        });
+        assert.equal(del.status, 204);
+
+        for (const value of ['true', 'TRUE', 'True']) {
+          const res = await request('GET', `/api/withdrawal-reasons?include_inactive=${value}`, {
+            token,
+            institutionId: inst.id,
+          });
+          assert.equal(res.status, 200, `include_inactive=${value}`);
+          assert.deepEqual(
+            res.body.map((r: any) => r.name),
+            ['Activo', 'Eliminado'],
+            `include_inactive=${value}`,
+          );
+        }
+      },
+    },
+    {
+      name: 'any other value of the parameter keeps the deleted reasons hidden',
+      run: async () => {
+        const inst = await createTestInstitution();
+        await insertReason(inst.id, 'Activo');
+        const removed = await insertReason(inst.id, 'Eliminado');
+        const role = await createTestRole([
+          { resource: 'withdrawal-reasons', canRead: true, canDelete: true },
+        ]);
+        const { token } = await createUser(role.name, inst.id);
+
+        const del = await request('DELETE', `/api/withdrawal-reasons/${removed.id}`, {
+          token,
+          institutionId: inst.id,
+        });
+        assert.equal(del.status, 204);
+
+        for (const value of ['0', 'false', 'FALSE', 'no', '']) {
+          const res = await request('GET', `/api/withdrawal-reasons?include_inactive=${value}`, {
+            token,
+            institutionId: inst.id,
+          });
+          assert.equal(res.status, 200, `include_inactive=${value}`);
+          assert.deepEqual(
+            res.body.map((r: any) => r.name),
+            ['Activo'],
+            `include_inactive=${value}`,
+          );
+        }
+      },
+    },
+    {
+      name: 'the deleted reasons of another institution are not included',
+      run: async () => {
+        const mine = await createTestInstitution();
+        const other = await createTestInstitution();
+        await insertReason(mine.id, 'Motivo propio');
+        const removed = await insertReason(other.id, 'Motivo ajeno');
+        await AppDataSource.query(
+          `UPDATE withdrawal_reasons SET deleted_at = NOW(), is_active = FALSE WHERE id = $1`,
+          [removed.id],
+        );
+
+        const role = await createTestRole([{ resource: 'withdrawal-reasons', canRead: true }]);
+        const { token } = await createUser(role.name, mine.id);
+
+        const res = await request('GET', '/api/withdrawal-reasons?include_inactive=1', {
+          token,
+          institutionId: mine.id,
+        });
+        assert.equal(res.status, 200);
+        assert.deepEqual(res.body.map((r: any) => r.name), ['Motivo propio']);
+      },
+    },
+    {
+      name: 'a superadmin with X-Institution-Id only sees the deleted reasons of that institution',
+      run: async () => {
+        const mine = await createTestInstitution();
+        const other = await createTestInstitution();
+        await insertReason(mine.id, 'Motivo propio');
+        await insertReason(other.id, 'Motivo ajeno');
+        await AppDataSource.query(
+          `UPDATE withdrawal_reasons SET deleted_at = NOW(), is_active = FALSE WHERE institution_id = $1`,
+          [other.id],
+        );
+
+        const { token } = await createUser('superadmin', null);
+        const res = await request('GET', '/api/withdrawal-reasons?include_inactive=1', {
+          token,
+          institutionId: mine.id,
+        });
+        assert.equal(res.status, 200);
+        assert.deepEqual(res.body.map((r: any) => r.name), ['Motivo propio']);
+      },
+    },
+  ];
+
+  for (const c of cases) {
+    await t.test(c.name, c.run);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────
 // R5 — create a reason
 // ─────────────────────────────────────────────────────────────────────
 test('R5: creating a reason validates the body and stores it in the caller institution', async (t) => {
