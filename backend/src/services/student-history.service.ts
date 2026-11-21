@@ -1,5 +1,6 @@
 import { AppDataSource } from '../data-source';
 import { Enrollment } from '../entities/Enrollment';
+import { LOCAL_TIME_ZONE } from './domain-event.service';
 
 interface DateRange {
   dateFrom?: string;
@@ -209,7 +210,9 @@ export async function getTimeline(institutionId: number, courseIds: number[] | n
   const enrollment = await getEnrollmentDetail(enrollmentId);
 
   const enrollmentRow = await AppDataSource.query(
-    `SELECT e.created_at AS "createdAt", ${CREATOR_SELECT}
+    `SELECT e.created_at AS "createdAt",
+            (e.created_at AT TIME ZONE '${LOCAL_TIME_ZONE}')::date::text AS "createdDay",
+            ${CREATOR_SELECT}
      FROM enrollments e
      LEFT JOIN users u ON u.id = e.created_by_user_id
      LEFT JOIN roles r ON r.id = u.role_id
@@ -219,12 +222,13 @@ export async function getTimeline(institutionId: number, courseIds: number[] | n
 
   const events: TimelineEvent[] = [];
 
-  // The driver hands the row over as a Date; the range filter below needs
-  // the day it was recorded on.
+  // The range filter compares against the local day it was recorded on
+  // (computed in SQL), not the UTC day of the timestamp.
   const createdAt: string | null = enrollmentRow[0]?.createdAt
     ? new Date(enrollmentRow[0].createdAt).toISOString()
     : null;
-  if (createdAt && (!range.dateFrom || createdAt.slice(0, 10) >= range.dateFrom) && (!range.dateTo || createdAt.slice(0, 10) <= range.dateTo)) {
+  const createdDay: string | null = enrollmentRow[0]?.createdDay ?? null;
+  if (createdAt && createdDay && (!range.dateFrom || createdDay >= range.dateFrom) && (!range.dateTo || createdDay <= range.dateTo)) {
     events.push({
       type: 'enrollment',
       recordedAt: createdAt,

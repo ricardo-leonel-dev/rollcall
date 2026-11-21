@@ -1177,6 +1177,34 @@ test('the history timeline includes a citation event', async (t) => {
       },
     },
     {
+      name: 'the enrollment event is filtered by its local day, not the UTC one',
+      run: async () => {
+        const fx = await createFixture();
+        // 2026-06-11 02:00 UTC is 2026-06-10 21:00 in America/Guayaquil.
+        await AppDataSource.query(
+          `UPDATE enrollments SET created_at = '2026-06-11T02:00:00Z' WHERE id = $1`,
+          [fx.enrollment.id],
+        );
+
+        const { token } = await createUser('superadmin', null);
+        const localDay = await request('GET', `/api/student-history/${fx.enrollment.id}/timeline?date_from=2026-06-10&date_to=2026-06-10`, {
+          token,
+          institutionId: fx.institution.id,
+        });
+        assert.equal(localDay.status, 200);
+        const events = localDay.body.filter((e: any) => e.type === 'enrollment');
+        assert.equal(events.length, 1, 'the enrollment shows on its local day');
+        assert.equal(new Date(events[0].recordedAt).toISOString(), '2026-06-11T02:00:00.000Z');
+
+        const utcDay = await request('GET', `/api/student-history/${fx.enrollment.id}/timeline?date_from=2026-06-11&date_to=2026-06-11`, {
+          token,
+          institutionId: fx.institution.id,
+        });
+        assert.equal(utcDay.status, 200);
+        assert.equal(utcDay.body.filter((e: any) => e.type === 'enrollment').length, 0, 'not on the UTC day');
+      },
+    },
+    {
       name: 'the citations of a withdrawn enrollment are still events',
       run: async () => {
         const fx = await createFixture();
