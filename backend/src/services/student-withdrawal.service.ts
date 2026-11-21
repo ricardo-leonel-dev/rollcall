@@ -243,7 +243,7 @@ export async function withdraw(
     notes = trimmed.length ? trimmed : null;
   }
 
-  let statsVisibility: StatsVisibility = 'until_withdrawal';
+  let statsVisibility: StatsVisibility = 'whole_year';
   if (data.statsVisibility !== undefined) {
     if (!isStatsVisibility(data.statsVisibility)) throw badRequest('statsVisibility inválido');
     statsVisibility = data.statsVisibility;
@@ -357,6 +357,14 @@ export async function revert(
     throw notFound('Retiro no encontrado');
   }
   if (row.reverted_at !== null) throw conflict('El retiro ya fue revertido');
+
+  // Reincorporar solo tiene sentido en el año lectivo que está en curso.
+  const activeYears = await AppDataSource.query(
+    `SELECT 1 FROM academic_years
+      WHERE id = $1 AND institution_id = $2 AND is_active AND deleted_at IS NULL`,
+    [row.academic_year_id, institutionId],
+  );
+  if (!activeYears.length) throw conflict('Solo se puede reincorporar en el año lectivo actual');
 
   const before = snapshotOf(row, null);
 

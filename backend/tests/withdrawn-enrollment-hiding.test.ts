@@ -45,6 +45,7 @@ import { createTestUser, deleteTestUsersByPrefix } from './helpers/test-users';
 import { fetchEnrollments, parsePhotoAbsence } from '../src/services/ai.service';
 
 const MIGRATION_FILE = '30_student_withdrawals_stats_visibility.sql';
+const MIGRATION_REINSTATE_FILE = '33_student_withdrawals_reinstate_permission.sql';
 
 const TEST_INST_PREFIX = '__test_weh_inst_';
 const TEST_ROLE_PREFIX = '__test_weh_role_';
@@ -92,8 +93,8 @@ function migrationPath(filename: string): string {
   return p;
 }
 
-async function runMigration(): Promise<void> {
-  await AppDataSource.query(fs.readFileSync(migrationPath(MIGRATION_FILE), 'utf8'));
+async function runMigration(filename: string = MIGRATION_FILE): Promise<void> {
+  await AppDataSource.query(fs.readFileSync(migrationPath(filename), 'utf8'));
 }
 
 async function cleanup(): Promise<void> {
@@ -561,6 +562,9 @@ before(async () => {
   await AppDataSource.initialize();
   await AppDataSource.query(`ALTER TABLE user_courses ADD COLUMN IF NOT EXISTS academic_year_id INTEGER`);
   await runMigration();
+  // The default of the visibility and the permission of the reinstatement
+  // live in this migration; the cases below assert them.
+  await runMigration(MIGRATION_REINSTATE_FILE);
 
   const app = express();
   app.use(express.json({ limit: '10mb' }));
@@ -863,7 +867,7 @@ test('a withdrawal stores and reports the visibility of its records', async (t) 
         assert.equal(col.data_type, 'character varying');
         assert.equal(col.character_maximum_length, 20);
         assert.equal(col.is_nullable, 'NO', 'the column is mandatory');
-        assert.match(String(col.column_default), /until_withdrawal/, 'the default is until_withdrawal');
+        assert.match(String(col.column_default), /whole_year/, 'the default is whole_year');
 
         const constraints = await AppDataSource.query(
           `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
@@ -877,7 +881,7 @@ test('a withdrawal stores and reports the visibility of its records', async (t) 
       },
     },
     {
-      name: 'a row inserted without the column gets until_withdrawal',
+      name: 'a row inserted without the column gets whole_year',
       run: async () => {
         const fx = await createFixture();
         const student = await createStudent(fx.institution.id, 'VALOR POR DEFECTO');
@@ -890,11 +894,11 @@ test('a withdrawal stores and reports the visibility of its records', async (t) 
            VALUES ($1, $2, $3, $4) RETURNING id, stats_visibility`,
           [fx.institution.id, enrollment.id, fx.reasonId, WITHDRAWAL_IN_Q3],
         );
-        assert.equal(row.stats_visibility, 'until_withdrawal');
+        assert.equal(row.stats_visibility, 'whole_year');
       },
     },
     {
-      name: 'a withdrawal without a visibility defaults to until_withdrawal',
+      name: 'a withdrawal without a visibility defaults to whole_year',
       run: async () => {
         const fx = await createFixture();
         const student = await createStudent(fx.institution.id, 'RETIRO SIN VISIBILIDAD');
@@ -904,7 +908,7 @@ test('a withdrawal stores and reports the visibility of its records', async (t) 
 
         const created = await withdraw(fx, enrollment.id, { withdrawalDate: WITHDRAWAL_IN_Q3 });
         assert.equal(created.status, 201);
-        assert.equal(created.body.statsVisibility, 'until_withdrawal');
+        assert.equal(created.body.statsVisibility, 'whole_year');
       },
     },
     {
@@ -1045,7 +1049,10 @@ test('the visibility of a withdrawal can be changed', async (t) => {
         const enrollment = await createEnrollment(
           fx.institution.id, student.id, fx.windowCourse.id, fx.year.id, 1, fx.guardianId,
         );
-        const created = await withdraw(fx, enrollment.id, { withdrawalDate: WITHDRAWAL_IN_Q3 });
+        const created = await withdraw(fx, enrollment.id, {
+          withdrawalDate: WITHDRAWAL_IN_Q3,
+          statsVisibility: 'until_withdrawal',
+        });
         assert.equal(created.status, 201);
 
         const patched = await request('PATCH', `/api/student-withdrawals/${created.body.id}`, {
@@ -1106,7 +1113,10 @@ test('the visibility of a withdrawal can be changed', async (t) => {
         const enrollment = await createEnrollment(
           fx.institution.id, student.id, fx.windowCourse.id, fx.year.id, 1, fx.guardianId,
         );
-        const created = await withdraw(fx, enrollment.id, { withdrawalDate: WITHDRAWAL_IN_Q3 });
+        const created = await withdraw(fx, enrollment.id, {
+          withdrawalDate: WITHDRAWAL_IN_Q3,
+          statsVisibility: 'until_withdrawal',
+        });
 
         const before = await eventsOf(fx.institution.id);
         const patched = await request('PATCH', `/api/student-withdrawals/${created.body.id}`, {
@@ -1234,7 +1244,10 @@ test('the visibility of a withdrawal can be changed', async (t) => {
         const enrollment = await createEnrollment(
           fx.institution.id, student.id, fx.windowCourse.id, fx.year.id, 1, fx.guardianId,
         );
-        const created = await withdraw(fx, enrollment.id, { withdrawalDate: WITHDRAWAL_IN_Q3 });
+        const created = await withdraw(fx, enrollment.id, {
+          withdrawalDate: WITHDRAWAL_IN_Q3,
+          statsVisibility: 'until_withdrawal',
+        });
 
         for (const body of [{}, { statsVisibility: 'foo' }, { statsVisibility: '' }, { statsVisibility: null }]) {
           const patched = await request('PATCH', `/api/student-withdrawals/${created.body.id}`, {
@@ -2886,6 +2899,9 @@ test('the views of a withdrawal and the history of its student keep working', as
           assert.equal(summary.body.absences.total, 2);
           assert.equal(summary.body.tardies.total, 1);
           assert.equal(summary.body.justifications.total, 1);
+          assert.deepEqual(Object.keys(summary.body.citations).sort(), ['items', 'total'], 'the summary carries the citations');
+          assert.equal(summary.body.citations.total, 0);
+          assert.deepEqual(summary.body.citations.items, []);
 
           const timeline = await request('GET', `/api/student-history/${enrollment.id}/timeline`, {
             token: fx.token, institutionId: fx.institution.id,
