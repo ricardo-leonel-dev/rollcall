@@ -1194,7 +1194,7 @@ test('R4: withdrawing an enrollment records one StudentWithdrawn event', async (
             reasonId: fx.reasonA.id,
             withdrawalDate: fx.today,
             notes: 'Se muda',
-            statsVisibility: 'until_withdrawal',
+            statsVisibility: 'whole_year',
             revertedAt: null,
           },
         });
@@ -1272,7 +1272,7 @@ test('R5: POST /api/student-withdrawals/:id/revert reinstates an enrollment', as
         const fx = await createFixture();
         const student = await createStudent(fx.institution.id);
         const enrollment = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.year.id);
-        const role = await createTestRole([{ resource: 'student-withdrawals', canRead: true, canCreate: true, canUpdate: true }]);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canRead: true, canCreate: true, canUpdate: true, canDelete: true }]);
         const { token, id: userId } = await createUser(role.name, fx.institution.id);
 
         const created = await request('POST', '/api/student-withdrawals', {
@@ -1310,7 +1310,7 @@ test('R5: POST /api/student-withdrawals/:id/revert reinstates an enrollment', as
         const fx = await createFixture();
         const student = await createStudent(fx.institution.id);
         const enrollment = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.year.id);
-        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true }]);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true, canDelete: true }]);
         const { token } = await createUser(role.name, fx.institution.id);
 
         const created = await request('POST', '/api/student-withdrawals', {
@@ -1345,7 +1345,7 @@ test('R5: POST /api/student-withdrawals/:id/revert reinstates an enrollment', as
         const fx = await createFixture();
         const student = await createStudent(fx.institution.id);
         const enrollment = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.year.id);
-        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true }]);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true, canDelete: true }]);
         const { token, id: userId } = await createUser(role.name, fx.institution.id);
 
         const created = await request('POST', '/api/student-withdrawals', {
@@ -1377,7 +1377,7 @@ test('R5: POST /api/student-withdrawals/:id/revert reinstates an enrollment', as
         const fx = await createFixture();
         const student = await createStudent(fx.institution.id);
         const enrollment = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.year.id);
-        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true }]);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true, canDelete: true }]);
         const { token } = await createUser(role.name, fx.institution.id);
 
         const created = await request('POST', '/api/student-withdrawals', {
@@ -1405,7 +1405,7 @@ test('R5: POST /api/student-withdrawals/:id/revert reinstates an enrollment', as
         const other = await createFixture();
         const student = await createStudent(fx.institution.id);
         const enrollment = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.year.id);
-        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true }]);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true, canDelete: true }]);
         const { token } = await createUser(role.name, fx.institution.id);
 
         const created = await request('POST', '/api/student-withdrawals', {
@@ -1450,7 +1450,7 @@ test('R5: POST /api/student-withdrawals/:id/revert reinstates an enrollment', as
         const fx = await createFixture();
         const student = await createStudent(fx.institution.id);
         const enrollment = await createEnrollment(fx.institution.id, student.id, fx.otherCourse.id, fx.year.id);
-        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true }]);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true, canDelete: true }]);
         const { token, id: userId } = await createUser(role.name, fx.institution.id);
         await scopeUserToCourse(userId, fx.course.id, fx.year.id);
 
@@ -1491,7 +1491,7 @@ test('R6: reinstating an enrollment records one StudentReinstated event', async 
         const fx = await createFixture();
         const student = await createStudent(fx.institution.id);
         const enrollment = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.year.id);
-        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true }]);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true, canDelete: true }]);
         const { token, id: userId } = await createUser(role.name, fx.institution.id);
 
         const created = await request('POST', '/api/student-withdrawals', {
@@ -1527,7 +1527,7 @@ test('R6: reinstating an enrollment records one StudentReinstated event', async 
         const fx = await createFixture();
         const student = await createStudent(fx.institution.id);
         const enrollment = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.year.id);
-        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true }]);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true, canDelete: true }]);
         const { token } = await createUser(role.name, fx.institution.id);
 
         const created = await request('POST', '/api/student-withdrawals', {
@@ -1554,7 +1554,7 @@ test('R6: reinstating an enrollment records one StudentReinstated event', async 
         const fx = await createFixture();
         const student = await createStudent(fx.institution.id);
         const enrollment = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.year.id);
-        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true }]);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canCreate: true, canUpdate: true, canDelete: true }]);
         const { token } = await createUser(role.name, fx.institution.id);
 
         const created = await request('POST', '/api/student-withdrawals', {
@@ -1634,7 +1634,7 @@ test('R7: GET /api/student-withdrawals lists the withdrawals of the institution'
         const student = await createStudent(fx.institution.id);
         const enrollment = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.year.id);
         const other = await createEnrollment(fx.institution.id, student.id, fx.otherCourse.id, fx.year.id);
-        const role = await createTestRole([{ resource: 'student-withdrawals', canRead: true, canCreate: true, canUpdate: true }]);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canRead: true, canCreate: true, canUpdate: true, canDelete: true }]);
         const { token } = await createUser(role.name, fx.institution.id);
 
         const active = await request('POST', '/api/student-withdrawals', {
@@ -1914,7 +1914,7 @@ test('R8: GET /api/student-withdrawals/students/:studentId/history lists the his
         const student = await createStudent(fx.institution.id);
         const first = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.year.id);
         const second = await createEnrollment(fx.institution.id, student.id, fx.otherCourse.id, fx.narrowYear.id);
-        const role = await createTestRole([{ resource: 'student-withdrawals', canRead: true, canCreate: true, canUpdate: true }]);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canRead: true, canCreate: true, canUpdate: true, canDelete: true }]);
         const { token } = await createUser(role.name, fx.institution.id);
 
         const firstWithdrawal = await request('POST', '/api/student-withdrawals', {
@@ -2059,8 +2059,11 @@ test('R9: GET /api/student-withdrawals/stats counts the withdrawals by reason', 
         const first = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.year.id);
         const second = await createEnrollment(fx.institution.id, student.id, fx.otherCourse.id, fx.year.id);
         const third = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.narrowYear.id);
-        const fourth = await createEnrollment(fx.institution.id, student.id, fx.otherCourse.id, fx.narrowYear.id);
-        const role = await createTestRole([{ resource: 'student-withdrawals', canRead: true, canCreate: true, canUpdate: true }]);
+        // The reinstatement only works in the active year, so the withdrawal
+        // that is reverted belongs to it.
+        const otherStudent = await createStudent(fx.institution.id);
+        const fourth = await createEnrollment(fx.institution.id, otherStudent.id, fx.otherCourse.id, fx.year.id);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canRead: true, canCreate: true, canUpdate: true, canDelete: true }]);
         const { token } = await createUser(role.name, fx.institution.id);
 
         // Two active withdrawals with the first reason, one with the second.

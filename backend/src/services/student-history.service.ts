@@ -84,14 +84,57 @@ async function fetchJustificationSummary(institutionId: number, enrollmentId: nu
   return { total: rows.length, items: rows.slice(0, SUMMARY_LIMIT) };
 }
 
+interface CitationSummaryItem {
+  id: number;
+  date: string;
+  time: string;
+  status: 'pending' | 'closed';
+  reasons: string[];
+  createdAt: string;
+}
+
+// The history is where the records of a withdrawn enrollment stay readable,
+// so the citations are listed without the visibility window of a withdrawal.
+async function fetchCitationSummary(institutionId: number, enrollmentId: number, range: DateRange) {
+  const conditions = ['c.enrollment_id = $1', 'c.institution_id = $2', 'c.deleted_at IS NULL'];
+  const params: any[] = [enrollmentId, institutionId];
+  let i = 3;
+  if (range.dateFrom) { conditions.push(`c.date >= $${i++}`); params.push(range.dateFrom); }
+  if (range.dateTo)   { conditions.push(`c.date <= $${i++}`); params.push(range.dateTo); }
+
+  const rows = await AppDataSource.query(
+    `SELECT
+       c.id, c.date::text AS date, to_char(c.time, 'HH24:MI') AS time, c.status,
+       c.created_at AS "createdAt",
+       COALESCE((SELECT json_agg(cr.name ORDER BY cr.name)
+                   FROM citation_citation_reasons ccr
+                   JOIN citation_reasons cr ON cr.id = ccr.citation_reason_id
+                  WHERE ccr.citation_id = c.id), '[]') AS reasons
+     FROM citations c
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY c.date DESC, c.time DESC, c.id DESC`,
+    params
+  );
+  const items: CitationSummaryItem[] = rows.map((r: any) => ({
+    id: Number(r.id),
+    date: r.date,
+    time: r.time,
+    status: r.status,
+    reasons: r.reasons ?? [],
+    createdAt: r.createdAt,
+  }));
+  return { total: rows.length, items: items.slice(0, SUMMARY_LIMIT) };
+}
+
 export async function getSummary(institutionId: number, courseIds: number[] | null, enrollmentId: number, range: DateRange) {
   await assertEnrollmentInScope(institutionId, courseIds, enrollmentId);
 
-  const [enrollment, absences, tardies, justifications] = await Promise.all([
+  const [enrollment, absences, tardies, justifications, citations] = await Promise.all([
     getEnrollmentDetail(enrollmentId),
     fetchAbsenceSummary(institutionId, enrollmentId, 'F', range),
     fetchAbsenceSummary(institutionId, enrollmentId, 'AT', range),
     fetchJustificationSummary(institutionId, enrollmentId, range),
+    fetchCitationSummary(institutionId, enrollmentId, range),
   ]);
 
   return {
@@ -99,12 +142,12 @@ export async function getSummary(institutionId: number, courseIds: number[] | nu
     absences,
     tardies,
     justifications,
-    citations: { status: 'not_implemented' },
+    citations,
   };
 }
 
 interface TimelineEvent {
-  type: 'enrollment' | 'absence' | 'tardy' | 'justification';
+  type: 'enrollment' | 'absence' | 'tardy' | 'justification' | 'citation';
   recordedAt: string;
   occurredAt: string | null;
   title: string;
@@ -176,7 +219,11 @@ export async function getTimeline(institutionId: number, courseIds: number[] | n
 
   const events: TimelineEvent[] = [];
 
-  const createdAt: string | null = enrollmentRow[0]?.createdAt ?? null;
+  // The driver hands the row over as a Date; the range filter below needs
+  // the day it was recorded on.
+  const createdAt: string | null = enrollmentRow[0]?.createdAt
+    ? new Date(enrollmentRow[0].createdAt).toISOString()
+    : null;
   if (createdAt && (!range.dateFrom || createdAt.slice(0, 10) >= range.dateFrom) && (!range.dateTo || createdAt.slice(0, 10) <= range.dateTo)) {
     events.push({
       type: 'enrollment',
@@ -257,6 +304,41 @@ export async function getTimeline(institutionId: number, courseIds: number[] | n
       occurredAt: null,
       title: 'Justificación',
       description: `Se justificó ${label}`,
+      ...creatorFields(row),
+    });
+  }
+
+  const citationConditions = ['c.enrollment_id = $1', 'c.institution_id = $2', 'c.deleted_at IS NULL'];
+  const citationParams: any[] = [enrollmentId, institutionId];
+  let m = 3;
+  if (range.dateFrom) { citationConditions.push(`c.date >= $${m++}`); citationParams.push(range.dateFrom); }
+  if (range.dateTo)   { citationConditions.push(`c.date <= $${m++}`); citationParams.push(range.dateTo); }
+
+  const citationRows = await AppDataSource.query(
+    `SELECT
+       c.date::text AS date, to_char(c.time, 'HH24:MI') AS time,
+       c.created_at AS "createdAt",
+       COALESCE((SELECT json_agg(cr.name ORDER BY cr.name)
+                   FROM citation_citation_reasons ccr
+                   JOIN citation_reasons cr ON cr.id = ccr.citation_reason_id
+                  WHERE ccr.citation_id = c.id), '[]') AS reasons,
+       ${CREATOR_SELECT}
+     FROM citations c
+     LEFT JOIN users u ON u.id = c.created_by_user_id
+     LEFT JOIN roles r ON r.id = u.role_id
+     WHERE ${citationConditions.join(' AND ')}
+     ORDER BY c.created_at ASC`,
+    citationParams
+  );
+  for (const row of citationRows) {
+    const reasons: string[] = row.reasons ?? [];
+    events.push({
+      type: 'citation',
+      recordedAt: row.createdAt,
+      occurredAt: row.date,
+      title: 'Citación',
+      description: `Citación al representante el ${monthLabel(row.date)} a las ${row.time}`
+        + (reasons.length ? `. Motivos: ${reasons.join(', ')}` : ''),
       ...creatorFields(row),
     });
   }

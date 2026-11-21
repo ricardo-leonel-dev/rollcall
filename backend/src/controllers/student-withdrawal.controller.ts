@@ -13,6 +13,6 @@ router.get('/stats',                       requirePermission(R,'read'),   async 
 router.get('/students/:studentId/history', requirePermission(R,'read'),   async (req, res) => res.json(await svc.findStudentHistory(req.institutionId!, req.courseIds ?? null, +req.params.studentId)));
 router.post('/',                           requirePermission(R,'create'), async (req, res) => res.status(201).json(await svc.withdraw(req.institutionId!, req.courseIds ?? null, req.user?.id ?? null, req.body)));
 router.patch('/:id',                       requirePermission(R,'update'), async (req, res) => res.json(await svc.updateStatsVisibility(req.institutionId!, req.courseIds ?? null, req.user?.id ?? null, +req.params.id, req.body ?? {})));
-router.post('/:id/revert',                 requirePermission(R,'update'), async (req, res) => res.json(await svc.revert(req.institutionId!, req.courseIds ?? null, req.user?.id ?? null, +req.params.id)));
+router.post('/:id/revert',                 requirePermission(R,'delete'), async (req, res) => res.json(await svc.revert(req.institutionId!, req.courseIds ?? null, req.user?.id ?? null, +req.params.id)));
 
 export default router;
