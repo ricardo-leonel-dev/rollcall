@@ -487,7 +487,7 @@ test('the observations are limited to a thousand characters and counted', () => 
 test('the visibility of the records is a radio group with the three options', () => {
   assert.match(dialogSource, /<mat-radio-group/);
   assert.match(dialogSource, /statsVisibilityOptions = STATS_VISIBILITY_OPTIONS/);
-  assert.match(dialogSource, /statsVisibility = signal<StatsVisibility>\('until_withdrawal'\)/);
+  assert.match(dialogSource, /statsVisibility = signal<StatsVisibility>\('whole_year'\)/);
   assert.match(dialogSource, /@for \(option of statsVisibilityOptions; track option\.value\)/);
 });
 

@@ -13,6 +13,7 @@ const TYPE_META: Record<TimelineEvent['type'], TypeMeta> = {
   absence:       { icon: 'event_busy', classes: 'bg-red-50 text-red-600 border-red-200',             rotate: '-2deg' },
   tardy:         { icon: 'schedule',   classes: 'bg-amber-50 text-amber-600 border-amber-200',       rotate: '2deg' },
   justification: { icon: 'fact_check', classes: 'bg-emerald-50 text-emerald-600 border-emerald-200', rotate: '-1deg' },
+  citation:      { icon: 'campaign',   classes: 'bg-sky-50 text-sky-700 border-sky-200',             rotate: '1.5deg' },
 };
 
 @Component({

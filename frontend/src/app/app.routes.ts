@@ -27,6 +27,7 @@ export const routes: Routes = [
         children: [
           { path: 'manage',  loadComponent: () => import('./features/students/student-management.component').then(m => m.StudentManagementComponent), canActivate: [moduleGuard], data: { module: 'students' } },
           { path: 'history', loadComponent: () => import('./features/students/student-history.component').then(m => m.StudentHistoryComponent), canActivate: [moduleGuard], data: { module: 'students' } },
+          { path: 'withdrawn', loadComponent: () => import('./features/students/withdrawn-students.component').then(m => m.WithdrawnStudentsComponent), canActivate: [moduleGuard], data: { module: 'students' } },
           { path: '',        redirectTo: 'manage', pathMatch: 'full' },
         ],
       },

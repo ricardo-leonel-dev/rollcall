@@ -14,10 +14,18 @@ import { TimelineComponent } from '../../shared/components/timeline/timeline.com
 import { ComingSoonComponent } from '../../shared/components/coming-soon/coming-soon.component';
 
 export interface StudentHistoryDialogData {
-  enrollment: Enrollment;
+  enrollment: StudentHistoryEnrollmentRef;
   dateFrom: string | null;
   dateTo: string | null;
+  // A withdrawn enrollment is read from the screen of the withdrawn
+  // students, where its absences and justifications are already hidden: the
+  // summary items show the records but do not lead anywhere.
+  readOnly?: boolean;
 }
+
+// The dialog only reads these six fields of the student.
+export type StudentHistoryEnrollmentRef =
+  Pick<Enrollment, 'enrollmentId' | 'courseId' | 'fullName' | 'course' | 'academicYear' | 'idNumber'>;
 
 const HISTORY_TAB_INDEX = 5;
 
@@ -51,6 +59,8 @@ const HISTORY_TAB_INDEX = 5;
       padding: 8px 6px; border-radius: 8px; cursor: pointer; transition: background .12s ease;
     }
     .summary-item:hover { background: var(--paper-deep); }
+    .summary-item--static { cursor: default; }
+    .summary-item--static:hover { background: transparent; }
     .summary-item-text { font-size: 13px; color: var(--ink-soft); }
     .summary-item-sub { font-size: 11px; color: var(--muted); }
     .summary-empty { font-size: 13px; color: var(--muted); padding: 6px; }
@@ -91,12 +101,14 @@ const HISTORY_TAB_INDEX = 5;
                     <div class="summary-empty">Sin faltas registradas</div>
                   } @else {
                     @for (item of s.absences.items; track item.id) {
-                      <div class="summary-item" (click)="goToAbsence(item)">
+                      <div class="summary-item" [class.summary-item--static]="data.readOnly" (click)="goToAbsence(item)">
                         <div>
                           <div class="summary-item-text">Falta del {{formatDate(item.date)}}</div>
                           <div class="summary-item-sub">{{item.isJustified ? 'Justificada' : 'Sin justificar'}}</div>
                         </div>
-                        <mat-icon style="color:var(--muted);font-size:18px;width:18px;height:18px">chevron_right</mat-icon>
+                        @if (!data.readOnly) {
+                          <mat-icon style="color:var(--muted);font-size:18px;width:18px;height:18px">chevron_right</mat-icon>
+                        }
                       </div>
                     }
                   }
@@ -114,12 +126,14 @@ const HISTORY_TAB_INDEX = 5;
                     <div class="summary-empty">Sin atrasos registrados</div>
                   } @else {
                     @for (item of s.tardies.items; track item.id) {
-                      <div class="summary-item" (click)="goToAbsence(item)">
+                      <div class="summary-item" [class.summary-item--static]="data.readOnly" (click)="goToAbsence(item)">
                         <div>
                           <div class="summary-item-text">Atraso del {{formatDate(item.date)}}</div>
                           <div class="summary-item-sub">{{item.isJustified ? 'Justificado' : 'Sin justificar'}}</div>
                         </div>
-                        <mat-icon style="color:var(--muted);font-size:18px;width:18px;height:18px">chevron_right</mat-icon>
+                        @if (!data.readOnly) {
+                          <mat-icon style="color:var(--muted);font-size:18px;width:18px;height:18px">chevron_right</mat-icon>
+                        }
                       </div>
                     }
                   }
@@ -137,12 +151,14 @@ const HISTORY_TAB_INDEX = 5;
                     <div class="summary-empty">Sin justificaciones registradas</div>
                   } @else {
                     @for (item of s.justifications.items; track item.id) {
-                      <div class="summary-item" (click)="goToJustification()">
+                      <div class="summary-item" [class.summary-item--static]="data.readOnly" (click)="goToJustification()">
                         <div>
                           <div class="summary-item-text">{{item.reason}}</div>
                           <div class="summary-item-sub">Cubre: {{item.absenceDates.map(formatDate).join(', ')}}</div>
                         </div>
-                        <mat-icon style="color:var(--muted);font-size:18px;width:18px;height:18px">chevron_right</mat-icon>
+                        @if (!data.readOnly) {
+                          <mat-icon style="color:var(--muted);font-size:18px;width:18px;height:18px">chevron_right</mat-icon>
+                        }
                       </div>
                     }
                   }
@@ -252,6 +268,7 @@ export class StudentHistoryDialogComponent implements OnInit {
   }
 
   goToAbsence(item: StudentHistorySummaryItem): void {
+    if (this.data.readOnly) return;
     this.dialogRef.close();
     this.router.navigate(['/absences'], {
       queryParams: {
@@ -264,6 +281,7 @@ export class StudentHistoryDialogComponent implements OnInit {
   }
 
   goToJustification(): void {
+    if (this.data.readOnly) return;
     this.dialogRef.close();
     this.router.navigate(['/justifications'], {
       queryParams: {
