@@ -52,7 +52,16 @@ async function findOwned(institutionId: number, id: number): Promise<WithdrawalR
   return r;
 }
 
-export async function findAll(institutionId: number, _courseIds: number[] | null): Promise<WithdrawalReason[]> {
+function includesInactive(includeInactive?: string): boolean {
+  if (typeof includeInactive !== 'string') return false;
+  const value = includeInactive.toLowerCase();
+  return value === '1' || value === 'true';
+}
+
+export async function findAll(institutionId: number, _courseIds: number[] | null, includeInactive?: string): Promise<WithdrawalReason[]> {
+  if (includesInactive(includeInactive)) {
+    return repo().find({ where: { institutionId }, order: { name: 'ASC' } });
+  }
   return repo().find({ where: { institutionId, deletedAt: IsNull() }, order: { name: 'ASC' } });
 }
 
