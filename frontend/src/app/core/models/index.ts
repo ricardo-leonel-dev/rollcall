@@ -199,6 +199,15 @@ export interface StudentJustificationSummaryItem {
   absenceDates: string[];
 }
 
+export interface StudentCitationSummaryItem {
+  id: number;
+  date: string;
+  time: string;
+  status: 'pending' | 'closed';
+  reasons: string[];
+  createdAt: string;
+}
+
 export interface StudentHistorySummary {
   enrollment: {
     enrollmentId: number;
@@ -213,11 +222,11 @@ export interface StudentHistorySummary {
   absences: { total: number; items: StudentHistorySummaryItem[] };
   tardies: { total: number; items: StudentHistorySummaryItem[] };
   justifications: { total: number; items: StudentJustificationSummaryItem[] };
-  citations: { status: 'not_implemented' };
+  citations: { total: number; items: StudentCitationSummaryItem[] };
 }
 
 export interface TimelineEvent {
-  type: 'enrollment' | 'absence' | 'tardy' | 'justification';
+  type: 'enrollment' | 'absence' | 'tardy' | 'justification' | 'citation';
   recordedAt: string;
   occurredAt: string | null;
   title: string;

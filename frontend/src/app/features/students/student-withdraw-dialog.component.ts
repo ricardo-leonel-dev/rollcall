@@ -162,7 +162,7 @@ export class StudentWithdrawDialogComponent implements OnInit {
   readonly date = signal<Date | null>(dateStringToDate(this.bounds.defaultDate));
   readonly reasonId = signal<number | null>(null);
   readonly notes = signal('');
-  readonly statsVisibility = signal<StatsVisibility>('until_withdrawal');
+  readonly statsVisibility = signal<StatsVisibility>('whole_year');
   readonly saving = signal(false);
 
   readonly minDate = computed(() => dateStringToDate(this.bounds.min));

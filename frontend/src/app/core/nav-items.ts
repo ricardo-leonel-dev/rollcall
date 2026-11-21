@@ -25,6 +25,7 @@ export const SECTIONS: SectionItem[] = [
     subnav: [
       { route: '/students/manage',  icon: 'groups',  label: 'Administración de estudiantes', moduleKey: 'students' },
       { route: '/students/history', icon: 'history', label: 'Historial',                     moduleKey: 'students' },
+      { route: '/students/withdrawn', icon: 'person_off', label: 'Retirados',               moduleKey: 'students' },
     ],
   },
   {

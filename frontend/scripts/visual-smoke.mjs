@@ -162,6 +162,7 @@ const MOCK_CITATION_REASONS = [
 const MOCK_WITHDRAWAL_REASONS = [
   { id: 1, institutionId: 1, name: 'Cambio de domicilio', description: 'La familia se mudó de ciudad.', isActive: true, createdAt: '2026-01-10T12:00:00.000Z', updatedAt: '2026-01-10T12:00:00.000Z', deletedAt: null },
   { id: 2, institutionId: 1, name: 'Otro', description: null, isActive: true, createdAt: '2026-01-10T12:00:00.000Z', updatedAt: '2026-01-10T12:00:00.000Z', deletedAt: null },
+  { id: 3, institutionId: 1, name: 'Motivo anterior', description: null, isActive: false, createdAt: '2026-01-10T12:00:00.000Z', updatedAt: '2026-01-10T12:00:00.000Z', deletedAt: null },
 ];
 
 // Roster fixture for the students screen: two students of 5° A, so the
@@ -182,6 +183,52 @@ const MOCK_ENROLLMENTS = [
     guardianId: 22, guardianName: 'Carlos Pérez', guardianPhone: '+593992345678',
     whatsappLink: 'https://wa.me/593992345678', guardianEmail: null, guardianIdNumber: null, isActive: true,
   },
+];
+
+// Withdrawals fixture: one active withdrawal and one that was already
+// reincorporated, so the capture shows both states of the table (the flat
+// pills and the muted name of a reincorporated student).
+const MOCK_WITHDRAWALS = [
+  {
+    id: 11, enrollmentId: 101, studentId: 21, studentName: 'Ana Torres', idNumber: '0750110011',
+    courseId: 1, courseName: '5° A', academicYearId: 1, academicYear: 'Año Lectivo 2026',
+    withdrawalDate: '2026-05-10', reason: { id: 1, name: 'Cambio de domicilio' },
+    notes: 'La familia se mudó de ciudad.', statsVisibility: 'until_withdrawal',
+    withdrawnAt: '2026-05-10T14:00:00.000Z', withdrawnBy: { id: 1, fullName: 'Visual Smoke' },
+    revertedAt: null, revertedBy: null,
+  },
+  {
+    id: 12, enrollmentId: 102, studentId: 22, studentName: 'Luis Pérez', idNumber: '0750110022',
+    courseId: 2, courseName: '5° B', academicYearId: 1, academicYear: 'Año Lectivo 2026',
+    withdrawalDate: '2026-04-02', reason: { id: 2, name: 'Otro' },
+    notes: null, statsVisibility: 'whole_year',
+    withdrawnAt: '2026-04-02T14:00:00.000Z', withdrawnBy: { id: 1, fullName: 'Visual Smoke' },
+    revertedAt: '2026-06-01T15:30:00.000Z', revertedBy: { id: 1, fullName: 'Visual Smoke' },
+  },
+];
+
+// The record of the withdrawals of one student, drawn as a ledger.
+const MOCK_WITHDRAWAL_RECORD = [
+  MOCK_WITHDRAWALS[1],
+  MOCK_WITHDRAWALS[0],
+];
+
+const MOCK_STUDENT_HISTORY_SUMMARY = {
+  enrollment: {
+    enrollmentId: 101, studentName: 'Ana Torres', idNumber: '0750110011', rosterNumber: 1,
+    courseId: 1, courseName: '5° A', academicYearId: 1, academicYear: 'Año Lectivo 2026',
+  },
+  absences: { total: 1, items: [{ id: 1, date: '2026-05-01', createdAt: '2026-05-01T08:00:00.000Z', isJustified: false }] },
+  tardies: { total: 0, items: [] },
+  justifications: { total: 0, items: [] },
+  citations: { total: 0, items: [] },
+};
+
+// The timeline of the history, with a citation among the other events.
+const MOCK_STUDENT_HISTORY_TIMELINE = [
+  { type: 'enrollment', recordedAt: '2026-01-10T08:00:00.000Z', occurredAt: '2026-01-10', title: 'Matrícula', description: 'El estudiante fue matriculado en el curso.', createdByName: 'Visual Smoke', origin: null },
+  { type: 'absence', recordedAt: '2026-05-01T08:00:00.000Z', occurredAt: '2026-05-01', title: 'Falta', description: 'Falta registrada en el curso.', createdByName: 'Visual Smoke', origin: null },
+  { type: 'citation', recordedAt: '2026-05-05T10:30:00.000Z', occurredAt: '2026-05-05', title: 'Citación', description: 'Citación al representante el 15 de octubre de 2026 a las 10:30. Motivos: Conducta', createdByName: 'Visual Smoke', origin: null },
 ];
 
 async function mockApi(context, options = {}) {
@@ -220,6 +267,9 @@ async function mockApi(context, options = {}) {
       if (FEATURE === 'student_withdraw_action') {
         rows.push({ resource: 'student-withdrawals', canRead: true, canCreate: true, canUpdate: true, canDelete: false });
       }
+      if (FEATURE === 'withdrawn_students_view') {
+        rows.push({ resource: 'student-withdrawals', canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+      }
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) });
     }
     if (url.includes('/api/roles')) {
@@ -237,6 +287,23 @@ async function mockApi(context, options = {}) {
     }
     if (url.includes('/api/enrollments')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_ENROLLMENTS) });
+    }
+    if (url.includes('/api/student-withdrawals/students/')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_WITHDRAWAL_RECORD) });
+    }
+    if (url.includes('/api/student-history/') && url.includes('/summary')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_STUDENT_HISTORY_SUMMARY) });
+    }
+    if (url.includes('/api/student-history/') && url.includes('/timeline')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_STUDENT_HISTORY_TIMELINE) });
+    }
+    if (url.includes('/api/student-withdrawals')) {
+      const failed = options.withdrawalsError === true || process.env.VISUAL_WITHDRAWALS_ERROR === '1';
+      if (failed) {
+        return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'Sin permiso de read en student-withdrawals' }) });
+      }
+      const empty = options.emptyWithdrawals === true || process.env.VISUAL_EMPTY_WITHDRAWALS === '1';
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(empty ? [] : MOCK_WITHDRAWALS) });
     }
     if (url.includes('/api/courses')) {
       // feature 34 fixture: three courses (5° A, 5° B, 6° A) so the folio's
@@ -881,6 +948,136 @@ async function captureStudentWithdrawAction(browser, page, outDir) {
   return report;
 }
 
+// The screen of the withdrawn students: most of its states live behind a
+// click (the row menu, the two dialogs, the timeline tab) and two of them
+// live behind the mocks (the empty list and the list the backend refuses),
+// so this feature gets its own capture sequence.
+async function captureWithdrawnStudentsView(browser, page, outDir) {
+  const report = { states: [] };
+  const shot = async (target, name) => {
+    const path = join(outDir, `visual_${FEATURE}_${VW}_${name}.png`);
+    await target.screenshot({ path, fullPage: false });
+    report.states.push({ name, screenshot: path });
+  };
+
+  // Below the md breakpoint the list is a set of cards instead of a table,
+  // so the row and its menu live in a different place.
+  const isMobile = Number(VW) < 768;
+
+  const firstRow = (target) => isMobile
+    ? target.locator('.md\\:hidden .card').first()
+    : target.locator('table.data-table tbody tr').first();
+
+  const menuTrigger = (target) => isMobile
+    ? target.locator('.md\\:hidden .card').first().locator('button').last()
+    : target.locator('table.data-table tbody tr').first().locator('td:last-child button');
+
+  const openList = async (target) => {
+    await target.goto(`${BASE_URL}/students/withdrawn`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await firstRow(target).waitFor({ state: 'visible', timeout: 15000 });
+  };
+
+  const openRowMenu = async (target) => {
+    await menuTrigger(target).click();
+    await target.locator('.mat-mdc-menu-panel').waitFor({ state: 'visible', timeout: 10000 });
+  };
+
+  await openList(page);
+
+  // 1. the list, with an active and a reincorporated withdrawal.
+  report.header = (await page.locator('.page-title').textContent()).trim();
+  report.eyebrow = (await page.locator('.chapter-eyebrow').textContent()).replace(/\s+/g, ' ').trim();
+  report.counter = (await page.locator('.filter-bar div', { hasText: /retiro/ }).first().textContent()).replace(/\s+/g, ' ').trim();
+  report.rows = (await page.locator('table.data-table tbody tr').allTextContents())
+    .map(t => t.replace(/\s+/g, ' ').trim());
+  await shot(page, 'list');
+
+  // 2. the row menu.
+  await openRowMenu(page);
+  report.menuItems = (await page.locator('.mat-mdc-menu-item .mat-mdc-menu-item-text').allTextContents())
+    .map(t => t.replace(/\s+/g, ' ').trim());
+  await shot(page, 'menu');
+
+  // 3. the record of the withdrawals of the student, drawn as a ledger.
+  await page.locator('.mat-mdc-menu-item', { hasText: 'Ver retiros' }).first().click();
+  const record = page.locator('mat-dialog-container').filter({ hasText: 'Retiros de Ana Torres' });
+  await record.waitFor({ state: 'visible', timeout: 10000 });
+  await wait(500);
+  report.record = {
+    title: (await record.locator('h2[mat-dialog-title]').textContent()).trim(),
+    entries: await record.locator('.entry').evaluateAll(rows => rows.map(row => ({
+      text: row.textContent.replace(/\s+/g, ' ').trim(),
+      stamp: row.querySelector('.stamp')?.textContent.trim() ?? null,
+      stampColor: row.querySelector('.stamp') ? getComputedStyle(row.querySelector('.stamp')).color : null,
+    }))),
+  };
+  await shot(page, 'record');
+  await page.keyboard.press('Escape');
+  await wait(400);
+
+  // 4. the visibility of the records.
+  await openRowMenu(page);
+  await page.locator('.mat-mdc-menu-item', { hasText: 'Cambiar visibilidad' }).first().click();
+  const visibility = page.locator('mat-dialog-container').filter({ hasText: 'Visibilidad en reportes' });
+  await visibility.waitFor({ state: 'visible', timeout: 10000 });
+  await wait(400);
+  report.visibility = {
+    title: (await visibility.locator('h2[mat-dialog-title]').textContent()).trim(),
+    options: await visibility.locator('.visibility-row').evaluateAll(rows => rows.map(row => ({
+      label: row.querySelector('.option-label')?.textContent.trim() ?? null,
+      selected: row.classList.contains('selected'),
+    }))),
+    guardarDisabled: await visibility.locator('mat-dialog-actions button', { hasText: 'Guardar' }).isDisabled(),
+  };
+  await shot(page, 'visibility');
+  await page.keyboard.press('Escape');
+  await wait(400);
+
+  // 5. the history of the student, with the citation on the timeline.
+  await openRowMenu(page);
+  await page.locator('.mat-mdc-menu-item', { hasText: 'Ver historial' }).first().click();
+  const history = page.locator('mat-dialog-container').filter({ hasText: 'Ana Torres' });
+  await history.waitFor({ state: 'visible', timeout: 10000 });
+  await history.locator('.mat-mdc-tab', { hasText: 'Histórica' }).click();
+  await wait(800);
+  report.timeline = {
+    events: await history.locator('.timeline-title').allTextContents(),
+    descriptions: await history.locator('.timeline-desc').allTextContents(),
+    nodeClasses: await history.locator('.timeline-node').evaluateAll(nodes => nodes.map(n => n.className)),
+  };
+  await shot(page, 'history');
+  await page.keyboard.press('Escape');
+  await wait(400);
+
+  // 6. the list without withdrawals, and the list the backend refuses.
+  const stateContext = async (options) => {
+    const context = await browser.newContext({
+      viewport: { width: Number(VW), height: Number(VH) },
+      serviceWorkers: 'block',
+    });
+    await mockApi(context, options);
+    const target = await context.newPage();
+    await injectAuth(target);
+    return { context, target };
+  };
+
+  const { context: emptyContext, target: emptyPage } = await stateContext({ emptyWithdrawals: true });
+  await emptyPage.goto(`${BASE_URL}/students/withdrawn`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await emptyPage.locator('.empty-state').first().waitFor({ state: 'visible', timeout: 15000 });
+  report.emptyState = (await emptyPage.locator('.empty-state').first().textContent()).replace(/\s+/g, ' ').trim();
+  await shot(emptyPage, 'empty');
+  await emptyContext.close();
+
+  const { context: errorContext, target: errorPage } = await stateContext({ withdrawalsError: true });
+  await errorPage.goto(`${BASE_URL}/students/withdrawn`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await errorPage.locator('.empty-state').first().waitFor({ state: 'visible', timeout: 15000 });
+  report.errorState = (await errorPage.locator('.empty-state').first().textContent()).replace(/\s+/g, ' ').trim();
+  await shot(errorPage, 'error');
+  await errorContext.close();
+
+  return report;
+}
+
 async function main() {
   if (!NO_SERVER) await startServer();
   let browser;
@@ -890,7 +1087,7 @@ async function main() {
       viewport: { width: Number(VW), height: Number(VH) },
       // The service worker caches two API paths of its own; blocking it keeps
       // the mocked API in charge of every request the page makes.
-      serviceWorkers: FEATURE === 'student_withdraw_action' ? 'block' : 'allow',
+      serviceWorkers: FEATURE === 'student_withdraw_action' || FEATURE === 'withdrawn_students_view' ? 'block' : 'allow',
     });
     await mockApi(context);
     const page = await context.newPage();
@@ -899,6 +1096,16 @@ async function main() {
     page.on('console', (msg) => {
       if (msg.type() === 'error') console.error('[console.error]', msg.text());
     });
+    if (FEATURE === 'withdrawn_students_view') {
+      const info = await captureWithdrawnStudentsView(browser, page, OUT_DIR);
+      const payload = { ...info, viewport: { width: Number(VW), height: Number(VH) } };
+      // One report per width, so the captures of both sizes are kept.
+      const widthReport = join(OUT_DIR, `visual_${FEATURE}_${VW}.json`);
+      writeFileSync(widthReport, JSON.stringify(payload, null, 2));
+      writeFileSync(REPORT_PATH, JSON.stringify(payload, null, 2));
+      console.log(JSON.stringify({ ok: true, report: widthReport, ...info }, null, 2));
+      return;
+    }
     if (FEATURE === 'student_withdraw_action') {
       const info = await captureStudentWithdrawAction(browser, page, OUT_DIR);
       const payload = { ...info, viewport: { width: Number(VW), height: Number(VH) } };

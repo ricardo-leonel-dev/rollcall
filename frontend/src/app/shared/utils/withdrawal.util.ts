@@ -2,7 +2,9 @@ import type {
   AcademicYear,
   CreateStudentWithdrawalPayload,
   StatsVisibility,
+  WithdrawalItem,
 } from '../../core/models/index';
+import type { ResourceFlags } from './permission.util';
 
 export const NOTES_MAX_LENGTH = 1000;
 
@@ -155,3 +157,117 @@ export function withdrawalErrorOutcome(err: unknown): WithdrawalErrorOutcome {
   }
   return { message: 'No se pudo retirar al estudiante. Intenta nuevamente.', closeAndReload: false };
 }
+
+// ----- The screen of the withdrawn students -----
+
+export type WithdrawalStatusFilter = 'active' | 'reverted' | 'all';
+
+export const WITHDRAWAL_STATUS_OPTIONS: readonly { value: WithdrawalStatusFilter; label: string }[] = [
+  { value: 'active', label: 'Retirados' },
+  { value: 'reverted', label: 'Reincorporados' },
+  { value: 'all', label: 'Todos' },
+];
+
+export interface WithdrawalListFilters {
+  status: WithdrawalStatusFilter;
+  academicYearId: number | null;
+  courseId: number | null;
+  reasonId: number | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+}
+
+// The backend reads the filters from the query string and ignores the empty
+// ones, so only the filters that are actually set travel with the request.
+export function buildWithdrawalListQuery(filters: WithdrawalListFilters): string {
+  const params = new URLSearchParams();
+  params.set('status', filters.status);
+  if (filters.academicYearId !== null && filters.academicYearId !== undefined) {
+    params.set('academic_year_id', String(filters.academicYearId));
+  }
+  if (filters.courseId !== null && filters.courseId !== undefined) {
+    params.set('course_id', String(filters.courseId));
+  }
+  if (filters.reasonId !== null && filters.reasonId !== undefined) {
+    params.set('reason_id', String(filters.reasonId));
+  }
+  if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+  if (filters.dateTo) params.set('date_to', filters.dateTo);
+  return params.toString();
+}
+
+export function statsVisibilityLabel(value: StatsVisibility): string {
+  return STATS_VISIBILITY_OPTIONS.find(o => o.value === value)?.label ?? value;
+}
+
+// The server sends the moment of the reinstatement in UTC; the day the user
+// saw it happen is the one of their own clock.
+export function formatRevertedDate(iso: string): string {
+  const moment = new Date(iso);
+  if (Number.isNaN(moment.getTime())) return iso;
+  const day = String(moment.getDate()).padStart(2, '0');
+  const month = String(moment.getMonth() + 1).padStart(2, '0');
+  return `${day}/${month}/${moment.getFullYear()}`;
+}
+
+export function withdrawnByName(item: Pick<WithdrawalItem, 'withdrawnBy'>): string {
+  return item.withdrawnBy?.fullName || '—';
+}
+
+export interface WithdrawalRowActions {
+  canReinstate: boolean;
+  canChangeVisibility: boolean;
+}
+
+// A reincorporated student has nothing left to change: both actions belong
+// to the active withdrawals only, and each one to its own permission.
+export function withdrawalRowActions(
+  flags: ResourceFlags,
+  item: Pick<WithdrawalItem, 'revertedAt'>,
+): WithdrawalRowActions {
+  const active = item.revertedAt === null;
+  return {
+    canReinstate: active && flags.canDelete,
+    canChangeVisibility: active && flags.canUpdate,
+  };
+}
+
+export function filterWithdrawals<T extends Pick<WithdrawalItem, 'studentName' | 'idNumber'>>(
+  items: readonly T[],
+  term: string,
+): T[] {
+  const query = term.trim().toLowerCase();
+  if (!query) return [...items];
+  return items.filter(item =>
+    item.studentName.toLowerCase().includes(query)
+    || (item.idNumber ?? '').toLowerCase().includes(query),
+  );
+}
+
+export function withdrawalListErrorMessage(err: unknown): string {
+  const status = (err as { status?: number } | null)?.status;
+  const message = (err as { error?: { error?: string } } | null)?.error?.error;
+
+  if ((status === 400 || status === 403) && message) return message;
+  return 'No se pudieron cargar los retiros.';
+}
+
+// A withdrawal that is gone or already reincorporated leaves the list, so the
+// list is read again. A rejected request keeps the dialog open with what the
+// user chose.
+export function withdrawalMutationErrorOutcome(err: unknown, fallback: string): WithdrawalErrorOutcome {
+  const status = (err as { status?: number } | null)?.status;
+  const message = (err as { error?: { error?: string } } | null)?.error?.error;
+
+  if (status === 404 || status === 409) {
+    return { message: message ?? fallback, closeAndReload: true };
+  }
+  if ((status === 400 || status === 403) && message) {
+    return { message, closeAndReload: false };
+  }
+  return { message: fallback, closeAndReload: false };
+}
+
+// The backend answers "Student not found" in English, so the record of the
+// withdrawals of a student always fails with this message.
+export const WITHDRAWAL_RECORD_ERROR = 'No se pudo cargar el registro de retiros.';
