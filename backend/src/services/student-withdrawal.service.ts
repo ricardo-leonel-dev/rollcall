@@ -50,6 +50,9 @@ export interface WithdrawalQuery {
 export interface WithdrawalStatsQuery {
   academic_year_id?: unknown;
   course_id?: unknown;
+  reason_id?: unknown;
+  date_from?: unknown;
+  date_to?: unknown;
 }
 
 type WithdrawalSnapshot = {
@@ -549,9 +552,13 @@ export async function getStats(
 ): Promise<{ total: number; byReason: ReasonCount[] }> {
   const academicYearId = parseQueryInt(query.academic_year_id);
   const courseId = parseQueryInt(query.course_id);
+  const reasonId = parseQueryInt(query.reason_id);
+  const dateFrom = parseQueryDate(query.date_from);
+  const dateTo = parseQueryDate(query.date_to);
 
   const params: unknown[] = [institutionId];
   const filters: string[] = [];
+  let reasonParam = 0;
 
   if (academicYearId !== undefined) {
     params.push(academicYearId);
@@ -561,10 +568,29 @@ export async function getStats(
     params.push(courseId);
     filters.push(`AND e.course_id = $${params.length}`);
   }
+  if (reasonId !== undefined) {
+    params.push(reasonId);
+    reasonParam = params.length;
+    filters.push(`AND w.reason_id = $${reasonParam}`);
+  }
+  if (dateFrom !== undefined) {
+    params.push(dateFrom);
+    filters.push(`AND w.withdrawal_date >= $${params.length}::date`);
+  }
+  if (dateTo !== undefined) {
+    params.push(dateTo);
+    filters.push(`AND w.withdrawal_date <= $${params.length}::date`);
+  }
   if (courseIds !== null) {
     params.push(courseIds);
     filters.push(`AND e.course_id = ANY($${params.length})`);
   }
+
+  // A requested reason is the only one listed, even when it counts zero;
+  // without it, every active reason is listed.
+  const listedReason = reasonId !== undefined
+    ? `r.id = $${reasonParam}`
+    : `((r.deleted_at IS NULL AND r.is_active) OR c.count IS NOT NULL)`;
 
   const rows = await AppDataSource.query(
     `WITH counts AS (
@@ -580,7 +606,7 @@ export async function getStats(
        FROM withdrawal_reasons r
        LEFT JOIN counts c ON c.reason_id = r.id
       WHERE r.institution_id = $1
-        AND ((r.deleted_at IS NULL AND r.is_active) OR c.count IS NOT NULL)
+        AND ${listedReason}
       ORDER BY COALESCE(c.count, 0) DESC, r.name ASC`,
     params,
   );

@@ -2252,19 +2252,299 @@ test('R9: GET /api/student-withdrawals/stats counts the withdrawals by reason', 
       },
     },
     {
+      name: 'the statistics can be filtered by date range, both ends included',
+      run: async () => {
+        const fx = await createFixture();
+        const first = await createStudent(fx.institution.id);
+        const second = await createStudent(fx.institution.id);
+        const third = await createStudent(fx.institution.id);
+        const firstEnrollment = await createEnrollment(fx.institution.id, first.id, fx.course.id, fx.year.id);
+        const secondEnrollment = await createEnrollment(fx.institution.id, second.id, fx.course.id, fx.year.id);
+        const thirdEnrollment = await createEnrollment(fx.institution.id, third.id, fx.course.id, fx.year.id);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canRead: true, canCreate: true }]);
+        const { token } = await createUser(role.name, fx.institution.id);
+
+        const withdrawals: Array<[any, number, string]> = [
+          [firstEnrollment, fx.reasonA.id, fx.narrowEnd],
+          [secondEnrollment, fx.reasonB.id, fx.outsideDate],
+          [thirdEnrollment, fx.reasonA.id, fx.today],
+        ];
+        for (const [enrollment, reasonId, withdrawalDate] of withdrawals) {
+          const res = await request('POST', '/api/student-withdrawals', {
+            token,
+            institutionId: fx.institution.id,
+            body: { enrollmentId: enrollment.id, reasonId, withdrawalDate },
+          });
+          assert.equal(res.status, 201);
+        }
+
+        const stats = async (query: string) => {
+          const res = await request('GET', `/api/student-withdrawals/stats?${query}`, {
+            token,
+            institutionId: fx.institution.id,
+          });
+          assert.equal(res.status, 200);
+          const byReason = new Map<number, any>(res.body.byReason.map((r: any) => [r.reasonId, r] as [number, any]));
+          return { total: res.body.total, byReason };
+        };
+
+        const range = await stats(`date_from=${fx.narrowEnd}&date_to=${fx.outsideDate}`);
+        assert.equal(range.total, 2, 'the two withdrawals inside the range count');
+        assert.equal(range.byReason.get(fx.reasonA.id).count, 1);
+        assert.equal(range.byReason.get(fx.reasonB.id).count, 1);
+
+        const singleDay = await stats(`date_from=${fx.narrowEnd}&date_to=${fx.narrowEnd}`);
+        assert.equal(singleDay.total, 1, 'both ends of the range are included');
+        assert.equal(singleDay.byReason.get(fx.reasonA.id).count, 1);
+        assert.equal(singleDay.byReason.get(fx.reasonB.id).count, 0, 'a reason outside the range counts zero');
+
+        const openStart = await stats(`date_to=${fx.narrowEnd}`);
+        assert.equal(openStart.total, 1, 'only the withdrawal before the end of the range counts');
+
+        const openEnd = await stats(`date_from=${fx.outsideDate}`);
+        assert.equal(openEnd.total, 2, 'only the withdrawals after the start of the range count');
+      },
+    },
+    {
+      name: 'the statistics can be filtered by reason',
+      run: async () => {
+        const fx = await createFixture();
+        const first = await createStudent(fx.institution.id);
+        const second = await createStudent(fx.institution.id);
+        const third = await createStudent(fx.institution.id);
+        const firstEnrollment = await createEnrollment(fx.institution.id, first.id, fx.course.id, fx.year.id);
+        const secondEnrollment = await createEnrollment(fx.institution.id, second.id, fx.course.id, fx.year.id);
+        const thirdEnrollment = await createEnrollment(fx.institution.id, third.id, fx.course.id, fx.year.id);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canRead: true, canCreate: true }]);
+        const { token } = await createUser(role.name, fx.institution.id);
+
+        const withdrawals: Array<[any, number]> = [
+          [firstEnrollment, fx.reasonA.id],
+          [secondEnrollment, fx.reasonA.id],
+          [thirdEnrollment, fx.reasonB.id],
+        ];
+        for (const [enrollment, reasonId] of withdrawals) {
+          const res = await request('POST', '/api/student-withdrawals', {
+            token,
+            institutionId: fx.institution.id,
+            body: { enrollmentId: enrollment.id, reasonId },
+          });
+          assert.equal(res.status, 201);
+        }
+
+        const stats = async (query: string) => {
+          const res = await request('GET', `/api/student-withdrawals/stats?${query}`, {
+            token,
+            institutionId: fx.institution.id,
+          });
+          assert.equal(res.status, 200);
+          return res.body;
+        };
+
+        const firstReason = await stats(`reason_id=${fx.reasonA.id}`);
+        assert.equal(firstReason.total, 2, 'the total is the count of that reason');
+        assert.equal(firstReason.byReason.length, 1, 'only that reason is listed');
+        assert.equal(firstReason.byReason[0].reasonId, fx.reasonA.id);
+        assert.equal(firstReason.byReason[0].count, 2);
+
+        const secondReason = await stats(`reason_id=${fx.reasonB.id}`);
+        assert.equal(secondReason.total, 1);
+        assert.equal(secondReason.byReason.length, 1);
+        assert.equal(secondReason.byReason[0].reasonId, fx.reasonB.id);
+        assert.equal(secondReason.byReason[0].count, 1);
+
+        const withoutWithdrawals = await stats(`reason_id=${fx.reasonToDelete.id}`);
+        assert.equal(withoutWithdrawals.total, 0, 'a reason without withdrawals counts zero');
+        assert.equal(withoutWithdrawals.byReason.length, 1, 'the requested reason is still listed');
+        assert.equal(withoutWithdrawals.byReason[0].count, 0);
+
+        const other = await createFixture();
+        const foreign = await stats(`reason_id=${other.reasonA.id}`);
+        assert.equal(foreign.total, 0, 'a reason of another institution counts nothing');
+        assert.deepEqual(foreign.byReason, [], 'the foreign reason is not listed');
+      },
+    },
+    {
+      name: 'a deleted reason asked for by id keeps its count',
+      run: async () => {
+        const fx = await createFixture();
+        const student = await createStudent(fx.institution.id);
+        const enrollment = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.year.id);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canRead: true, canCreate: true }]);
+        const { token } = await createUser(role.name, fx.institution.id);
+
+        const created = await request('POST', '/api/student-withdrawals', {
+          token,
+          institutionId: fx.institution.id,
+          body: { enrollmentId: enrollment.id, reasonId: fx.reasonToDelete.id },
+        });
+        assert.equal(created.status, 201);
+
+        await AppDataSource.query(
+          `UPDATE withdrawal_reasons SET deleted_at = NOW() WHERE id = $1`,
+          [fx.reasonToDelete.id],
+        );
+
+        const res = await request('GET', `/api/student-withdrawals/stats?reason_id=${fx.reasonToDelete.id}`, {
+          token,
+          institutionId: fx.institution.id,
+        });
+        assert.equal(res.status, 200);
+        assert.equal(res.body.total, 1, 'the withdrawal of the deleted reason still counts');
+        assert.equal(res.body.byReason.length, 1);
+        assert.equal(res.body.byReason[0].reasonId, fx.reasonToDelete.id);
+        assert.equal(res.body.byReason[0].count, 1);
+        assert.equal(res.body.byReason[0].reasonName, fx.reasonToDelete.name, 'it keeps its name');
+      },
+    },
+    {
+      name: 'the date and reason filters combine with the year and the course',
+      run: async () => {
+        const fx = await createFixture();
+        const student = await createStudent(fx.institution.id);
+        const inMainCourse = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.year.id);
+        const inOtherCourse = await createEnrollment(fx.institution.id, student.id, fx.otherCourse.id, fx.year.id);
+        const inNarrowYear = await createEnrollment(fx.institution.id, student.id, fx.course.id, fx.narrowYear.id);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canRead: true, canCreate: true }]);
+        const { token } = await createUser(role.name, fx.institution.id);
+
+        const withdrawals: Array<[any, number, string]> = [
+          [inMainCourse, fx.reasonA.id, fx.narrowEnd],
+          [inOtherCourse, fx.reasonB.id, fx.outsideDate],
+          [inNarrowYear, fx.reasonA.id, fx.narrowEnd],
+        ];
+        for (const [enrollment, reasonId, withdrawalDate] of withdrawals) {
+          const res = await request('POST', '/api/student-withdrawals', {
+            token,
+            institutionId: fx.institution.id,
+            body: { enrollmentId: enrollment.id, reasonId, withdrawalDate },
+          });
+          assert.equal(res.status, 201);
+        }
+
+        const stats = async (query: string) => {
+          const res = await request('GET', `/api/student-withdrawals/stats?${query}`, {
+            token,
+            institutionId: fx.institution.id,
+          });
+          assert.equal(res.status, 200);
+          return res.body;
+        };
+
+        const byYearAndReason = await stats(
+          `academic_year_id=${fx.year.id}&reason_id=${fx.reasonA.id}&date_from=${fx.narrowEnd}&date_to=${fx.narrowEnd}`,
+        );
+        assert.equal(byYearAndReason.total, 1, 'only the withdrawal of that year and reason counts');
+
+        const byNarrowYear = await stats(
+          `academic_year_id=${fx.narrowYear.id}&reason_id=${fx.reasonA.id}&date_from=${fx.narrowEnd}&date_to=${fx.narrowEnd}`,
+        );
+        assert.equal(byNarrowYear.total, 1, 'the withdrawal of the narrow year counts');
+
+        const byCourseAndReason = await stats(
+          `course_id=${fx.otherCourse.id}&reason_id=${fx.reasonB.id}&date_from=${fx.outsideDate}&date_to=${fx.outsideDate}`,
+        );
+        assert.equal(byCourseAndReason.total, 1, 'only the withdrawal of that course and reason counts');
+
+        const contradictory = await stats(
+          `academic_year_id=${fx.year.id}&course_id=${fx.otherCourse.id}&reason_id=${fx.reasonA.id}`,
+        );
+        assert.equal(contradictory.total, 0, 'a contradictory combination returns nothing');
+        assert.equal(contradictory.byReason.length, 1, 'only the asked reason is listed');
+        assert.equal(contradictory.byReason[0].count, 0, 'it counts zero');
+      },
+    },
+    {
+      name: 'the filtered statistics count the same withdrawals as the list',
+      run: async () => {
+        const fx = await createFixture();
+        const first = await createStudent(fx.institution.id);
+        const second = await createStudent(fx.institution.id);
+        const third = await createStudent(fx.institution.id);
+        const firstEnrollment = await createEnrollment(fx.institution.id, first.id, fx.course.id, fx.year.id);
+        const secondEnrollment = await createEnrollment(fx.institution.id, second.id, fx.otherCourse.id, fx.year.id);
+        const thirdEnrollment = await createEnrollment(fx.institution.id, third.id, fx.course.id, fx.narrowYear.id);
+        const role = await createTestRole([{ resource: 'student-withdrawals', canRead: true, canCreate: true }]);
+        const { token } = await createUser(role.name, fx.institution.id);
+
+        const withdrawals: Array<[any, number, string]> = [
+          [firstEnrollment, fx.reasonA.id, fx.narrowEnd],
+          [secondEnrollment, fx.reasonB.id, fx.outsideDate],
+          [thirdEnrollment, fx.reasonA.id, fx.narrowEnd],
+        ];
+        for (const [enrollment, reasonId, withdrawalDate] of withdrawals) {
+          const res = await request('POST', '/api/student-withdrawals', {
+            token,
+            institutionId: fx.institution.id,
+            body: { enrollmentId: enrollment.id, reasonId, withdrawalDate },
+          });
+          assert.equal(res.status, 201);
+        }
+
+        const queries = [
+          '',
+          `date_from=${fx.narrowEnd}&date_to=${fx.outsideDate}`,
+          `date_from=${fx.narrowEnd}&date_to=${fx.narrowEnd}`,
+          `reason_id=${fx.reasonA.id}`,
+          `reason_id=${fx.reasonA.id}&date_from=${fx.narrowEnd}&date_to=${fx.narrowEnd}`,
+          `academic_year_id=${fx.year.id}&course_id=${fx.course.id}&reason_id=${fx.reasonA.id}`,
+        ];
+
+        for (const query of queries) {
+          const suffix = query ? `?${query}` : '';
+          const list = await request('GET', `/api/student-withdrawals${suffix}`, {
+            token,
+            institutionId: fx.institution.id,
+          });
+          const stats = await request('GET', `/api/student-withdrawals/stats${suffix}`, {
+            token,
+            institutionId: fx.institution.id,
+          });
+          assert.equal(list.status, 200);
+          assert.equal(stats.status, 200);
+          assert.equal(stats.body.total, list.body.length, `the same total for ${query || 'the unfiltered query'}`);
+
+          const listed = new Map<number, number>();
+          for (const item of list.body) {
+            listed.set(item.reason.id, (listed.get(item.reason.id) ?? 0) + 1);
+          }
+          const counted = new Map<number, number>(
+            stats.body.byReason.map((r: any) => [r.reasonId, Number(r.count)] as [number, number]),
+          );
+          for (const [reasonId, count] of listed) {
+            assert.equal(counted.get(reasonId), count, `the same count for the reason ${reasonId} in ${query}`);
+          }
+        }
+      },
+    },
+    {
       name: 'an invalid query is rejected with 400',
       run: async () => {
         const fx = await createFixture();
         const role = await createTestRole([{ resource: 'student-withdrawals', canRead: true }]);
         const { token } = await createUser(role.name, fx.institution.id);
 
-        for (const query of ['academic_year_id=0', 'academic_year_id=abc', 'course_id=-1', 'course_id=abc']) {
+        const invalid = [
+          'academic_year_id=0', 'academic_year_id=abc', 'course_id=-1', 'course_id=abc',
+          'reason_id=0', 'reason_id=abc', 'reason_id=-1', 'reason_id=',
+          'date_from=not-a-date', 'date_from=2026-13-01', 'date_from=2026-02-30',
+          'date_to=not-a-date', 'date_to=2026-99-99', 'date_to=',
+        ];
+
+        for (const query of invalid) {
           const res = await request('GET', `/api/student-withdrawals/stats?${query}`, {
             token,
             institutionId: fx.institution.id,
           });
           assert.equal(res.status, 400, `${query} is rejected`);
           assert.equal(res.body.error, 'Parámetros de consulta inválidos');
+
+          const list = await request('GET', `/api/student-withdrawals?${query}`, {
+            token,
+            institutionId: fx.institution.id,
+          });
+          assert.equal(list.status, 400, `the list rejects ${query} too`);
+          assert.equal(list.body.error, res.body.error, `the list answers the same for ${query}`);
         }
       },
     },
