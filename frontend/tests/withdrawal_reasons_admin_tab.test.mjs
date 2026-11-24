@@ -308,7 +308,7 @@ test('the reasons of the institution are loaded', () => {
   assert.match(adminSource, /readonly withdrawalReasons = signal<WithdrawalReason\[\]>\(\[\]\)/);
   assert.match(
     adminSource,
-    /firstValueFrom\(this\.http\.get<WithdrawalReason\[\]>\('\/api\/withdrawal-reasons'\)\)\.catch\(\(\) => \[\] as WithdrawalReason\[\]\)/,
+    /firstValueFrom\(this\.http\.get<WithdrawalReason\[\]>\(withdrawalReasonsUrl\(\)\)\)\.catch\(\(\) => \[\] as WithdrawalReason\[\]\)/,
   );
   assert.match(adminSource, /this\.withdrawalReasons\.set\(withdrawalReasons\)/);
 });
@@ -335,7 +335,7 @@ test('a superadmin loads no role permissions and no institution-scoped list', ()
 test('a failed request never breaks the rest of the admin data', () => {
   const loadAll = readLoadAll();
 
-  assert.match(loadAll, /get<WithdrawalReason\[\]>\('\/api\/withdrawal-reasons'\)\)\.catch\(/);
+  assert.match(loadAll, /get<WithdrawalReason\[\]>\(withdrawalReasonsUrl\(\)\)\)\.catch\(/);
   assert.match(loadAll, /get<RolePermission\[\]>\(`\/api\/roles\/permissions\/\$\{roleId\}`\)\)\.catch\(/);
 });
 

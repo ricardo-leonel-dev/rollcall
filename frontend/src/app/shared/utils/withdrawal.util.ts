@@ -3,6 +3,7 @@ import type {
   CreateStudentWithdrawalPayload,
   StatsVisibility,
   WithdrawalItem,
+  WithdrawalReason,
 } from '../../core/models/index';
 import type { ResourceFlags } from './permission.util';
 
@@ -64,6 +65,13 @@ export const WITHDRAWAL_FORM_ERROR_MESSAGES: Record<Exclude<WithdrawalFormError,
 };
 
 export type WithdrawalReasonsState = 'loading' | 'ready' | 'error';
+
+// The deleted reasons are only asked for where they can still be used: the
+// list of the withdrawn students filters old withdrawals that point at them.
+// The dialog and the admin tab work with the active ones only.
+export function withdrawalReasonsUrl(includeInactive = false): string {
+  return includeInactive ? '/api/withdrawal-reasons?include_inactive=1' : '/api/withdrawal-reasons';
+}
 
 // The reason select shows while the reasons load and when there is at least
 // one active reason; otherwise the dialog shows a notice in its place.
@@ -198,6 +206,12 @@ export function buildWithdrawalListQuery(filters: WithdrawalListFilters): string
 
 export function statsVisibilityLabel(value: StatsVisibility): string {
   return STATS_VISIBILITY_OPTIONS.find(o => o.value === value)?.label ?? value;
+}
+
+// A deleted reason still shows up in the filter of the withdrawn students, so
+// it is told apart from the ones that can still be picked.
+export function withdrawalReasonLabel(reason: Pick<WithdrawalReason, 'name' | 'isActive'>): string {
+  return reason.isActive ? reason.name : `${reason.name} (inactivo)`;
 }
 
 // The server sends the moment of the reinstatement in UTC; the day the user

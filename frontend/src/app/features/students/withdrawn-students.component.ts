@@ -34,6 +34,8 @@ import {
   statsVisibilityLabel,
   withdrawalListErrorMessage,
   withdrawalMutationErrorOutcome,
+  withdrawalReasonLabel,
+  withdrawalReasonsUrl,
   withdrawalRowActions,
   withdrawnByName,
 } from '../../shared/utils/withdrawal.util';
@@ -78,7 +80,7 @@ import {
           <mat-select [ngModel]="reasonId()" (ngModelChange)="onReasonChange($event)">
             <mat-option [value]="null">Todos</mat-option>
             @for (reason of reasons(); track reason.id) {
-              <mat-option [value]="reason.id">{{reason.name}}{{reason.isActive ? '' : ' (inactivo)'}}</mat-option>
+              <mat-option [value]="reason.id">{{reasonLabel(reason)}}</mat-option>
             }
           </mat-select>
         </mat-form-field>
@@ -268,6 +270,7 @@ export class WithdrawnStudentsComponent implements OnInit {
   readonly statusOptions = WITHDRAWAL_STATUS_OPTIONS;
   readonly formatWithdrawalDate = formatWithdrawalDate;
   readonly formatRevertedDate = formatRevertedDate;
+  readonly reasonLabel = withdrawalReasonLabel;
 
   readonly items = signal<WithdrawalItem[]>([]);
   readonly loading = signal(false);
@@ -326,9 +329,12 @@ export class WithdrawnStudentsComponent implements OnInit {
 
   // Without the reasons there is no way to filter by them, so the filter
   // itself goes away and the list still loads.
+  //
+  // The deleted reasons come along: old withdrawals keep pointing at them,
+  // and without them those records could not be filtered by reason.
   private async loadReasons(): Promise<void> {
     try {
-      this.reasons.set(await firstValueFrom(this.http.get<WithdrawalReason[]>('/api/withdrawal-reasons')));
+      this.reasons.set(await firstValueFrom(this.http.get<WithdrawalReason[]>(withdrawalReasonsUrl(true))));
     } catch {
       this.reasons.set(null);
     }
