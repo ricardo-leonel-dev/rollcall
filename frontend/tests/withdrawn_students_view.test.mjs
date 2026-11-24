@@ -705,7 +705,7 @@ test('a failed reinstatement shows what went wrong and reloads only when it has 
     /const outcome = withdrawalMutationErrorOutcome\(err, 'No se pudo reincorporar al estudiante\. Intenta nuevamente\.'\);/,
   );
   assert.match(reinstate, /this\.notify\.error\(outcome\.message\)/);
-  assert.match(reinstate, /if \(outcome\.closeAndReload\) await this\.load\(\);/);
+  assert.match(reinstate, /if \(outcome\.closeAndReload\) \{\s*this\.statsRefresh\.update\(n => n \+ 1\);\s*await this\.load\(\);\s*\}/);
 });
 
 test('a row cannot be reincorporated twice', () => {

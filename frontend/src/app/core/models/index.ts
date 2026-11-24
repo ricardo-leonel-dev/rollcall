@@ -90,6 +90,19 @@ export interface WithdrawalItem {
   revertedBy: WithdrawalActor | null;
 }
 
+// How many students left the institution for each reason, and how many left
+// in total.
+export interface WithdrawalReasonCount {
+  reasonId: number;
+  reasonName: string;
+  count: number;
+}
+
+export interface WithdrawalStats {
+  total: number;
+  byReason: WithdrawalReasonCount[];
+}
+
 export interface CourseAcademicYear {
   id: number;
   courseId: number;
