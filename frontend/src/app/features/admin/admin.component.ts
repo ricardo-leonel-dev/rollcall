@@ -23,6 +23,7 @@ import { SealAvatarComponent } from '../../shared/components/seal-avatar/seal-av
 import { CITATION_REASON_SEVERITY_OPTIONS, citationReasonSeverityBadgeClass } from '../../shared/utils/citation-reason.util';
 import { NO_FLAGS, ResourceFlags, resolveResourcePermissions } from '../../shared/utils/permission.util';
 import { dateStringToDate, dateToDateString } from '../../shared/utils/date.util';
+import { withdrawalReasonsUrl } from '../../shared/utils/withdrawal.util';
 import { InstitutionDialogComponent } from './institution-dialog.component';
 import { AcademicYearDialogComponent, AcademicYearDialogResult } from './academic-year-dialog.component';
 import { QuartersDialogComponent, QuartersDialogResult } from './quarters-dialog.component';
@@ -1110,7 +1111,7 @@ export class AdminComponent implements OnInit {
       firstValueFrom(this.http.get<Role[]>('/api/roles')),
       noInstitutionYet ? Promise.resolve([] as Quarter[]) : this.quarterService.getAll().catch(() => [] as Quarter[]),
       noInstitutionYet ? Promise.resolve([] as CitationReason[]) : firstValueFrom(this.http.get<CitationReason[]>('/api/citation-reasons')).catch(() => [] as CitationReason[]),
-      noInstitutionYet ? Promise.resolve([] as WithdrawalReason[]) : firstValueFrom(this.http.get<WithdrawalReason[]>('/api/withdrawal-reasons')).catch(() => [] as WithdrawalReason[]),
+      noInstitutionYet ? Promise.resolve([] as WithdrawalReason[]) : firstValueFrom(this.http.get<WithdrawalReason[]>(withdrawalReasonsUrl())).catch(() => [] as WithdrawalReason[]),
       this.auth.isSuperAdmin() || roleId === null
         ? Promise.resolve(null)
         : firstValueFrom(this.http.get<RolePermission[]>(`/api/roles/permissions/${roleId}`)).catch(() => null),

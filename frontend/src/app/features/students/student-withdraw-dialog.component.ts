@@ -24,6 +24,7 @@ import {
   withdrawalDateBounds,
   withdrawalDateRequired,
   withdrawalErrorOutcome,
+  withdrawalReasonsUrl,
 } from '../../shared/utils/withdrawal.util';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 
@@ -209,7 +210,7 @@ export class StudentWithdrawDialogComponent implements OnInit {
   private async loadReasons(): Promise<void> {
     this.reasonsState.set('loading');
     try {
-      const rows = await firstValueFrom(this.http.get<WithdrawalReason[]>('/api/withdrawal-reasons'));
+      const rows = await firstValueFrom(this.http.get<WithdrawalReason[]>(withdrawalReasonsUrl()));
       this.reasons.set(rows.filter(r => r.isActive));
       this.reasonsState.set('ready');
     } catch {

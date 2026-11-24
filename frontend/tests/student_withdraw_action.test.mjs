@@ -447,7 +447,7 @@ const dialogSource = readFileSync(
 );
 
 test('the dialog asks the backend for the reasons when it opens', () => {
-  assert.match(dialogSource, /this\.http\.get<WithdrawalReason\[\]>\('\/api\/withdrawal-reasons'\)/);
+  assert.match(dialogSource, /withdrawalReasonsUrl\(\)/);
   assert.match(dialogSource, /\.filter\(r => r\.isActive\)/);
 });
 

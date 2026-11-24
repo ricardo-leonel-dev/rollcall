@@ -114,6 +114,8 @@ const {
   statsVisibilityLabel,
   withdrawalListErrorMessage,
   withdrawalMutationErrorOutcome,
+  withdrawalReasonLabel,
+  withdrawalReasonsUrl,
   withdrawalRowActions,
   withdrawnByName,
 } = withdrawalUtil;
@@ -176,6 +178,16 @@ test('the visibility of a row is shown with the name the withdraw dialog uses', 
     assert.equal(statsVisibilityLabel(option.value), option.label);
   }
   assert.equal(statsVisibilityLabel('whole_year'), 'Ocultar todo el año');
+});
+
+test('the reasons are asked for with the deleted ones only when they are needed', () => {
+  assert.equal(withdrawalReasonsUrl(), '/api/withdrawal-reasons');
+  assert.equal(withdrawalReasonsUrl(true), '/api/withdrawal-reasons?include_inactive=1');
+});
+
+test('a deleted reason is told apart from the ones that can still be picked', () => {
+  assert.equal(withdrawalReasonLabel({ name: 'Motivo', isActive: true }), 'Motivo');
+  assert.equal(withdrawalReasonLabel({ name: 'Motivo', isActive: false }), 'Motivo (inactivo)');
 });
 
 test('the date a student was reincorporated on is written the way the country writes it', () => {
@@ -468,9 +480,29 @@ test('the list is asked for with the filters of the screen', () => {
 });
 
 test('the reason filter disappears when the reasons cannot be loaded', () => {
-  assert.match(pageSource, /this\.http\.get<WithdrawalReason\[\]>\('\/api\/withdrawal-reasons'\)/);
-  assert.match(pageSource, /this\.reasons\.set\(null\)/);
+  const loadReasons = readMethod(pageSource, 'private async loadReasons(): Promise<void>');
+
+  assert.match(loadReasons, /catch \{[\s\S]*this\.reasons\.set\(null\)/);
   assert.match(pageSource, /@if \(reasons\(\) !== null\)/);
+});
+
+test('the reason filter of the withdrawn students also offers the deleted reasons', () => {
+  const loadReasons = readMethod(pageSource, 'private async loadReasons(): Promise<void>');
+
+  assert.match(loadReasons, /withdrawalReasonsUrl\(true\)/);
+  assert.match(pageSource, /@for \(reason of reasons\(\); track reason\.id\) \{/);
+  assert.match(pageSource, /\{\{reasonLabel\(reason\)\}\}/);
+});
+
+test('the withdraw dialog and the admin tab keep asking for the reasons without the deleted ones', () => {
+  const dialogSource = readSource('src/app/features/students/student-withdraw-dialog.component.ts');
+  const adminSource = readSource('src/app/features/admin/admin.component.ts');
+
+  assert.match(dialogSource, /withdrawalReasonsUrl\(\)/);
+  assert.doesNotMatch(dialogSource, /withdrawalReasonsUrl\(true\)/);
+
+  assert.match(adminSource, /withdrawalReasonsUrl\(\)/);
+  assert.doesNotMatch(adminSource, /withdrawalReasonsUrl\(true\)/);
 });
 
 test('the table shows what is known about each withdrawal', () => {
