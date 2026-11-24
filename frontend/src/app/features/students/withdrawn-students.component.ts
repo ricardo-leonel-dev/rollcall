@@ -21,11 +21,13 @@ import { NO_FLAGS, ResourceFlags, resolveResourcePermissions } from '../../share
 import { dateToDateString } from '../../shared/utils/date.util';
 import { StudentHistoryDialogComponent } from './student-history-dialog.component';
 import { StudentWithdrawalsDialogComponent } from './student-withdrawals-dialog.component';
+import { WithdrawalStatsPanelComponent } from './withdrawal-stats-panel.component';
 import { WithdrawalVisibilityDialogComponent } from './withdrawal-visibility-dialog.component';
 import {
   WITHDRAWAL_STATUS_OPTIONS,
   WithdrawalListFilters,
   WithdrawalRowActions,
+  WithdrawalStatsFilters,
   WithdrawalStatusFilter,
   buildWithdrawalListQuery,
   filterWithdrawals,
@@ -37,6 +39,7 @@ import {
   withdrawalReasonLabel,
   withdrawalReasonsUrl,
   withdrawalRowActions,
+  withdrawalStatsCaption,
   withdrawnByName,
 } from '../../shared/utils/withdrawal.util';
 
@@ -46,6 +49,7 @@ import {
   imports: [
     FormsModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatDatepickerModule,
     MatButtonModule, MatIconModule, MatMenuModule, MatDividerModule, ChapterHeaderComponent,
+    WithdrawalStatsPanelComponent,
   ],
   template: `
     <app-chapter-header icon="person_off" eyebrowPrefix="Estudiantes" eyebrowSuffix="Registro de retiros" />
@@ -122,6 +126,11 @@ import {
         </div>
       }
     </div>
+
+    <app-withdrawal-stats-panel
+      [filters]="statsFilters()"
+      [caption]="statsCaption()"
+      [refreshToken]="statsRefresh()" />
 
     @if (loading()) {
       <div class="spinner-center" style="height:200px">
@@ -302,6 +311,25 @@ export class WithdrawnStudentsComponent implements OnInit {
 
   readonly filteredItems = computed(() => filterWithdrawals(this.items(), this.searchTerm()));
 
+  // The panel counts the withdrawals that are still in place, so the state of
+  // the withdrawal never travels with its request.
+  readonly statsFilters = computed<WithdrawalStatsFilters>(() => {
+    const { status, ...rest } = this.filters();
+    return rest;
+  });
+
+  // The names of the filters the screen already loaded, so the panel can say
+  // which ones are applied without asking the backend again.
+  readonly statsCaption = computed(() => withdrawalStatsCaption(this.statsFilters(), {
+    years: this.academicYearContext.years(),
+    courses: this.courses(),
+    reasons: this.reasons(),
+  }));
+
+  // A reinstatement takes a withdrawal out of the counts, so the panel is read
+  // again with the same filters.
+  readonly statsRefresh = signal(0);
+
   private loadSeq = 0;
 
   constructor() {
@@ -452,11 +480,17 @@ export class WithdrawnStudentsComponent implements OnInit {
     try {
       await firstValueFrom(this.http.post<WithdrawalItem>(`/api/student-withdrawals/${item.id}/revert`, null));
       this.notify.success('Estudiante reincorporado');
+      this.statsRefresh.update(n => n + 1);
       await this.load();
     } catch (err: unknown) {
       const outcome = withdrawalMutationErrorOutcome(err, 'No se pudo reincorporar al estudiante. Intenta nuevamente.');
       this.notify.error(outcome.message);
-      if (outcome.closeAndReload) await this.load();
+      // A withdrawal that is gone also leaves the counts of the panel, so both
+      // are read again.
+      if (outcome.closeAndReload) {
+        this.statsRefresh.update(n => n + 1);
+        await this.load();
+      }
     } finally {
       this.busyId.set(null);
     }

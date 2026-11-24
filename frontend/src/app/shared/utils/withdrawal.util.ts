@@ -1,5 +1,6 @@
 import type {
   AcademicYear,
+  Course,
   CreateStudentWithdrawalPayload,
   StatsVisibility,
   WithdrawalItem,
@@ -285,3 +286,97 @@ export function withdrawalMutationErrorOutcome(err: unknown, fallback: string): 
 // The backend answers "Student not found" in English, so the record of the
 // withdrawals of a student always fails with this message.
 export const WITHDRAWAL_RECORD_ERROR = 'No se pudo cargar el registro de retiros.';
+
+// ----- The panel of the statistics of the withdrawals -----
+
+// The list filters without the state of the withdrawal: the panel only counts
+// the withdrawals that are still in place, so the state never reaches it.
+export type WithdrawalStatsFilters = Omit<WithdrawalListFilters, 'status'>;
+
+// The statistics are asked for with the same values the list is asked for, so
+// the numbers of the panel and the rows of the list mean the same thing.
+export function buildWithdrawalStatsQuery(filters: WithdrawalStatsFilters): string {
+  const params = new URLSearchParams();
+  if (filters.academicYearId !== null && filters.academicYearId !== undefined) {
+    params.set('academic_year_id', String(filters.academicYearId));
+  }
+  if (filters.courseId !== null && filters.courseId !== undefined) {
+    params.set('course_id', String(filters.courseId));
+  }
+  if (filters.reasonId !== null && filters.reasonId !== undefined) {
+    params.set('reason_id', String(filters.reasonId));
+  }
+  if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+  if (filters.dateTo) params.set('date_to', filters.dateTo);
+  return params.toString();
+}
+
+export function withdrawalStatsUrl(filters: WithdrawalStatsFilters): string {
+  const query = buildWithdrawalStatsQuery(filters);
+  return query
+    ? `/api/student-withdrawals/stats?${query}`
+    : '/api/student-withdrawals/stats';
+}
+
+// The share of a reason in the total, as a whole percent. The percents do not
+// add up to a hundred when the numbers are rounded.
+export function withdrawalReasonShare(count: number, total: number): number {
+  if (!total || total <= 0) return 0;
+  return Math.round((count * 100) / total);
+}
+
+export function withdrawalStatsTotalLabel(total: number): string {
+  const plural = total !== 1;
+  return `${total} retiro${plural ? 's' : ''} vigente${plural ? 's' : ''}`;
+}
+
+export function withdrawalStatsErrorMessage(err: unknown): string {
+  const status = (err as { status?: number } | null)?.status;
+  const message = (err as { error?: { error?: string } } | null)?.error?.error;
+
+  if ((status === 400 || status === 403) && message) return message;
+  return 'No se pudieron cargar las estadísticas.';
+}
+
+export interface WithdrawalStatsCaptionSources {
+  years: readonly Pick<AcademicYear, 'id' | 'name'>[];
+  courses: readonly Pick<Course, 'id' | 'name'>[];
+  reasons: readonly Pick<WithdrawalReason, 'id' | 'name' | 'isActive'>[] | null;
+}
+
+// The caption names the filters that are actually applied, with the names the
+// screen already loaded. A filter whose name is not known (its list is still
+// loading or it failed) is left out instead of shown as a number.
+export function withdrawalStatsCaption(
+  filters: WithdrawalStatsFilters,
+  sources: WithdrawalStatsCaptionSources,
+): string | null {
+  const parts: string[] = [];
+
+  const year = sources.years.find(y => y.id === filters.academicYearId);
+  if (year) parts.push(year.name);
+
+  const course = sources.courses.find(c => c.id === filters.courseId);
+  if (course) parts.push(course.name);
+
+  const reason = sources.reasons?.find(r => r.id === filters.reasonId);
+  if (reason) parts.push(withdrawalReasonLabel(reason));
+
+  if (filters.dateFrom && filters.dateTo) {
+    parts.push(`Del ${formatWithdrawalDate(filters.dateFrom)} al ${formatWithdrawalDate(filters.dateTo)}`);
+  } else if (filters.dateFrom) {
+    parts.push(`Desde ${formatWithdrawalDate(filters.dateFrom)}`);
+  } else if (filters.dateTo) {
+    parts.push(`Hasta ${formatWithdrawalDate(filters.dateTo)}`);
+  }
+
+  return parts.length ? parts.join(' · ') : null;
+}
+
+// Below this width the panel starts closed, so the list of the withdrawn
+// students is what a phone shows first.
+export const WITHDRAWAL_STATS_EXPANDED_MIN_WIDTH = 768;
+
+export function withdrawalStatsInitiallyExpanded(viewportWidth: number): boolean {
+  return viewportWidth >= WITHDRAWAL_STATS_EXPANDED_MIN_WIDTH;
+}

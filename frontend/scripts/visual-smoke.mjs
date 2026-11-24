@@ -213,6 +213,20 @@ const MOCK_WITHDRAWAL_RECORD = [
   MOCK_WITHDRAWALS[0],
 ];
 
+// The counts of the panel of the withdrawals: six reasons, so the panel has
+// to fill its two columns row by row, and two of them without withdrawals.
+const MOCK_WITHDRAWAL_STATS = {
+  total: 8,
+  byReason: [
+    { reasonId: 1, reasonName: 'Cambio de domicilio', count: 3 },
+    { reasonId: 2, reasonName: 'Motivos económicos', count: 2 },
+    { reasonId: 4, reasonName: 'Salud', count: 0 },
+    { reasonId: 5, reasonName: 'Cambio de ciudad', count: 1 },
+    { reasonId: 6, reasonName: 'Problemas familiares', count: 1 },
+    { reasonId: 7, reasonName: 'Otros', count: 0 },
+  ],
+};
+
 const MOCK_STUDENT_HISTORY_SUMMARY = {
   enrollment: {
     enrollmentId: 101, studentName: 'Ana Torres', idNumber: '0750110011', rosterNumber: 1,
@@ -270,6 +284,9 @@ async function mockApi(context, options = {}) {
       if (FEATURE === 'withdrawn_students_view') {
         rows.push({ resource: 'student-withdrawals', canRead: true, canCreate: true, canUpdate: true, canDelete: true });
       }
+      if (FEATURE === 'withdrawal_stats_panel') {
+        rows.push({ resource: 'student-withdrawals', canRead: true, canCreate: true, canUpdate: true, canDelete: true });
+      }
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) });
     }
     if (url.includes('/api/roles')) {
@@ -296,6 +313,18 @@ async function mockApi(context, options = {}) {
     }
     if (url.includes('/api/student-history/') && url.includes('/timeline')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_STUDENT_HISTORY_TIMELINE) });
+    }
+    if (url.includes('/api/student-withdrawals/stats')) {
+      // The counts of the panel of the withdrawals. The empty and the refused
+      // answers are captured with VISUAL_EMPTY_WITHDRAWAL_STATS=1 and
+      // VISUAL_WITHDRAWAL_STATS_ERROR=1.
+      const empty = options.statsEmpty === true || process.env.VISUAL_EMPTY_WITHDRAWAL_STATS === '1';
+      const failed = options.statsError === true || process.env.VISUAL_WITHDRAWAL_STATS_ERROR === '1';
+      if (failed) {
+        return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'Sin permiso de read en student-withdrawals' }) });
+      }
+      const body = empty ? { total: 0, byReason: [] } : MOCK_WITHDRAWAL_STATS;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     }
     if (url.includes('/api/student-withdrawals')) {
       const failed = options.withdrawalsError === true || process.env.VISUAL_WITHDRAWALS_ERROR === '1';
@@ -1078,6 +1107,103 @@ async function captureWithdrawnStudentsView(browser, page, outDir) {
   return report;
 }
 
+// The panel of the counts of the withdrawals, above the list of the withdrawn
+// students. Its states live behind the mocks (the empty counts and the counts
+// the backend refuses) and behind the disclosure button, so this feature gets
+// its own capture sequence.
+async function captureWithdrawalStatsPanel(browser, page, outDir) {
+  const report = { states: [] };
+  const shot = async (target, name) => {
+    const path = join(outDir, `visual_${FEATURE}_${VW}_${name}.png`);
+    await target.screenshot({ path, fullPage: false });
+    report.states.push({ name, screenshot: path });
+  };
+
+  const isMobile = Number(VW) < 768;
+  const toggle = page.getByRole('button', { name: 'Retiros vigentes por motivo' });
+  const panel = page.locator('section[aria-labelledby]', { has: toggle });
+  const text = async (target) => (await target.innerText()).replace(/\s+/g, ' ').trim();
+
+  // On a phone the filters take the whole screen, so the panel is brought
+  // into view before every capture.
+  const showPanel = async (target) => {
+    await target.locator('section[aria-labelledby]', {
+      has: target.getByRole('button', { name: 'Retiros vigentes por motivo' }),
+    }).scrollIntoViewIfNeeded();
+    await wait(300);
+  };
+
+  const filterSelect = (target, label) => target.locator('mat-form-field', {
+    has: target.locator(`mat-label:text-is("${label}")`),
+  }).locator('mat-select').first();
+
+  const pickOption = async (target, label, optionText) => {
+    await filterSelect(target, label).click();
+    const option = target.locator('mat-option', { hasText: optionText }).first();
+    await option.waitFor({ state: 'visible', timeout: 10000 });
+    await option.click();
+    await wait(400);
+  };
+
+  const open = async (target) => {
+    await target.goto(`${BASE_URL}/students/withdrawn`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await toggle.waitFor({ state: 'visible', timeout: 15000 });
+    await wait(700);
+  };
+
+  await open(page);
+
+  // 1. the panel as it opens: closed on a phone, open on a screen.
+  await showPanel(page);
+  report.expandedOnOpen = await toggle.getAttribute('aria-expanded');
+  report.panelOnOpen = await text(panel);
+  await shot(page, isMobile ? 'collapsed' : 'panel');
+
+  if (isMobile) {
+    await toggle.click();
+    await wait(400);
+    report.expandedAfterToggle = await toggle.getAttribute('aria-expanded');
+    report.panelExpanded = await text(panel);
+    await showPanel(page);
+    await shot(page, 'expanded');
+  }
+
+  // 2. the panel with the filters of the screen, so the caption names them.
+  await pickOption(page, 'Curso', '5° A');
+  await pickOption(page, 'Motivo', 'Cambio de domicilio');
+  report.caption = await text(panel);
+  await showPanel(page);
+  await shot(page, 'filters');
+
+  // 3. the panel without withdrawals, and the counts the backend refuses.
+  const stateContext = async (options) => {
+    const context = await browser.newContext({
+      viewport: { width: Number(VW), height: Number(VH) },
+      serviceWorkers: 'block',
+    });
+    await mockApi(context, options);
+    const target = await context.newPage();
+    await injectAuth(target);
+    return { context, target };
+  };
+
+  const { context: emptyContext, target: emptyPage } = await stateContext({ statsEmpty: true });
+  await open(emptyPage);
+  await showPanel(emptyPage);
+  report.emptyState = await text(emptyPage.locator('section[aria-labelledby]', { has: emptyPage.getByRole('button', { name: 'Retiros vigentes por motivo' }) }));
+  await shot(emptyPage, 'empty');
+  await emptyContext.close();
+
+  const { context: errorContext, target: errorPage } = await stateContext({ statsError: true });
+  await open(errorPage);
+  await showPanel(errorPage);
+  report.errorState = await text(errorPage.locator('section[aria-labelledby]', { has: errorPage.getByRole('button', { name: 'Retiros vigentes por motivo' }) }));
+  await shot(errorPage, 'error');
+  await errorContext.close();
+
+  return report;
+}
+
 async function main() {
   if (!NO_SERVER) await startServer();
   let browser;
@@ -1087,7 +1213,7 @@ async function main() {
       viewport: { width: Number(VW), height: Number(VH) },
       // The service worker caches two API paths of its own; blocking it keeps
       // the mocked API in charge of every request the page makes.
-      serviceWorkers: FEATURE === 'student_withdraw_action' || FEATURE === 'withdrawn_students_view' ? 'block' : 'allow',
+      serviceWorkers: FEATURE === 'student_withdraw_action' || FEATURE === 'withdrawn_students_view' || FEATURE === 'withdrawal_stats_panel' ? 'block' : 'allow',
     });
     await mockApi(context);
     const page = await context.newPage();
@@ -1108,6 +1234,16 @@ async function main() {
     }
     if (FEATURE === 'student_withdraw_action') {
       const info = await captureStudentWithdrawAction(browser, page, OUT_DIR);
+      const payload = { ...info, viewport: { width: Number(VW), height: Number(VH) } };
+      // One report per width, so the captures of both sizes are kept.
+      const widthReport = join(OUT_DIR, `visual_${FEATURE}_${VW}.json`);
+      writeFileSync(widthReport, JSON.stringify(payload, null, 2));
+      writeFileSync(REPORT_PATH, JSON.stringify(payload, null, 2));
+      console.log(JSON.stringify({ ok: true, report: widthReport, ...info }, null, 2));
+      return;
+    }
+    if (FEATURE === 'withdrawal_stats_panel') {
+      const info = await captureWithdrawalStatsPanel(browser, page, OUT_DIR);
       const payload = { ...info, viewport: { width: Number(VW), height: Number(VH) } };
       // One report per width, so the captures of both sizes are kept.
       const widthReport = join(OUT_DIR, `visual_${FEATURE}_${VW}.json`);
