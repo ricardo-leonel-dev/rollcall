@@ -144,7 +144,6 @@ export interface Enrollment {
   gender: string | null;
   birthDate: string | null;
   age: number | null;
-  isEnrolled: boolean;
   studentPhone: string | null;
   studentEmail: string | null;
   guardianId: number | null;
