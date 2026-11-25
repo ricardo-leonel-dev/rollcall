@@ -1,20 +1,7 @@
 import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { TimelineEvent } from '../../../core/models/index';
-
-interface TypeMeta {
-  icon: string;
-  classes: string;
-  rotate: string;
-}
-
-const TYPE_META: Record<TimelineEvent['type'], TypeMeta> = {
-  enrollment:    { icon: 'school',     classes: 'bg-indigo-50 text-indigo-600 border-indigo-200',   rotate: '1deg' },
-  absence:       { icon: 'event_busy', classes: 'bg-red-50 text-red-600 border-red-200',             rotate: '-2deg' },
-  tardy:         { icon: 'schedule',   classes: 'bg-amber-50 text-amber-600 border-amber-200',       rotate: '2deg' },
-  justification: { icon: 'fact_check', classes: 'bg-emerald-50 text-emerald-600 border-emerald-200', rotate: '-1deg' },
-  citation:      { icon: 'campaign',   classes: 'bg-sky-50 text-sky-700 border-sky-200',             rotate: '1.5deg' },
-};
+import { type TypeMeta, timelineMeta } from '../../utils/timeline-meta.util';
 
 @Component({
   selector: 'app-timeline',
@@ -100,8 +87,8 @@ export class TimelineComponent {
   @Input() events: TimelineEvent[] = [];
   @Input() loading = false;
 
-  meta(type: TimelineEvent['type']): TypeMeta {
-    return TYPE_META[type];
+  meta(type: string): TypeMeta {
+    return timelineMeta(type);
   }
 
   formatDate(dateStr: string): string {

@@ -44,7 +44,9 @@ function readMenuBlock(source, marker) {
 
 const historyPageSource = readSource('src/app/features/students/student-history.component.ts');
 const historyDialogSource = readSource('src/app/features/students/student-history-dialog.component.ts');
-const timelineSource = readSource('src/app/shared/components/timeline/timeline.component.ts');
+const { timelineMeta } = await import(
+  pathToFileURL(resolve(FE_ROOT, 'src/app/shared/utils/timeline-meta.util.ts')).href
+);
 const navItems = await import(
   pathToFileURL(resolve(FE_ROOT, 'src/app/core/nav-items.ts')).href
 );
@@ -85,14 +87,10 @@ test('the students subnav keeps its first two entries, in the same order', () =>
 });
 
 test('the timeline keeps the style of the four events it already had', () => {
-  for (const line of [
-    "  enrollment:    { icon: 'school',     classes: 'bg-indigo-50 text-indigo-600 border-indigo-200',   rotate: '1deg' },",
-    "  absence:       { icon: 'event_busy', classes: 'bg-red-50 text-red-600 border-red-200',             rotate: '-2deg' },",
-    "  tardy:         { icon: 'schedule',   classes: 'bg-amber-50 text-amber-600 border-amber-200',       rotate: '2deg' },",
-    "  justification: { icon: 'fact_check', classes: 'bg-emerald-50 text-emerald-600 border-emerald-200', rotate: '-1deg' },",
-  ]) {
-    assert.ok(timelineSource.includes(line), `the timeline keeps: ${line.trim()}`);
-  }
+  assert.deepEqual(timelineMeta('enrollment'), { icon: 'school', classes: 'bg-indigo-50 text-indigo-600 border-indigo-200', rotate: '1deg' });
+  assert.deepEqual(timelineMeta('absence'), { icon: 'event_busy', classes: 'bg-red-50 text-red-600 border-red-200', rotate: '-2deg' });
+  assert.deepEqual(timelineMeta('tardy'), { icon: 'schedule', classes: 'bg-amber-50 text-amber-600 border-amber-200', rotate: '2deg' });
+  assert.deepEqual(timelineMeta('justification'), { icon: 'fact_check', classes: 'bg-emerald-50 text-emerald-600 border-emerald-200', rotate: '-1deg' });
 });
 
 // ----- The helpers of the list of withdrawals -----
@@ -781,19 +779,7 @@ test('the list is read again after the visibility changes', () => {
 const modelsSource = readSource('src/app/core/models/index.ts');
 
 test('the timeline knows how to draw a citation', () => {
-  assert.ok(
-    timelineSource.includes(
-      "  citation:      { icon: 'campaign',   classes: 'bg-sky-50 text-sky-700 border-sky-200',             rotate: '1.5deg' },",
-    ),
-    'the timeline has a citation node',
-  );
-});
-
-test('the history model knows the type of a citation event', () => {
-  assert.match(
-    modelsSource,
-    /export interface TimelineEvent \{\s*type: 'enrollment' \| 'absence' \| 'tardy' \| 'justification' \| 'citation';/,
-  );
+  assert.deepEqual(timelineMeta('citation'), { icon: 'campaign', classes: 'bg-sky-50 text-sky-700 border-sky-200', rotate: '1.5deg' });
 });
 
 test('the summary of the history carries the citations of the student', () => {

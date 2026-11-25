@@ -238,7 +238,7 @@ export interface StudentHistorySummary {
 }
 
 export interface TimelineEvent {
-  type: 'enrollment' | 'absence' | 'tardy' | 'justification' | 'citation';
+  type: 'enrollment' | 'absence' | 'tardy' | 'justification' | 'citation' | 'withdrawal' | 'reinstatement';
   recordedAt: string;
   occurredAt: string | null;
   title: string;
