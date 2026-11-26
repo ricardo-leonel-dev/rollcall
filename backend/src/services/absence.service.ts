@@ -83,8 +83,8 @@ export async function findAll(institutionId: number, courseIds: number[] | null,
   return AppDataSource.query(sql, params);
 }
 
-async function assertEnrollmentInScope(institutionId: number, courseIds: number[] | null, enrollmentId: number): Promise<Enrollment> {
-  const enrollment = await AppDataSource.getRepository(Enrollment).findOne({ where: { id: enrollmentId, institutionId } });
+async function assertEnrollmentInScope(institutionId: number, courseIds: number[] | null, enrollmentId: number, em: EntityManager = AppDataSource.manager): Promise<Enrollment> {
+  const enrollment = await em.getRepository(Enrollment).findOne({ where: { id: enrollmentId, institutionId } });
   if (!enrollment || (courseIds !== null && !courseIds.includes(enrollment.courseId))) {
     throw Object.assign(new Error('Enrollment not found'), { status: 404 });
   }
@@ -247,19 +247,84 @@ export async function createRange(institutionId: number, courseIds: number[] | n
   };
 }
 
+type AbsenceSnapshot = ReturnType<typeof absenceSnapshot>;
+
+// Only the fields the snapshot carries count as a change: photo_source is
+// editable but is not part of the audit snapshot, so touching it alone leaves
+// the absence exactly as it was for the audit trail.
+function absenceChanged(before: AbsenceSnapshot, after: AbsenceSnapshot): boolean {
+  return before.id !== after.id
+    || before.enrollmentId !== after.enrollmentId
+    || before.date !== after.date
+    || before.type !== after.type
+    || before.notes !== after.notes;
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// A YYYY-MM-DD string that also names a real calendar day (no 2026-02-30).
+function isCalendarDate(value: string): boolean {
+  if (!DATE_RE.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
 export async function update(institutionId: number, courseIds: number[] | null, id: number, data: Partial<{
   date: string; type: 'F' | 'AT'; notes: string; photoSource: string;
-}>) {
-  const a = await findById(institutionId, courseIds, id);
-  await assertEnrollmentNotWithdrawn(a.enrollmentId);
-  if (data.type && !['F', 'AT'].includes(data.type)) {
-    throw Object.assign(new Error('Invalid type. Only F or AT'), { status: 400 });
-  }
-  if (data.date)                      a.date        = data.date;
-  if (data.type)                      a.type        = data.type;
-  if (data.notes !== undefined)       a.notes       = data.notes;
-  if (data.photoSource !== undefined) a.photoSource = data.photoSource;
-  return repo().save(a);
+}>, actorUserId: number | null = null) {
+  // The row is read and written through the transaction's manager, so the
+  // audit event and the edit share one fate: a failing event insert rolls
+  // the edit back.
+  return AppDataSource.transaction(async (em) => {
+    const a = await em.findOne(Absence, { where: { id, institutionId, deletedAt: IsNull() } });
+    if (!a) throw Object.assign(new Error('Absence not found'), { status: 404 });
+    if (courseIds !== null) await assertEnrollmentInScope(institutionId, courseIds, a.enrollmentId, em);
+    await assertEnrollmentNotWithdrawn(a.enrollmentId, em);
+    if (data.type && !['F', 'AT'].includes(data.type)) {
+      throw Object.assign(new Error('Invalid type. Only F or AT'), { status: 400 });
+    }
+    if (data.date !== undefined && (typeof data.date !== 'string' || !isCalendarDate(data.date))) {
+      throw Object.assign(new Error('Invalid date. Use YYYY-MM-DD'), { status: 400 });
+    }
+
+    const before = absenceSnapshot(a);
+
+    if (data.date)                      a.date        = data.date;
+    if (data.type)                      a.type        = data.type;
+    if (data.notes !== undefined)       a.notes       = data.notes;
+    if (data.photoSource !== undefined) a.photoSource = data.photoSource;
+
+    const after = absenceSnapshot(a);
+
+    // Optimistic concurrency: the write only lands if the row still holds the
+    // values just read, so an edit made by someone else in between is never
+    // overwritten nor recorded under a stale "before".
+    const result = await em.createQueryBuilder()
+      .update(Absence)
+      .set({ date: a.date, type: a.type, notes: a.notes, photoSource: a.photoSource })
+      .where('id = :id AND deleted_at IS NULL', { id })
+      .andWhere('date = :beforeDate AND type = :beforeType AND notes IS NOT DISTINCT FROM :beforeNotes', {
+        beforeDate: before.date, beforeType: before.type, beforeNotes: before.notes,
+      })
+      .execute();
+    if (!result.affected) {
+      throw Object.assign(new Error('La falta fue modificada por otra persona, recarga'), { status: 409 });
+    }
+
+    if (absenceChanged(before, after)) {
+      await recordEvents(em, [{
+        institutionId,
+        eventType: 'AbsenceUpdated',
+        entityType: 'absence',
+        entityId: a.id,
+        actorUserId,
+        payload: { before, after },
+      }]);
+    }
+
+    return em.findOneOrFail(Absence, { where: { id } });
+  });
 }
 
 export async function remove(institutionId: number, courseIds: number[] | null, id: number, actorUserId: number | null = null) {
