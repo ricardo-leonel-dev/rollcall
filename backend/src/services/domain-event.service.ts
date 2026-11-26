@@ -6,6 +6,7 @@ export type DomainEventType =
   | 'AbsenceUpdated'
   | 'AbsenceDeleted'
   | 'JustificationCreated'
+  | 'JustificationUpdated'
   | 'JustificationDeleted'
   | 'StudentWithdrawn'
   | 'StudentReinstated'
