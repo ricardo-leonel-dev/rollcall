@@ -180,6 +180,19 @@ function justificationSnapshot(
   };
 }
 
+type JustificationSnapshot = ReturnType<typeof justificationSnapshot>;
+
+// Only the fields the snapshot carries count as a change: the linked
+// absences are part of it, so relinking a justification is recorded too.
+function justificationChanged(before: JustificationSnapshot, after: JustificationSnapshot): boolean {
+  return before.id !== after.id
+    || before.enrollmentId !== after.enrollmentId
+    || before.reason !== after.reason
+    || before.notifiedBy !== after.notifiedBy
+    || before.absenceIds.length !== after.absenceIds.length
+    || before.absenceIds.some((absenceId, i) => absenceId !== after.absenceIds[i]);
+}
+
 // An update re-links the absences it already holds, so its own links must not
 // count as "already justified".
 async function assertAbsencesLinkable(
@@ -243,7 +256,7 @@ export async function create(institutionId: number, courseIds: number[] | null, 
       entityType: 'justification',
       entityId: saved.id,
       actorUserId: createdByUserId,
-      payload: { before: null, after: justificationSnapshot(saved, data.absenceIds) },
+      payload: { before: null, after: justificationSnapshot(saved, [...data.absenceIds].sort((a, b) => a - b)) },
     }]);
 
     return saved;
@@ -252,18 +265,44 @@ export async function create(institutionId: number, courseIds: number[] | null, 
 
 export async function update(institutionId: number, courseIds: number[] | null, id: number, data: {
   reason?: string; notifiedBy?: string; absenceIds?: number[];
-}) {
+}, actorUserId: number | null = null) {
+  // The checks stay outside the transaction: a rejected edit must leave no
+  // trace. The snapshot and the links are read again under the row lock.
   const j = await findById(institutionId, courseIds, id);
   await assertEnrollmentNotWithdrawn(j.enrollmentId);
   if (data.absenceIds !== undefined) {
     await assertAbsencesLinkable(institutionId, j.enrollmentId, data.absenceIds, id);
   }
 
-  if (data.reason) j.reason = data.reason;
-  if (data.notifiedBy !== undefined) j.notifiedBy = data.notifiedBy;
-
+  // The row and its links are read and written through the transaction's
+  // manager, so the audit event and the edit share one fate: a failing event
+  // insert rolls the edit and the relinking back. The row lock serializes
+  // concurrent edits: each one reads the "before" the previous one left and
+  // replaces the links whole, so two relinks never merge their sets.
   return AppDataSource.transaction(async (em) => {
-    await em.save(j);
+    const current = await em.findOne(Justification, {
+      where: { id, institutionId, deletedAt: IsNull() },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!current) throw Object.assign(new Error('Justification not found'), { status: 404 });
+
+    const links = await em.find(JustificationAbsence, { where: { justificationId: id } });
+    const currentAbsenceIds = links.map((link) => link.absenceId).sort((a, b) => a - b);
+
+    const before = justificationSnapshot(current, currentAbsenceIds);
+
+    if (data.reason) current.reason = data.reason;
+    if (data.notifiedBy !== undefined) current.notifiedBy = data.notifiedBy;
+
+    // The links are sorted so a relinking shows up in the snapshot even when
+    // the request lists the same absences in another order.
+    const nextAbsenceIds = data.absenceIds !== undefined
+      ? [...data.absenceIds].sort((a, b) => a - b)
+      : currentAbsenceIds;
+
+    const after = justificationSnapshot(current, nextAbsenceIds);
+
+    await em.save(current);
 
     if (data.absenceIds !== undefined) {
       await em.delete(JustificationAbsence, { justificationId: id });
@@ -273,7 +312,20 @@ export async function update(institutionId: number, courseIds: number[] | null, 
       }
     }
 
-    return j;
+    // An edit that leaves the snapshot as it was leaves no audit trail: the
+    // event says what changed, and nothing changed.
+    if (justificationChanged(before, after)) {
+      await recordEvents(em, [{
+        institutionId,
+        eventType: 'JustificationUpdated',
+        entityType: 'justification',
+        entityId: id,
+        actorUserId,
+        payload: { before, after },
+      }]);
+    }
+
+    return current;
   });
 }
 
