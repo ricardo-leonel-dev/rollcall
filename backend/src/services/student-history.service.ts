@@ -127,15 +127,46 @@ async function fetchCitationSummary(institutionId: number, enrollmentId: number,
   return { total: rows.length, items: items.slice(0, SUMMARY_LIMIT) };
 }
 
+// The withdrawal that stands for the enrollment, with the reason it was filed
+// for and whether it still stands (a withdrawal that was reinstated does not).
+// The withdrawal date is chosen by the user, so it can be backdated: ordering
+// by date alone would let a reinstated withdrawal with a later date hide the
+// one that is in force, and the summary would report a student as active when
+// the enrollment is actually withdrawn. The withdrawal that was not
+// reinstated wins first; among withdrawals in the same condition the most
+// recent one is reported. The reason is joined without the soft-delete filter
+// for the same reason the timeline keeps it: the history must keep naming the
+// reason that was in force when the student left.
+async function fetchWithdrawalSummary(institutionId: number, enrollmentId: number) {
+  const rows = await AppDataSource.query(
+    `SELECT w.withdrawal_date::text AS date, wr.name AS reason,
+            (w.reverted_at IS NULL) AS active
+       FROM student_withdrawals w
+       JOIN withdrawal_reasons wr ON wr.id = w.reason_id
+      WHERE w.enrollment_id = $1 AND w.institution_id = $2
+      ORDER BY (w.reverted_at IS NULL) DESC, w.withdrawal_date DESC, w.id DESC
+      LIMIT 1`,
+    [enrollmentId, institutionId]
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    active: Boolean(row.active),
+    date: (row.date as string) ?? null,
+    reason: (row.reason as string) ?? null,
+  };
+}
+
 export async function getSummary(institutionId: number, courseIds: number[] | null, enrollmentId: number, range: DateRange) {
   await assertEnrollmentInScope(institutionId, courseIds, enrollmentId);
 
-  const [enrollment, absences, tardies, justifications, citations] = await Promise.all([
+  const [enrollment, absences, tardies, justifications, citations, withdrawal] = await Promise.all([
     getEnrollmentDetail(enrollmentId),
     fetchAbsenceSummary(institutionId, enrollmentId, 'F', range),
     fetchAbsenceSummary(institutionId, enrollmentId, 'AT', range),
     fetchJustificationSummary(institutionId, enrollmentId, range),
     fetchCitationSummary(institutionId, enrollmentId, range),
+    fetchWithdrawalSummary(institutionId, enrollmentId),
   ]);
 
   return {
@@ -144,11 +175,12 @@ export async function getSummary(institutionId: number, courseIds: number[] | nu
     tardies,
     justifications,
     citations,
+    withdrawal,
   };
 }
 
 interface TimelineEvent {
-  type: 'enrollment' | 'absence' | 'tardy' | 'justification' | 'citation';
+  type: 'enrollment' | 'absence' | 'tardy' | 'justification' | 'citation' | 'withdrawal' | 'reinstatement';
   recordedAt: string;
   occurredAt: string | null;
   title: string;
@@ -343,6 +375,86 @@ export async function getTimeline(institutionId: number, courseIds: number[] | n
       title: 'Citación',
       description: `Citación al representante el ${monthLabel(row.date)} a las ${row.time}`
         + (reasons.length ? `. Motivos: ${reasons.join(', ')}` : ''),
+      ...creatorFields(row),
+    });
+  }
+
+  // A withdrawal and its reinstatement are two different moments of the same
+  // enrollment, so each one becomes its own event: the student left on the
+  // withdrawal date and came back on the day the reinstatement was recorded.
+  // The reason is joined without the soft-delete filter on purpose: the
+  // history must keep naming the reason that was in force when the student
+  // left, even after the catalog entry was deleted.
+  const withdrawalConditions = ['w.enrollment_id = $1', 'w.institution_id = $2'];
+  const withdrawalParams: any[] = [enrollmentId, institutionId];
+  let p = 3;
+  if (range.dateFrom) { withdrawalConditions.push(`w.withdrawal_date >= $${p++}`); withdrawalParams.push(range.dateFrom); }
+  if (range.dateTo)   { withdrawalConditions.push(`w.withdrawal_date <= $${p++}`); withdrawalParams.push(range.dateTo); }
+
+  const withdrawalRows = await AppDataSource.query(
+    `SELECT w.withdrawal_date::text AS "withdrawalDate",
+            w.notes,
+            w.created_at AS "createdAt",
+            wr.name AS "reasonName",
+            ${CREATOR_SELECT}
+       FROM student_withdrawals w
+       JOIN withdrawal_reasons wr ON wr.id = w.reason_id
+       LEFT JOIN users u ON u.id = w.withdrawn_by_user_id
+       LEFT JOIN roles r ON r.id = u.role_id
+      WHERE ${withdrawalConditions.join(' AND ')}
+      ORDER BY w.created_at ASC`,
+    withdrawalParams
+  );
+  for (const row of withdrawalRows) {
+    events.push({
+      type: 'withdrawal',
+      recordedAt: new Date(row.createdAt).toISOString(),
+      occurredAt: row.withdrawalDate,
+      title: 'Retiro',
+      description: `Motivo: ${row.reasonName}` + (row.notes ? `. Notas: ${row.notes}` : ''),
+      ...creatorFields(row),
+    });
+  }
+
+  // The reinstatement is filtered by the local day it happened on, the same
+  // way the enrollment event is: the moment it was recorded decides which day
+  // the student came back, not the UTC day of the timestamp.
+  const reinstatementConditions = [
+    'w.enrollment_id = $1',
+    'w.institution_id = $2',
+    'w.reverted_at IS NOT NULL',
+  ];
+  const reinstatementParams: any[] = [enrollmentId, institutionId];
+  let q = 3;
+  if (range.dateFrom) {
+    reinstatementConditions.push(`(w.reverted_at AT TIME ZONE '${LOCAL_TIME_ZONE}')::date::text >= $${q++}`);
+    reinstatementParams.push(range.dateFrom);
+  }
+  if (range.dateTo) {
+    reinstatementConditions.push(`(w.reverted_at AT TIME ZONE '${LOCAL_TIME_ZONE}')::date::text <= $${q++}`);
+    reinstatementParams.push(range.dateTo);
+  }
+
+  const reinstatementRows = await AppDataSource.query(
+    `SELECT w.reverted_at AS "revertedAt",
+            wr.name AS "reasonName",
+            ${CREATOR_SELECT}
+       FROM student_withdrawals w
+       JOIN withdrawal_reasons wr ON wr.id = w.reason_id
+       LEFT JOIN users u ON u.id = w.reverted_by_user_id
+       LEFT JOIN roles r ON r.id = u.role_id
+      WHERE ${reinstatementConditions.join(' AND ')}
+      ORDER BY w.reverted_at ASC`,
+    reinstatementParams
+  );
+  for (const row of reinstatementRows) {
+    const reinstatedAt = new Date(row.revertedAt).toISOString();
+    events.push({
+      type: 'reinstatement',
+      recordedAt: reinstatedAt,
+      occurredAt: reinstatedAt,
+      title: 'Reincorporación',
+      description: `Se reincorpora la matrícula. Motivo del retiro: ${row.reasonName}`,
       ...creatorFields(row),
     });
   }
