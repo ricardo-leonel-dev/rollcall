@@ -7,6 +7,7 @@ import { AcademicYear } from '../entities/AcademicYear';
 import { Guardian } from '../entities/Guardian';
 import { Absence } from '../entities/Absence';
 import { cascadeSoftDeleteAbsence } from './absence.service';
+import { recordEvents } from './domain-event.service';
 import { notWithdrawnSql, assertEnrollmentNotWithdrawn } from './enrollment-withdrawal';
 
 const repo = () => AppDataSource.getRepository(Enrollment);
@@ -19,24 +20,24 @@ export async function cascadeSoftDeleteEnrollment(em: EntityManager, enrollmentI
 
 async function assertOwnership(institutionId: number, courseIds: number[] | null, data: {
   studentId?: number; courseId?: number; academicYearId?: number; guardianId?: number | null;
-}) {
+}, em: EntityManager = AppDataSource.manager) {
   if (data.studentId !== undefined) {
-    const s = await AppDataSource.getRepository(Student).findOne({ where: { id: data.studentId, institutionId } });
+    const s = await em.getRepository(Student).findOne({ where: { id: data.studentId, institutionId } });
     if (!s) throw Object.assign(new Error('Student not found'), { status: 404 });
   }
   if (data.courseId !== undefined) {
     if (courseIds !== null && !courseIds.includes(data.courseId)) {
       throw Object.assign(new Error('Course not found'), { status: 404 });
     }
-    const c = await AppDataSource.getRepository(Course).findOne({ where: { id: data.courseId, institutionId } });
+    const c = await em.getRepository(Course).findOne({ where: { id: data.courseId, institutionId } });
     if (!c) throw Object.assign(new Error('Course not found'), { status: 404 });
   }
   if (data.academicYearId !== undefined) {
-    const ay = await AppDataSource.getRepository(AcademicYear).findOne({ where: { id: data.academicYearId, institutionId } });
+    const ay = await em.getRepository(AcademicYear).findOne({ where: { id: data.academicYearId, institutionId } });
     if (!ay) throw Object.assign(new Error('Academic year not found'), { status: 404 });
   }
   if (data.guardianId) {
-    const g = await AppDataSource.getRepository(Guardian).findOne({ where: { id: data.guardianId, institutionId } });
+    const g = await em.getRepository(Guardian).findOne({ where: { id: data.guardianId, institutionId } });
     if (!g) throw Object.assign(new Error('Guardian not found'), { status: 404 });
   }
 }
@@ -119,21 +120,97 @@ export async function create(institutionId: number, courseIds: number[] | null, 
   return repo().save(e);
 }
 
+// The audit snapshot carries the business fields only — the technical ones
+// (createdAt/updatedAt/deletedAt) would change the meaning of the record on
+// every later read.
+function enrollmentSnapshot(e: {
+  id: number; studentId: number; courseId: number; academicYearId: number;
+  guardianId: number | null; rosterNumber: number | null;
+  studentPhone: string | null; studentEmail: string | null; isActive: boolean;
+}) {
+  return {
+    id: e.id,
+    studentId: e.studentId,
+    courseId: e.courseId,
+    academicYearId: e.academicYearId,
+    guardianId: e.guardianId ?? null,
+    rosterNumber: e.rosterNumber ?? null,
+    studentPhone: e.studentPhone ?? null,
+    studentEmail: e.studentEmail ?? null,
+    isActive: e.isActive,
+  };
+}
+
+type EnrollmentSnapshot = ReturnType<typeof enrollmentSnapshot>;
+
+// Only the fields the snapshot carries count as a change: the audit trail
+// says what the edit touched, so a request that repeats the same values
+// leaves the enrollment exactly as it was for the trail.
+function enrollmentChanged(before: EnrollmentSnapshot, after: EnrollmentSnapshot): boolean {
+  return before.id !== after.id
+    || before.studentId !== after.studentId
+    || before.courseId !== after.courseId
+    || before.academicYearId !== after.academicYearId
+    || before.guardianId !== after.guardianId
+    || before.rosterNumber !== after.rosterNumber
+    || before.studentPhone !== after.studentPhone
+    || before.studentEmail !== after.studentEmail
+    || before.isActive !== after.isActive;
+}
+
 export async function update(institutionId: number, courseIds: number[] | null, id: number, data: Partial<{
   guardianId: number; rosterNumber: number;
   studentPhone: string; studentEmail: string; isActive: boolean;
-}>) {
-  const e = await findById(institutionId, courseIds, id);
-  await assertEnrollmentNotWithdrawn(id);
-  if (data.guardianId !== undefined) {
-    await assertOwnership(institutionId, courseIds, { guardianId: data.guardianId });
-    e.guardianId = data.guardianId;
-  }
-  if (data.rosterNumber !== undefined) e.rosterNumber = data.rosterNumber;
-  if (data.studentPhone !== undefined) e.studentPhone = data.studentPhone;
-  if (data.studentEmail !== undefined) e.studentEmail = data.studentEmail;
-  if (data.isActive !== undefined) e.isActive = data.isActive;
-  return repo().save(e);
+}>, actorUserId: number | null = null) {
+  // Course-scope check: an enrollment outside the caller's courses is a 404.
+  await findById(institutionId, courseIds, id);
+
+  // The row is read and written through the transaction's manager, so the
+  // audit event and the edit share one fate: a failing event insert rolls
+  // the edit back. The row lock serializes concurrent edits: each one reads
+  // the "before" the previous one left.
+  return AppDataSource.transaction(async (em) => {
+    const current = await em.findOne(Enrollment, {
+      where: { id, institutionId, deletedAt: IsNull() },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!current) throw Object.assign(new Error('Enrollment not found'), { status: 404 });
+
+    // Checked under the row lock: a withdrawal committed before the lock is
+    // seen here, so the edit and its event never land on a withdrawn
+    // enrollment. A rejection throws, rolling the transaction back.
+    await assertEnrollmentNotWithdrawn(id, em);
+    if (data.guardianId !== undefined) {
+      await assertOwnership(institutionId, courseIds, { guardianId: data.guardianId }, em);
+    }
+
+    const before = enrollmentSnapshot(current);
+
+    if (data.guardianId !== undefined) current.guardianId = data.guardianId;
+    if (data.rosterNumber !== undefined) current.rosterNumber = data.rosterNumber;
+    if (data.studentPhone !== undefined) current.studentPhone = data.studentPhone;
+    if (data.studentEmail !== undefined) current.studentEmail = data.studentEmail;
+    if (data.isActive !== undefined) current.isActive = data.isActive;
+
+    const after = enrollmentSnapshot(current);
+
+    await em.save(current);
+
+    // An edit that leaves the snapshot as it was leaves no audit trail: the
+    // event says what changed, and nothing changed.
+    if (enrollmentChanged(before, after)) {
+      await recordEvents(em, [{
+        institutionId,
+        eventType: 'EnrollmentUpdated',
+        entityType: 'enrollment',
+        entityId: id,
+        actorUserId,
+        payload: { before, after },
+      }]);
+    }
+
+    return current;
+  });
 }
 
 export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
