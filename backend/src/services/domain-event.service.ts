@@ -3,6 +3,7 @@ import { AppDataSource } from '../data-source';
 
 export type DomainEventType =
   | 'AbsenceRecorded'
+  | 'AbsenceUpdated'
   | 'AbsenceDeleted'
   | 'JustificationCreated'
   | 'JustificationDeleted'
