@@ -5,6 +5,10 @@ export type DomainEventType =
   | 'AbsenceRecorded'
   | 'AbsenceUpdated'
   | 'AbsenceDeleted'
+  | 'CitationCreated'
+  | 'CitationUpdated'
+  | 'CitationClosed'
+  | 'CitationDeleted'
   | 'EnrollmentCreated'
   | 'EnrollmentUpdated'
   | 'EnrollmentDeleted'
@@ -18,7 +22,7 @@ export type DomainEventType =
 export interface DomainEventInput {
   institutionId: number;
   eventType: DomainEventType;
-  entityType: 'absence' | 'enrollment' | 'justification' | 'student_withdrawal';
+  entityType: 'absence' | 'citation' | 'enrollment' | 'justification' | 'student_withdrawal';
   entityId: number;
   actorUserId: number | null;
   payload: { before: Record<string, unknown> | null; after: Record<string, unknown> | null } & Record<string, unknown>;
