@@ -1,11 +1,12 @@
 import { AppDataSource } from '../data-source';
-import { In, IsNull } from 'typeorm';
+import { EntityManager, In, IsNull } from 'typeorm';
 import { Citation } from '../entities/Citation';
 import { CitationCitationReason } from '../entities/CitationCitationReason';
 import { CitationAttachment } from '../entities/CitationAttachment';
 import { CitationReason } from '../entities/CitationReason';
 import { Enrollment } from '../entities/Enrollment';
 import { notWithdrawnSql, visibleRecordSql, assertEnrollmentNotWithdrawn } from './enrollment-withdrawal';
+import { recordEvents } from './domain-event.service';
 import fs from 'fs';
 import path from 'path';
 
@@ -103,6 +104,60 @@ async function findOwned(institutionId: number, courseIds: number[] | null, id: 
   if (!c) throw Object.assign(new Error('Citation not found'), { status: 404 });
   if (courseIds !== null) await assertEnrollmentInScope(institutionId, courseIds, c.enrollmentId);
   return c;
+}
+
+type CitationSnapshot = {
+  id: number;
+  enrollmentId: number;
+  guardianId: number | null;
+  date: string;
+  time: string;
+  status: string;
+  observations: string | null;
+  reasonIds: number[];
+};
+
+// The snapshot is read from the row itself: the stored values are the
+// canonical ones, so an edit that repeats the current value is not read as a
+// change ('07:55' and '07:55:00' are the same moment). The reasons come
+// sorted, so the order of the request does not make a relinking look like a
+// change.
+async function citationState(em: EntityManager, id: number): Promise<CitationSnapshot> {
+  const [row] = await em.query(
+    `SELECT c.id, c.enrollment_id AS "enrollmentId", c.guardian_id AS "guardianId",
+            c.date::text AS date, c.time::text AS time, c.status, c.observations,
+            COALESCE((
+              SELECT json_agg(ccr.citation_reason_id ORDER BY ccr.citation_reason_id)
+              FROM citation_citation_reasons ccr WHERE ccr.citation_id = c.id
+            ), '[]') AS "reasonIds"
+       FROM citations c WHERE c.id = $1`,
+    [id],
+  );
+  return {
+    id: Number(row.id),
+    enrollmentId: Number(row.enrollmentId),
+    guardianId: row.guardianId === null ? null : Number(row.guardianId),
+    date: row.date,
+    time: row.time,
+    status: row.status,
+    observations: row.observations ?? null,
+    reasonIds: (row.reasonIds as unknown[]).map(Number),
+  };
+}
+
+// Only the fields the snapshot carries count as a change: the audit trail
+// says what the edit touched, so a request that repeats the same values
+// leaves the citation exactly as it was for the trail.
+function citationChanged(before: CitationSnapshot, after: CitationSnapshot): boolean {
+  return before.id !== after.id
+    || before.enrollmentId !== after.enrollmentId
+    || before.guardianId !== after.guardianId
+    || before.date !== after.date
+    || before.time !== after.time
+    || before.status !== after.status
+    || before.observations !== after.observations
+    || before.reasonIds.length !== after.reasonIds.length
+    || before.reasonIds.some((reasonId, i) => reasonId !== after.reasonIds[i]);
 }
 
 export async function findRoster(institutionId: number, courseIds: number[] | null, courseId: number, academicYearId: number) {
@@ -209,17 +264,33 @@ export async function create(institutionId: number, courseIds: number[] | null, 
     for (const reasonId of reasonIds) {
       await em.save(em.create(CitationCitationReason, { citationId: saved.id, citationReasonId: reasonId }));
     }
+
+    // The citation and the audit event that describes it are written on the
+    // same transaction: the event exists if and only if the citation was
+    // created, and a failing event insert rolls the citation back.
+    const after = await citationState(em, saved.id);
+    await recordEvents(em, [{
+      institutionId,
+      eventType: 'CitationCreated',
+      entityType: 'citation',
+      entityId: saved.id,
+      actorUserId: createdByUserId,
+      payload: { before: null, after },
+    }]);
+
     return saved;
   });
 }
 
 export async function update(institutionId: number, courseIds: number[] | null, id: number, data: Partial<{
   date: string; time: string | null; observations: string | null; reasonIds: unknown;
-}>) {
+}>, actorUserId: number | null = null) {
   if (data.time !== undefined && !data.time) {
     throw Object.assign(new Error('El campo time no puede estar vacío'), { status: 400 });
   }
 
+  // The checks stay outside the transaction: a rejected edit must leave no
+  // trace. The row and its reasons are read again under the row lock.
   const c = await findOwned(institutionId, courseIds, id);
   await assertEnrollmentNotWithdrawn(c.enrollmentId);
 
@@ -233,38 +304,126 @@ export async function update(institutionId: number, courseIds: number[] | null, 
 
   const reasonIds = data.reasonIds !== undefined ? await assertReasonIds(institutionId, data.reasonIds) : undefined;
 
-  if (data.date !== undefined) c.date = data.date;
-  if (data.time !== undefined) c.time = data.time;
-  if (data.observations !== undefined) c.observations = data.observations;
+  // The values the request carries, taken out of the request: the narrowing
+  // of the guard above does not survive inside the transaction.
+  const newDate = data.date;
+  const newTime = data.time;
+  const newObservations = data.observations;
 
+  // The row and its reasons are read and written through the transaction's
+  // manager, so the audit event and the edit share one fate: a failing event
+  // insert rolls the edit and the relinking back. The row lock serializes
+  // concurrent edits: each one reads the "before" the previous one left.
   return AppDataSource.transaction(async (em) => {
-    await em.save(c);
+    const current = await em.findOne(Citation, {
+      where: { id, institutionId, deletedAt: IsNull() },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!current) throw Object.assign(new Error('Citation not found'), { status: 404 });
+
+    const before = await citationState(em, id);
+
+    if (newDate !== undefined) current.date = newDate;
+    if (newTime !== undefined) current.time = newTime;
+    if (newObservations !== undefined) current.observations = newObservations;
+
+    await em.save(current);
+
     if (reasonIds !== undefined) {
       await em.delete(CitationCitationReason, { citationId: id });
       for (const reasonId of reasonIds) {
         await em.save(em.create(CitationCitationReason, { citationId: id, citationReasonId: reasonId }));
       }
     }
-    return c;
+
+    const after = await citationState(em, id);
+
+    // An edit that leaves the snapshot as it was leaves no audit trail: the
+    // event says what changed, and nothing changed.
+    if (citationChanged(before, after)) {
+      await recordEvents(em, [{
+        institutionId,
+        eventType: 'CitationUpdated',
+        entityType: 'citation',
+        entityId: id,
+        actorUserId,
+        payload: { before, after },
+      }]);
+    }
+
+    return current;
   });
 }
 
 export async function close(institutionId: number, courseIds: number[] | null, id: number, closedByUserId: number | null) {
   const c = await findOwned(institutionId, courseIds, id);
   await assertEnrollmentNotWithdrawn(c.enrollmentId);
-  if (c.status === 'closed') {
-    throw Object.assign(new Error('La citación ya está cerrada'), { status: 409 });
-  }
-  c.status = 'closed';
-  c.closedAt = new Date();
-  c.closedByUserId = closedByUserId;
-  return repo().save(c);
+
+  // The row is read and written through the transaction's manager, so the
+  // audit event and the closing share one fate: a failing event insert rolls
+  // the closing back. The row lock serializes concurrent closings: only the
+  // first one finds the citation open.
+  return AppDataSource.transaction(async (em) => {
+    const current = await em.findOne(Citation, {
+      where: { id, institutionId, deletedAt: IsNull() },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!current) throw Object.assign(new Error('Citation not found'), { status: 404 });
+    if (current.status === 'closed') {
+      throw Object.assign(new Error('La citación ya está cerrada'), { status: 409 });
+    }
+
+    const before = await citationState(em, id);
+
+    current.status = 'closed';
+    current.closedAt = new Date();
+    current.closedByUserId = closedByUserId;
+
+    await em.save(current);
+
+    const after = await citationState(em, id);
+
+    await recordEvents(em, [{
+      institutionId,
+      eventType: 'CitationClosed',
+      entityType: 'citation',
+      entityId: id,
+      actorUserId: closedByUserId,
+      payload: { before, after },
+    }]);
+
+    return current;
+  });
 }
 
-export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
+export async function remove(institutionId: number, courseIds: number[] | null, id: number, actorUserId: number | null = null) {
   const c = await findOwned(institutionId, courseIds, id);
   await assertEnrollmentNotWithdrawn(c.enrollmentId);
-  await repo().update({ id }, { deletedAt: new Date(), isActive: false });
+
+  // The row is read and written through the transaction's manager, so the
+  // audit event and the delete share one fate: a failing event insert rolls
+  // the delete back. The row lock serializes concurrent deletes and keeps the
+  // snapshot in step with the state the delete removed.
+  await AppDataSource.transaction(async (em) => {
+    const current = await em.findOne(Citation, {
+      where: { id, institutionId, deletedAt: IsNull() },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!current) throw Object.assign(new Error('Citation not found'), { status: 404 });
+
+    const before = await citationState(em, id);
+
+    await em.update(Citation, { id }, { deletedAt: new Date(), isActive: false });
+
+    await recordEvents(em, [{
+      institutionId,
+      eventType: 'CitationDeleted',
+      entityType: 'citation',
+      entityId: id,
+      actorUserId,
+      payload: { before, after: null },
+    }]);
+  });
 }
 
 export async function addAttachments(institutionId: number, courseIds: number[] | null, citationId: number, files: Express.Multer.File[]) {
