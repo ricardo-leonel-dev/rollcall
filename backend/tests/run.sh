@@ -26,6 +26,7 @@ rm -rf /tmp/test-build
   tests/justification-updated-event.test.ts \
   tests/absence-update.test.ts \
   tests/enrollment-updated-event.test.ts \
+  tests/enrollment-lifecycle-events.test.ts \
   tests/drop-enrollment-is-enrolled.test.ts \
   tests/course-section.test.ts \
   tests/student-history-timeline.test.ts \
@@ -46,6 +47,7 @@ NODE_PATH="$(pwd)/node_modules" exec node --test --test-concurrency=1 \
   /tmp/test-build/tests/justification-updated-event.test.js \
   /tmp/test-build/tests/absence-update.test.js \
   /tmp/test-build/tests/enrollment-updated-event.test.js \
+  /tmp/test-build/tests/enrollment-lifecycle-events.test.js \
   /tmp/test-build/tests/drop-enrollment-is-enrolled.test.js \
   /tmp/test-build/tests/course-section.test.js \
   /tmp/test-build/tests/student-history-timeline.test.js

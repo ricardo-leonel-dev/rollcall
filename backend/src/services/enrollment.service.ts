@@ -91,39 +91,10 @@ export async function findById(institutionId: number, courseIds: number[] | null
   return e;
 }
 
-export async function create(institutionId: number, courseIds: number[] | null, data: {
-  studentId: number; courseId: number; academicYearId: number;
-  guardianId?: number; rosterNumber?: number;
-  studentPhone?: string; studentEmail?: string;
-}, createdByUserId: number | null = null) {
-  await assertOwnership(institutionId, courseIds, data);
-  if (!data.rosterNumber) {
-    const [row] = await AppDataSource.query(
-      `SELECT COALESCE(MAX(roster_number), 0) + 1 AS next
-         FROM enrollments
-        WHERE course_id = $1 AND academic_year_id = $2 AND deleted_at IS NULL`,
-      [data.courseId, data.academicYearId]
-    );
-    data.rosterNumber = Number(row.next);
-  }
-  const e = repo().create({
-    studentId: data.studentId,
-    courseId: data.courseId,
-    academicYearId: data.academicYearId,
-    guardianId: data.guardianId ?? null,
-    rosterNumber: data.rosterNumber,
-    studentPhone: data.studentPhone ?? null,
-    studentEmail: data.studentEmail ?? null,
-    institutionId,
-    createdByUserId,
-  });
-  return repo().save(e);
-}
-
 // The audit snapshot carries the business fields only — the technical ones
 // (createdAt/updatedAt/deletedAt) would change the meaning of the record on
 // every later read.
-function enrollmentSnapshot(e: {
+export function enrollmentSnapshot(e: {
   id: number; studentId: number; courseId: number; academicYearId: number;
   guardianId: number | null; rosterNumber: number | null;
   studentPhone: string | null; studentEmail: string | null; isActive: boolean;
@@ -139,6 +110,51 @@ function enrollmentSnapshot(e: {
     studentEmail: e.studentEmail ?? null,
     isActive: e.isActive,
   };
+}
+
+export async function create(institutionId: number, courseIds: number[] | null, data: {
+  studentId: number; courseId: number; academicYearId: number;
+  guardianId?: number; rosterNumber?: number;
+  studentPhone?: string; studentEmail?: string;
+}, createdByUserId: number | null = null) {
+  await assertOwnership(institutionId, courseIds, data);
+  // The enrollment and the audit event that describes it are written on the
+  // same transaction: the event exists if and only if the enrollment was
+  // created, and a failing event insert rolls the enrollment back.
+  return AppDataSource.transaction(async (em) => {
+    if (!data.rosterNumber) {
+      const [row] = await em.query(
+        `SELECT COALESCE(MAX(roster_number), 0) + 1 AS next
+           FROM enrollments
+          WHERE course_id = $1 AND academic_year_id = $2 AND deleted_at IS NULL`,
+        [data.courseId, data.academicYearId]
+      );
+      data.rosterNumber = Number(row.next);
+    }
+    const e = em.create(Enrollment, {
+      studentId: data.studentId,
+      courseId: data.courseId,
+      academicYearId: data.academicYearId,
+      guardianId: data.guardianId ?? null,
+      rosterNumber: data.rosterNumber,
+      studentPhone: data.studentPhone ?? null,
+      studentEmail: data.studentEmail ?? null,
+      institutionId,
+      createdByUserId,
+    });
+    const saved = await em.save(e);
+
+    await recordEvents(em, [{
+      institutionId,
+      eventType: 'EnrollmentCreated',
+      entityType: 'enrollment',
+      entityId: saved.id,
+      actorUserId: createdByUserId,
+      payload: { before: null, after: enrollmentSnapshot(saved) },
+    }]);
+
+    return saved;
+  });
 }
 
 type EnrollmentSnapshot = ReturnType<typeof enrollmentSnapshot>;
@@ -213,8 +229,35 @@ export async function update(institutionId: number, courseIds: number[] | null, 
   });
 }
 
-export async function remove(institutionId: number, courseIds: number[] | null, id: number) {
+export async function remove(institutionId: number, courseIds: number[] | null, id: number, actorUserId: number | null = null) {
   await findById(institutionId, courseIds, id);
-  await assertEnrollmentNotWithdrawn(id);
-  await AppDataSource.transaction(em => cascadeSoftDeleteEnrollment(em, id));
+  // The row is read and written through the transaction's manager, so the
+  // audit event and the delete share one fate: a failing event insert rolls
+  // the delete back. The row lock serializes concurrent deletes and keeps the
+  // snapshot in step with the state the delete removed.
+  await AppDataSource.transaction(async (em) => {
+    const current = await em.findOne(Enrollment, {
+      where: { id, institutionId, deletedAt: IsNull() },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!current) throw Object.assign(new Error('Enrollment not found'), { status: 404 });
+
+    // Checked under the row lock: a withdrawal committed before the lock is
+    // seen here, so the delete and its event never land on a withdrawn
+    // enrollment. A rejection throws, rolling the transaction back.
+    await assertEnrollmentNotWithdrawn(id, em);
+
+    const before = enrollmentSnapshot(current);
+
+    await cascadeSoftDeleteEnrollment(em, id);
+
+    await recordEvents(em, [{
+      institutionId,
+      eventType: 'EnrollmentDeleted',
+      entityType: 'enrollment',
+      entityId: id,
+      actorUserId,
+      payload: { before, after: null },
+    }]);
+  });
 }
